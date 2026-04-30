@@ -238,7 +238,11 @@ export async function dev(
         bootstrapPath,
         [
           `const bundle = require(${JSON.stringify(serverBundlePath)});`,
-          `const handler = typeof bundle.default === "function" ? bundle.default : (bundle.app ? bundle.app.fetch : bundle.createApp().fetch);`,
+          `let handler = bundle.default && bundle.default.fetch ? bundle.default.fetch : null;`,
+          `if (!handler) {`,
+          `  const { createApp } = require("@evjs/server");`,
+          `  handler = createApp().fetch;`,
+          `}`,
           `const { serve } = require("@evjs/server/node");`,
           `serve({ fetch: handler }, { port: ${serverPort}, https: ${JSON.stringify(config.server.dev.https)} });`,
         ].join("\n"),
