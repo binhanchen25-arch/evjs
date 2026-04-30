@@ -4,7 +4,17 @@ const test = createExampleTest("sqlite-server-fns");
 
 test.describe("sqlite-server-fns", () => {
   test("displays heading and seeded users", async ({ page, baseURL }) => {
+    const responsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.goto(baseURL);
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.result).toBeDefined();
+    expect(Array.isArray(data.result)).toBe(true);
+    expect(data.result.length).toBeGreaterThanOrEqual(3);
 
     await expect(page.getByText("SQLite Server Functions")).toBeVisible({
       timeout: 10_000,
@@ -54,7 +64,16 @@ test.describe("sqlite-server-fns", () => {
     const uniqueName = `User ${Date.now()}`;
     await page.fill('[placeholder="Name"]', uniqueName);
     await page.fill('[placeholder="Email"]', `e2e-${Date.now()}@example.com`);
+    const createResponsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.click('button[type="submit"]');
+    const createResponse = await createResponsePromise;
+    expect(createResponse.status()).toBe(200);
+    const createData = await createResponse.json();
+    expect(createData.result).toBeDefined();
+    expect(createData.result.name).toBe(uniqueName);
 
     // Verify new user appears
     await expect(

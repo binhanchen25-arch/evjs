@@ -7,7 +7,17 @@ test.describe("basic-server-fns", () => {
     page,
     baseURL,
   }) => {
+    const responsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.goto(baseURL);
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.result).toBeDefined();
+    expect(Array.isArray(data.result)).toBe(true);
+    expect(data.result.length).toBeGreaterThanOrEqual(3);
 
     // Wait for loading to finish
     await expect(page.getByText("Loading users")).not.toBeVisible({
@@ -29,7 +39,17 @@ test.describe("basic-server-fns", () => {
     // Fill the create user form
     await page.fill('[placeholder="Name"]', "Dave");
     await page.fill('[placeholder="Email"]', "dave@example.com");
+    const createResponsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.click('button[type="submit"]');
+    const createResponse = await createResponsePromise;
+    expect(createResponse.status()).toBe(200);
+    const createData = await createResponse.json();
+    expect(createData.result).toBeDefined();
+    expect(createData.result.name).toBe("Dave");
+    expect(createData.result.email).toBe("dave@example.com");
 
     // Verify new user appears
     await expect(page.getByText("Dave")).toBeVisible({ timeout: 5_000 });

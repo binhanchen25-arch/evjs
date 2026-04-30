@@ -164,6 +164,43 @@ function PostsPage() {
 
       <h3 style={{ marginTop: "1.5rem" }}>Health Check</h3>
       <HealthCheck />
+
+      <h3 style={{ marginTop: "1.5rem" }}>Server Function Check</h3>
+      <ServerFunctionCheck />
+    </div>
+  );
+}
+
+function ServerFunctionCheck() {
+  const [message, setMessage] = useState<string>("");
+
+  async function checkServerFn() {
+    const { sayHello } = await import("../api/demo.server");
+    const result = await sayHello("World");
+    setMessage(result);
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={checkServerFn}
+        style={{ padding: "0.5rem", cursor: "pointer" }}
+      >
+        Call sayHello("World")
+      </button>
+      {message && (
+        <pre
+          style={{
+            background: "#f5f5f5",
+            padding: "0.75rem",
+            borderRadius: 4,
+            marginTop: "0.5rem",
+          }}
+        >
+          {message}
+        </pre>
+      )}
     </div>
   );
 }

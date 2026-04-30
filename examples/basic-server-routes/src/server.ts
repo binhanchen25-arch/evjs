@@ -6,6 +6,8 @@ import { createApp } from "@evjs/server";
 import { healthHandler } from "./api/health.routes";
 import { postHandler, postsHandler } from "./api/posts.routes";
 
-export const app = createApp({
+const app = createApp({
   routes: [healthHandler, postsHandler, postHandler],
 });
+
+export default app.fetch;

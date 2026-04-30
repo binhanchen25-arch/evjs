@@ -8,6 +8,18 @@ export interface ServerEntryConfig {
    * Middleware module paths to auto-register in the server entry.
    */
   middleware?: string[];
+  /**
+   * Server function endpoint path.
+   */
+  endpoint?: string;
+}
+
+/** Information about a discovered server route module. */
+export interface RouteModuleInfo {
+  /** Absolute path to the route module file. */
+  path: string;
+  /** Exported names of the route handlers. */
+  exports: string[];
 }
 
 /** Options for transforming a "use server" file. */

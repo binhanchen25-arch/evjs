@@ -225,9 +225,9 @@ export function createExampleTest(exampleName: string) {
           bootstrapPath,
           [
             `const bundle = require(${JSON.stringify(serverEntryPath)});`,
-            `const app = bundle.app || bundle.createApp();`,
+            `const handler = typeof bundle.default === "function" ? bundle.default : (bundle.app ? bundle.app.fetch : bundle.createApp().fetch);`,
             `const { serve } = require("@hono/node-server");`,
-            `serve({ fetch: app.fetch, port: ${apiPort} }, (info) => {`,
+            `serve({ fetch: handler, port: ${apiPort} }, (info) => {`,
             `  console.log("E2E_SERVER_READY:" + info.port);`,
             `});`,
           ].join("\n"),

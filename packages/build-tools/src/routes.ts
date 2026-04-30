@@ -44,6 +44,65 @@ export function extractRoutes(source: string): ExtractedRoute[] {
   return routes;
 }
 
+/**
+ * Detect server route handlers exported from this file.
+ * Returns the exported variable names, or null if this is not a server route file
+ * (i.e., it doesn't import `createRoute` from `@evjs/server`).
+ */
+export function detectServerRouteExports(source: string): string[] | null {
+  let ast: ReturnType<typeof parseSync>;
+  try {
+    ast = parseSync(source, {
+      syntax: "typescript",
+      tsx: true,
+      target: "esnext",
+    });
+  } catch {
+    return null;
+  }
+
+  let hasServerImport = false;
+
+  for (const item of ast.body) {
+    if (item.type === "ImportDeclaration") {
+      if (item.source.value === "@evjs/server") {
+        for (const spec of item.specifiers) {
+          if (
+            spec.type === "ImportSpecifier" &&
+            spec.local.value === "createRoute"
+          ) {
+            hasServerImport = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (!hasServerImport) return null;
+
+  const exports: string[] = [];
+
+  for (const item of ast.body) {
+    if (item.type === "ExportDeclaration") {
+      const decl = item.declaration;
+      if (decl.type === "VariableDeclaration") {
+        for (const d of decl.declarations) {
+          if (
+            d.init &&
+            isCreateRouteCall(d.init) &&
+            d.id.type === "Identifier"
+          ) {
+            exports.push(d.id.value);
+          }
+        }
+      }
+    }
+  }
+
+  return exports;
+}
+
 /** Walk a top-level module item looking for createRoute calls. */
 function collectFromItem(item: ModuleItem, routes: ExtractedRoute[]): void {
   // export const fooRoute = createRoute({ ... })

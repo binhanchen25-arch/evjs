@@ -17,6 +17,24 @@ export interface ResolvedDevConfig {
   port: number;
   /** HTTPS configuration. */
   https: boolean | { key: string; cert: string };
+  /** Dev proxy rules. */
+  proxy: DevProxyRule[];
+}
+
+/** Resolved server functions build configuration. */
+export interface ResolvedServerFunctionsConfig {
+  /** Client-side transport module for server function stubs. */
+  clientProxy: string;
+  /** Server-side registration module for server functions. */
+  serverRegister: string;
+}
+
+/** Proxy rule for the dev server. */
+export interface DevProxyRule {
+  context: string[];
+  target: string;
+  changeOrigin?: boolean;
+  secure?: boolean;
 }
 
 /** Resolved server dev configuration (all defaults applied). */
@@ -31,10 +49,8 @@ export interface ResolvedServerDevConfig {
 export interface ResolvedServerConfig {
   /** Explicit server entry file. Omitted when auto-generated. */
   entry?: string;
-  /** Server runtime command. */
-  runtime: string;
-  /** Server function endpoint path. */
-  endpoint: string;
+  /** Server function build configuration. */
+  functions: ResolvedServerFunctionsConfig;
   /** Server dev options. */
   dev: ResolvedServerDevConfig;
 }
@@ -97,6 +113,12 @@ export interface EvConfig<TBundlerCfg = unknown> {
     port?: number;
     /** Enable HTTPS. If an object is provided, it can be explicit key/cert PEM strings or file paths. */
     https?: boolean | { key: string; cert: string };
+    /**
+     * Dev proxy configuration.
+     * Configures the client dev server to proxy requests to backend services.
+     * Defaults to forwarding DEFAULT_ENDPOINT ("/api/fn") to the local API dev server.
+     */
+    proxy?: DevProxyRule[];
   };
 
   /**
@@ -111,10 +133,19 @@ export interface EvConfig<TBundlerCfg = unknown> {
     | {
         /** Explicit server entry file. If provided, overrides auto-generated entry. */
         entry?: string;
-        /** Server runtime command. Default: "node". */
-        runtime?: string;
-        /** Server function endpoint path. Default: "/api/fn". */
-        endpoint?: string;
+        /** Server function build configuration. */
+        functions?: {
+          /**
+           * Client-side transport module for server function stubs.
+           * Default: "@evjs/client/transport".
+           */
+          clientProxy?: string;
+          /**
+           * Server-side registration module for server functions.
+           * Default: "@evjs/server/register".
+           */
+          serverRegister?: string;
+        };
         /** Server dev options. */
         dev?: {
           /** API server port (dev mode). Default: 3001. */
@@ -163,7 +194,8 @@ export const CONFIG_DEFAULTS = {
   html: "./index.html",
   port: 3000,
   serverPort: 3001,
-  endpoint: DEFAULT_ENDPOINT,
+  clientProxy: "@evjs/client/transport",
+  serverRegister: "@evjs/server/register",
 } as const;
 
 /**
@@ -195,6 +227,8 @@ export function resolveConfig<TBundlerCfg = unknown>(
     }
   }
 
+  const serverPort = serverConfig.dev?.port ?? CONFIG_DEFAULTS.serverPort;
+
   return {
     assetPrefix,
     entry: config.entry ?? CONFIG_DEFAULTS.entry,
@@ -203,14 +237,30 @@ export function resolveConfig<TBundlerCfg = unknown>(
     dev: {
       port: config.dev?.port ?? CONFIG_DEFAULTS.port,
       https: config.dev?.https ?? false,
+      proxy: [
+        // User-defined proxies take precedence
+        ...(config.dev?.proxy ?? []),
+        // Framework always proxies the server function endpoint to the local API dev server
+        {
+          context: [DEFAULT_ENDPOINT],
+          target: `http${serverConfig.dev?.https ? "s" : ""}://localhost:${serverPort}`,
+          changeOrigin: true,
+          secure: false,
+        },
+      ],
     },
     serverEnabled,
     server: {
       entry: serverConfig.entry,
-      runtime: serverConfig.runtime ?? "node",
-      endpoint: serverConfig.endpoint ?? CONFIG_DEFAULTS.endpoint,
+      functions: {
+        clientProxy:
+          serverConfig.functions?.clientProxy ?? CONFIG_DEFAULTS.clientProxy,
+        serverRegister:
+          serverConfig.functions?.serverRegister ??
+          CONFIG_DEFAULTS.serverRegister,
+      },
       dev: {
-        port: serverConfig.dev?.port ?? CONFIG_DEFAULTS.serverPort,
+        port: serverPort,
         https: serverConfig.dev?.https ?? false,
       },
     },

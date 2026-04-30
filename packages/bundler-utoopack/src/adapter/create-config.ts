@@ -6,11 +6,7 @@
  * `server.functions.callServerModule` config field.
  */
 
-import { createRequire } from "node:module";
 import path from "node:path";
-
-const _require = createRequire(import.meta.url);
-
 import {
   type EvBundlerCtx,
   type EvPluginHooks,
@@ -27,13 +23,19 @@ import type { ConfigComplete } from "@utoo/pack";
  * @param hooks - Plugin lifecycle hooks
  * @returns A config object suitable for `@utoo/pack`'s `build()` / `dev()` API
  */
-export function createUtoopackConfig(
+export async function createUtoopackConfig(
   config: ResolvedEvConfig<ConfigComplete>,
   cwd: string,
   hooks: EvPluginHooks<ConfigComplete>[],
-): ConfigComplete {
+): Promise<ConfigComplete> {
   const isProduction = process.env.NODE_ENV === "production";
   const serverEnabled = config.serverEnabled;
+
+  let finalServerEntry: string | undefined;
+
+  if (serverEnabled) {
+    finalServerEntry = config.server.entry || "@evjs/server/app";
+  }
 
   const utoopackConfig: ConfigComplete = {
     mode: isProduction ? "production" : "development",
@@ -67,7 +69,7 @@ export function createUtoopackConfig(
     ...(serverEnabled
       ? {
           server: {
-            entry: config.server.entry ?? _require.resolve("@evjs/server/app"),
+            entry: finalServerEntry!,
             output: {
               path: path.resolve(cwd, "dist/server"),
               filename: isProduction
@@ -78,8 +80,8 @@ export function createUtoopackConfig(
                 : "[name].js",
             },
             function: {
-              clientProxy: "@evjs/client/transport",
-              serverRegister: "@evjs/server/register",
+              clientProxy: config.server.functions.clientProxy,
+              serverRegister: config.server.functions.serverRegister,
             },
           },
         }
@@ -88,18 +90,7 @@ export function createUtoopackConfig(
     // Dev server configuration
     devServer: {
       hot: true,
-      ...(serverEnabled
-        ? {
-            proxy: [
-              {
-                context: [config.server.endpoint],
-                target: `${config.server.dev.https ? "https" : "http"}://localhost:${config.server.dev.port}`,
-                changeOrigin: true,
-                secure: false,
-              },
-            ],
-          }
-        : {}),
+      proxy: config.dev.proxy,
     },
   };
 

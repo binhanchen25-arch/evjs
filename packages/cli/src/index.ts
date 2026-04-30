@@ -225,9 +225,7 @@ export async function dev(
     }
 
     const serverPort = config?.server?.dev?.port ?? CONFIG_DEFAULTS.serverPort;
-    const runtimeConfig = config?.server?.runtime ?? "node";
-    const [runtime, ...runtimeExtraArgs] = runtimeConfig.split(/\s+/);
-    logger.info`Server bundle detected, starting ${runtime} API...`;
+    logger.info`Server bundle detected, starting API...`;
 
     const bootstrapPath = path.resolve(cwd, "dist/server/_dev_start.cjs");
     try {
@@ -240,25 +238,16 @@ export async function dev(
         bootstrapPath,
         [
           `const bundle = require(${JSON.stringify(serverBundlePath)});`,
-          `const app = bundle.app || bundle.createApp({ functions: { endpoint: ${JSON.stringify(config.server.endpoint)} } });`,
+          `const handler = typeof bundle.default === "function" ? bundle.default : (bundle.app ? bundle.app.fetch : bundle.createApp().fetch);`,
           `const { serve } = require("@evjs/server/node");`,
-          `serve(app, { port: ${serverPort}, https: ${JSON.stringify(config.server.dev.https)} });`,
+          `serve({ fetch: handler }, { port: ${serverPort}, https: ${JSON.stringify(config.server.dev.https)} });`,
         ].join("\n"),
       );
 
-      // node gets --watch flags; other runtimes use their own args as-is
-      const runtimeArgs =
-        runtime === "node"
-          ? [
-              "--watch",
-              "--watch-preserve-output",
-              ...runtimeExtraArgs,
-              bootstrapPath,
-            ]
-          : [...runtimeExtraArgs, bootstrapPath];
+      const runtimeArgs = [bootstrapPath];
 
       // Don't await execa here since it's a long-running watch process
-      const child = execa(runtime, runtimeArgs, {
+      const child = execa("node", runtimeArgs, {
         stdio: "inherit",
         env: { ...process.env, NODE_ENV: "development" },
       });

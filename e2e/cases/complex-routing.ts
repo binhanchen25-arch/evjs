@@ -103,7 +103,17 @@ test.describe("complex-routing", () => {
     page,
     baseURL,
   }) => {
+    const dashboardPromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.goto(`${baseURL}/dashboard`);
+    const dashboardResponse = await dashboardPromise;
+    expect(dashboardResponse.status()).toBe(200);
+    const dashboardData = await dashboardResponse.json();
+    expect(dashboardData.result).toBeDefined();
+    expect(dashboardData.result.totalPosts).toBeDefined();
+    expect(dashboardData.result.totalAuthors).toBeDefined();
 
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({
       timeout: 10_000,

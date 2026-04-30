@@ -7,7 +7,18 @@ test.describe("configured-server-fns", () => {
     page,
     baseURL,
   }) => {
+    const responsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/rpc/server-fn") &&
+        res.request().method() === "POST",
+    );
     await page.goto(baseURL);
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.result).toBeDefined();
+    expect(Array.isArray(data.result)).toBe(true);
+    expect(data.result.length).toBeGreaterThanOrEqual(3);
 
     // Wait for loading to finish
     await expect(page.getByText("Loading users")).not.toBeVisible({
@@ -29,7 +40,17 @@ test.describe("configured-server-fns", () => {
     // Fill and submit the create user form
     await page.fill('[placeholder="Name"]', "Eve");
     await page.fill('[placeholder="Email"]', "eve@example.com");
+    const createResponsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/rpc/server-fn") &&
+        res.request().method() === "POST",
+    );
     await page.click('button:has-text("Create")');
+    const createResponse = await createResponsePromise;
+    expect(createResponse.status()).toBe(200);
+    const createData = await createResponse.json();
+    expect(createData.result).toBeDefined();
+    expect(createData.result.name).toBe("Eve");
 
     // Form should clear after successful mutation
     await expect(page.locator('[placeholder="Name"]')).toHaveValue("", {

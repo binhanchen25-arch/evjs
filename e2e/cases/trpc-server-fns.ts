@@ -15,7 +15,15 @@ test.describe("trpc-server-fns", () => {
   });
 
   test("tRPC section loads data", async ({ page, baseURL }) => {
+    const trpcPromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/trpc") && res.request().method() === "GET",
+    );
     await page.goto(baseURL);
+    const trpcResponse = await trpcPromise;
+    expect(trpcResponse.status()).toBe(200);
+    const trpcData = await trpcResponse.json();
+    expect(trpcData.result).toBeDefined();
 
     // Wait for tRPC section heading
     await expect(page.getByText("1. tRPC Call")).toBeVisible({
@@ -40,7 +48,14 @@ test.describe("trpc-server-fns", () => {
   test("refresh button is visible", async ({ page, baseURL }) => {
     await page.goto(baseURL);
 
+    const refreshPromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     const refreshButton = page.getByText("Refresh All");
+    await refreshButton.click();
+    const refreshResponse = await refreshPromise;
+    expect(refreshResponse.status()).toBe(200);
     await expect(refreshButton).toBeVisible({ timeout: 10_000 });
   });
 });

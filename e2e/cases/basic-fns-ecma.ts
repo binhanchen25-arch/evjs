@@ -13,7 +13,17 @@ test.describe("basic-fns-ecma", () => {
     page,
     baseURL,
   }) => {
+    const responsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.goto(baseURL);
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.result).toBeDefined();
+    expect(Array.isArray(data.result)).toBe(true);
+    expect(data.result.length).toBeGreaterThanOrEqual(1);
 
     // Verify messages fetched from server
     await expect(page.getByText("Hello from the ECMA runtime!")).toBeVisible();
@@ -32,7 +42,16 @@ test.describe("basic-fns-ecma", () => {
 
     // Post a new message
     await page.fill('[placeholder="Message"]', "Test message from e2e");
+    const addResponsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.click('button:has-text("Send")');
+    const addResponse = await addResponsePromise;
+    expect(addResponse.status()).toBe(200);
+    const addData = await addResponse.json();
+    expect(addData.result).toBeDefined();
+    expect(addData.result).toBe("Test message from e2e");
 
     // Verify the form clears
     await expect(page.locator('[placeholder="Message"]')).toHaveValue("");

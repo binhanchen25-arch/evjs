@@ -9,7 +9,6 @@ npm run dev -w example-basic-fns-ecma
 
 # Production
 npm run build -w example-basic-fns-ecma
-npm run start -w example-basic-fns-ecma
 ```
 
 ## Key Files
@@ -19,10 +18,10 @@ npm run start -w example-basic-fns-ecma
 | `src/main.tsx` | App bootstrap |
 | `src/routes.tsx` | Routes + components |
 | `src/api/messages.server.ts` | Server functions |
-| `server.entry.mjs` | Custom ECMA server entry using `@evjs/server/ecma` runtime |
+| `src/server.ts` | Service Worker style bootstrap entry |
 
 ## What It Demonstrates
 
-- `createFetchHandler` from `@evjs/server/ecma`
+- How to write a Service Worker style entry point (`self.addEventListener("fetch")`)
 - Portable server bundle (no Node.js-specific APIs)
-- Custom runtime configuration via `ev.config.ts`
+- Co-locating Web Standard export alongside Service Worker listeners for maximum compatibility

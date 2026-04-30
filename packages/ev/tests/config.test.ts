@@ -23,8 +23,12 @@ describe("resolveConfig", () => {
     expect(resolved.dev.port).toBe(CONFIG_DEFAULTS.port);
     expect(resolved.dev.https).toBe(false);
     expect(resolved.serverEnabled).toBe(true);
-    expect(resolved.server.runtime).toBe("node");
-    expect(resolved.server.endpoint).toBe(CONFIG_DEFAULTS.endpoint);
+    expect(resolved.server.functions.clientProxy).toBe(
+      "@evjs/client/transport",
+    );
+    expect(resolved.server.functions.serverRegister).toBe(
+      "@evjs/server/register",
+    );
     expect(resolved.server.dev.port).toBe(CONFIG_DEFAULTS.serverPort);
     expect(resolved.server.dev.https).toBe(false);
     expect(resolved.bundler).toBeUndefined();
@@ -36,7 +40,7 @@ describe("resolveConfig", () => {
     expect(resolved.assetPrefix).toBe("/");
     expect(resolved.entry).toBe("./src/main.tsx");
     expect(resolved.html).toBe("./index.html");
-    expect(resolved.server.endpoint).toBe("/api/fn");
+    expect(resolved.dev.proxy).toBeDefined();
   });
 
   it("respects user overrides for top-level fields", () => {
@@ -81,26 +85,25 @@ describe("resolveConfig", () => {
     const resolved = resolveConfig({ server: false });
     expect(resolved.serverEnabled).toBe(false);
     // Server config should still exist with defaults (for safety)
-    expect(resolved.server.runtime).toBe("node");
-    expect(resolved.server.endpoint).toBe(CONFIG_DEFAULTS.endpoint);
+    expect(resolved.server.functions).toBeDefined();
   });
 
   it("respects server overrides", () => {
     const resolved = resolveConfig({
       server: {
         entry: "./server.ts",
-        runtime: "bun",
-        endpoint: "/rpc",
+        functions: {
+          clientProxy: "custom/client",
+          serverRegister: "custom/server",
+        },
         dev: { port: 4000 },
       },
     });
     expect(resolved.serverEnabled).toBe(true);
     expect(resolved.server.entry).toBe("./server.ts");
-    expect(resolved.server.runtime).toBe("bun");
-    expect(resolved.server.endpoint).toBe("/rpc");
+    expect(resolved.server.functions.clientProxy).toBe("custom/client");
     expect(resolved.server.dev.port).toBe(4000);
   });
-
   it("respects server dev https override", () => {
     const resolved = resolveConfig({
       server: {

@@ -21,7 +21,7 @@
 │                                  │ │                                   │
 │  TanStack Router                 │ │  Hono App (createApp)             │
 │  TanStack Query                  │ │  registerServerReference() + createRoute()     │
-│  createServerReference() stubs   │ │  createFetchHandler()             │
+│  createServerReference() stubs   │ │  app.fetch()                      │
 │  ServerTransport ────────────────┼─┼──► POST /api/fn ──► registry     │
 │                                  │ │                                   │
 └──────────────────────────────────┘ └───────────────────────────────────┘
@@ -131,7 +131,7 @@ Browser ──(:3000)──► Dev Server ──► HMR (static assets)
 
 ```
 Node.js          server.entry.mjs ──► @hono/node-server
-ECMA (Deno/Bun)  server.entry.mjs ──► createFetchHandler(app)
+ECMA (Deno/Bun)  server.entry.mjs ──► export default app.fetch
 Service Worker   sw.entry.js ──► self.addEventListener('fetch', ...)
 ```
 

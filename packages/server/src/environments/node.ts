@@ -2,7 +2,6 @@ import fs from "node:fs";
 import https from "node:https";
 import { serve as honoServe } from "@hono/node-server";
 import { getLogger } from "@logtape/logtape";
-import type { Hono } from "hono";
 
 const logger = getLogger(["evjs", "server"]);
 
@@ -22,7 +21,10 @@ export interface NodeRunnerOptions {
  * When `https` is enabled, generates a self-signed certificate using
  * Node's built-in crypto module for local development.
  */
-export function serve(app: Hono, options?: NodeRunnerOptions) {
+export function serve(
+  app: { fetch: (request: Request, ...args: any[]) => any },
+  options?: NodeRunnerOptions,
+) {
   const port = options?.port || Number(process.env.PORT) || 3001;
   const hostname = options?.host;
   const serverOptions: Record<string, unknown> = {

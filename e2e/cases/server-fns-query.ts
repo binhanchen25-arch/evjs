@@ -6,7 +6,15 @@ test.describe("server-fns-query", () => {
   // ── Basic query & mutation ──
 
   test("loads users via query proxy", async ({ page, baseURL }) => {
+    const responsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.goto(baseURL);
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.result).toBeDefined();
 
     await expect(page.getByText("Alice")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Bob")).toBeVisible();
@@ -31,7 +39,16 @@ test.describe("server-fns-query", () => {
     // Fill and submit the create user form
     await page.fill('[placeholder="Name"]', "Eve");
     await page.fill('[placeholder="Email"]', "eve@example.com");
+    const createResponsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.click('button:has-text("Create User")');
+    const createResponse = await createResponsePromise;
+    expect(createResponse.status()).toBe(200);
+    const createData = await createResponse.json();
+    expect(createData.result).toBeDefined();
+    expect(createData.result.name).toBe("Eve");
 
     // Form should clear after successful mutation
     await expect(page.locator('[placeholder="Name"]')).toHaveValue("", {
@@ -65,7 +82,15 @@ test.describe("server-fns-query", () => {
     // Navigate via client-side link to avoid nested path chunk issues
     await page.goto(baseURL);
     await expect(page.getByText("Alice")).toBeVisible({ timeout: 10_000 });
+    const searchLoadPromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.getByRole("link", { name: "Search" }).click();
+    const searchLoadResponse = await searchLoadPromise;
+    expect(searchLoadResponse.status()).toBe(200);
+    const searchLoadData = await searchLoadResponse.json();
+    expect(searchLoadData.result).toBeDefined();
 
     await expect(page.getByText("Search Users (multi-arg)")).toBeVisible({
       timeout: 10_000,
@@ -95,8 +120,18 @@ test.describe("server-fns-query", () => {
       timeout: 10_000,
     });
 
+    const searchResponsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     // Type a name to filter — multi-arg function call (name, email)
     await page.fill("#search-name", "Ali");
+    const searchResponse = await searchResponsePromise;
+    expect(searchResponse.status()).toBe(200);
+    const searchData = await searchResponse.json();
+    expect(searchData.result).toBeDefined();
+    expect(Array.isArray(searchData.result)).toBe(true);
+    expect(searchData.result.length).toBeGreaterThanOrEqual(1);
 
     // Wait for filtered results — should show Alice, not Bob/Charlie
     await expect(
@@ -113,7 +148,16 @@ test.describe("server-fns-query", () => {
     // Navigate via client-side link to avoid nested path issue
     await page.goto(baseURL);
     await expect(page.getByText("Alice")).toBeVisible({ timeout: 10_000 });
+    const userDetailPromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.getByRole("link", { name: "User #1" }).click();
+    const userDetailResponse = await userDetailPromise;
+    expect(userDetailResponse.status()).toBe(200);
+    const userDetailData = await userDetailResponse.json();
+    expect(userDetailData.result).toBeDefined();
+    expect(userDetailData.result.name).toBe("Alice");
 
     await expect(page.locator("#user-detail")).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("#user-name")).toHaveText("Name: Alice");
@@ -129,7 +173,17 @@ test.describe("server-fns-query", () => {
     // Navigate via client-side link
     await page.goto(baseURL);
     await expect(page.getByText("Alice")).toBeVisible({ timeout: 10_000 });
+    const userErrorPromise = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/fn") && res.request().method() === "POST",
+    );
     await page.getByRole("link", { name: "User #999 (error)" }).click();
+    const userErrorResponse = await userErrorPromise;
+    // Server function returns 200 HTTP status but wraps error in JSON
+    expect(userErrorResponse.status()).toBe(200);
+    const userErrorData = await userErrorResponse.json();
+    expect(userErrorData.error).toBeDefined();
+    expect(userErrorData.status).toBe(404);
 
     await expect(page.locator("#user-error")).toBeVisible({ timeout: 10_000 });
     await expect(page.locator("#error-message")).toContainText(

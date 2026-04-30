@@ -28,7 +28,21 @@ if (!serverEntryPath || !distDir || !port) {
 
 // Load the server bundle — this registers all server functions
 const bundle = require(serverEntryPath);
-const app = bundle.createApp();
+let app;
+if (typeof bundle.default === "function" && !bundle.default.fetch) {
+  app = bundle.default;
+} else if (bundle.createApp) {
+  app = bundle.createApp();
+} else if (bundle.app) {
+  app = bundle.app;
+} else if (bundle.default && bundle.default.fetch) {
+  app = bundle.default;
+} else {
+  // If the bundle just registers functions without exporting an app,
+  // we create a default app to handle the /api/fn endpoint.
+  const { createApp } = require("@evjs/server");
+  app = createApp();
+}
 
 const indexHtml = fs.readFileSync(path.join(distDir, "index.html"), "utf-8");
 

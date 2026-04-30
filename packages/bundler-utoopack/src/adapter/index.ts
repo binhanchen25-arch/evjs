@@ -124,7 +124,7 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
     hooks: EvPluginHooks<ConfigComplete>[],
   ): Promise<void> {
     const { createUtoopackConfig } = await import("./create-config.js");
-    const utoopackConfig = createUtoopackConfig(config, cwd, hooks);
+    const utoopackConfig = await createUtoopackConfig(config, cwd, hooks);
 
     logger.info`Building for production with utoopack...`;
 
@@ -152,7 +152,7 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
     hooks: EvPluginHooks<ConfigComplete>[],
   ): Promise<void> {
     const { createUtoopackConfig } = await import("./create-config.js");
-    const utoopackConfig = createUtoopackConfig(config, cwd, hooks);
+    const utoopackConfig = await createUtoopackConfig(config, cwd, hooks);
 
     logger.info`Starting development server with utoopack...`;
 
