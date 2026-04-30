@@ -224,8 +224,7 @@ export function createExampleTest(exampleName: string) {
         fs.writeFileSync(
           bootstrapPath,
           [
-            `const bundle = require(${JSON.stringify(serverEntryPath)});`,
-            `const handler = typeof bundle.default === "function" ? bundle.default : (bundle.app ? bundle.app.fetch : bundle.createApp().fetch);`,
+            `const handler = require(${JSON.stringify(serverEntryPath)}).default;`,
             `const { serve } = require("@hono/node-server");`,
             `serve({ fetch: handler, port: ${apiPort} }, (info) => {`,
             `  console.log("E2E_SERVER_READY:" + info.port);`,

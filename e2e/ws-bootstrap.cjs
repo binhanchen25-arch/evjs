@@ -27,15 +27,8 @@ if (!serverEntryPath || !distDir || !port) {
 }
 
 // Load the server bundle — this registers all server functions
-const bundle = require(serverEntryPath);
-let app = bundle.default;
-
-if (!app || !app.fetch) {
-  // If the bundle just registers functions without exporting an app,
-  // we create a default app to handle the /api/fn endpoint.
-  const { createApp } = require("@evjs/server");
-  app = createApp();
-}
+// and exports the fetch handler as default.
+const handler = require(serverEntryPath).default;
 
 const indexHtml = fs.readFileSync(path.join(distDir, "index.html"), "utf-8");
 
@@ -74,7 +67,7 @@ wss.on("connection", (ws) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fnId, args: args ?? [] }),
     });
-    const response = await app.fetch(request);
+    const response = await handler(request);
     const result = await response.json();
     ws.send(JSON.stringify({ id, ...result }));
   });

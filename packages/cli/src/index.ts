@@ -237,12 +237,7 @@ export async function dev(
       fs.writeFileSync(
         bootstrapPath,
         [
-          `const bundle = require(${JSON.stringify(serverBundlePath)});`,
-          `let handler = bundle.default && bundle.default.fetch ? bundle.default.fetch : null;`,
-          `if (!handler) {`,
-          `  const { createApp } = require("@evjs/server");`,
-          `  handler = createApp().fetch;`,
-          `}`,
+          `const handler = require(${JSON.stringify(serverBundlePath)}).default;`,
           `const { serve } = require("@evjs/server/node");`,
           `serve({ fetch: handler }, { port: ${serverPort}, https: ${JSON.stringify(config.server.dev.https)} });`,
         ].join("\n"),
