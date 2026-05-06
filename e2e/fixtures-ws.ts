@@ -26,7 +26,7 @@ interface WorkerFixture {
 }
 
 /**
- * E2E fixture for the websocket-fns example.
+ * E2E fixture for the custom-ws-transport example.
  *
  * Builds with utoopack, starts a WebSocket server using ws-bootstrap.cjs,
  * and serves the client bundle via the same HTTP server.
@@ -36,7 +36,7 @@ export function createWebSocketExampleTest() {
     import.meta.dirname,
     "..",
     "examples",
-    "websocket-fns",
+    "custom-ws-transport",
   );
 
   return base.extend<ExampleFixture, WorkerFixture>({

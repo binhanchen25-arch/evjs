@@ -33,20 +33,11 @@ program
           name: "template",
           message: "Select a template:",
           choices: [
-            { title: "Basic CSR (Client-Side Rendering)", value: "basic-csr" },
+            { title: "Basic (Routing + Server Functions)", value: "basic" },
+            { title: "MPA (Multi-Page Application)", value: "mpa" },
             {
-              title: "Basic MPA (Multi-Page Application)",
-              value: "basic-mpa",
-            },
-            { title: "Basic Server Functions", value: "basic-server-fns" },
-            {
-              title:
-                "Basic Server Routes (Programmatic REST API via createRoute())",
-              value: "basic-server-routes",
-            },
-            {
-              title: "Configured Server Functions (ev.config.ts + Query)",
-              value: "configured-server-fns",
+              title: "API Routes (Programmatic REST API via createRoute())",
+              value: "api-routes",
             },
             {
               title: "Complex Routing (params, search, layouts, loaders)",
@@ -56,6 +47,13 @@ program
               title: "With Tailwind CSS (plugin loaders example)",
               value: "with-tailwind",
             },
+            { title: "With tRPC Interop", value: "with-trpc" },
+            { title: "With SQLite (Full-stack CRUD)", value: "with-sqlite" },
+            {
+              title: "Custom Transport (WebSockets)",
+              value: "custom-ws-transport",
+            },
+            { title: "Plugin Authoring", value: "plugin-authoring" },
           ],
         },
       ],

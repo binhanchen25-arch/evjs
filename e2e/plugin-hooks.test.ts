@@ -13,9 +13,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
  * runs a real build, and verifies the plugin achieved its goal.
  */
 
-const EXAMPLES = path.resolve(import.meta.dirname, "../examples");
-const CSR_APP = path.resolve(EXAMPLES, "basic-csr");
-const FULLSTACK_APP = path.resolve(EXAMPLES, "basic-server-fns");
+const EXAMPLES = path.resolve(__dirname, "../examples");
+const CSR_APP = path.resolve(EXAMPLES, "plugin-authoring");
+const FULLSTACK_APP = path.resolve(EXAMPLES, "basic");
 
 const BUNDLERS: [string, BundlerAdapter<unknown>][] = [
   ["utoopack", utoopackAdapter as unknown as BundlerAdapter<unknown>],
@@ -161,7 +161,7 @@ describe.each(
 
     await build({ bundler, plugins: [discoveryPlugin] });
 
-    // The basic-server-fns example has server functions
+    // The basic example has server functions
     expect(serverEntry).toBeDefined();
     expect(serverFnCount).toBeGreaterThan(0);
   }, 60_000);

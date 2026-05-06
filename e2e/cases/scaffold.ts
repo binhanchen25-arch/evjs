@@ -36,7 +36,7 @@ test.describe("Scaffolding CLI E2E", () => {
     // 1. Scaffold the app (scaffold into the pre-created unique temp dir)
     const appName = path.basename(targetDir);
     console.log(`Scaffolding into ${targetDir}...`);
-    execSync(`node ${cliPath} ${appName} -t basic-server-fns`, {
+    execSync(`node ${cliPath} ${appName} -t basic`, {
       cwd: path.dirname(targetDir),
       stdio: "inherit",
       env: cleanEnv,

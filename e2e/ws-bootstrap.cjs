@@ -1,5 +1,5 @@
 /**
- * E2E bootstrap for websocket-fns example.
+ * E2E bootstrap for custom-ws-transport example.
  *
  * Starts a combined HTTP + WebSocket server:
  * - Serves static client files
@@ -27,8 +27,9 @@ if (!serverEntryPath || !distDir || !port) {
 }
 
 // Load the server bundle — this registers all server functions
-// and exports the fetch handler as default.
-const handler = require(serverEntryPath).default;
+require(serverEntryPath);
+const { createApp } = require("@evjs/server");
+const handler = createApp();
 
 const indexHtml = fs.readFileSync(path.join(distDir, "index.html"), "utf-8");
 
@@ -67,7 +68,7 @@ wss.on("connection", (ws) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fnId, args: args ?? [] }),
     });
-    const response = await handler(request);
+    const response = await handler.fetch(request);
     const result = await response.json();
     ws.send(JSON.stringify({ id, ...result }));
   });
