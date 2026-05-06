@@ -17,8 +17,8 @@ const EXAMPLES = path.resolve(__dirname, "../examples");
 const CSR_APP = path.resolve(EXAMPLES, "plugin-authoring");
 const FULLSTACK_APP = path.resolve(EXAMPLES, "basic");
 
-const BUNDLERS: [string, BundlerAdapter<unknown>][] = [
-  ["utoopack", utoopackAdapter as unknown as BundlerAdapter<unknown>],
+const BUNDLERS: [string, BundlerAdapter][] = [
+  ["utoopack", utoopackAdapter as unknown as BundlerAdapter],
 ];
 
 let savedCwd: string;
@@ -59,7 +59,7 @@ describe.each(BUNDLERS)("build notifier plugin [%s]", (_name, bundler) => {
       duration: 0,
     };
 
-    const buildNotifier: EvPlugin<unknown> = {
+    const buildNotifier: EvPlugin = {
       name: "build-notifier",
       setup(_ctx) {
         let t0: number;
@@ -95,7 +95,7 @@ describe.each(BUNDLERS)("deployment manifest plugin [%s]", (_name, bundler) => {
 
     const manifestPath = path.resolve(CSR_APP, "dist/deploy-manifest.json");
 
-    const deployPlugin: EvPlugin<unknown> = {
+    const deployPlugin: EvPlugin = {
       name: "deploy-manifest",
       setup(ctx) {
         return {
@@ -145,7 +145,7 @@ describe.each(
     let serverFnCount = 0;
     let serverEntry: string | undefined;
 
-    const discoveryPlugin: EvPlugin<unknown> = {
+    const discoveryPlugin: EvPlugin = {
       name: "fn-discovery",
       setup() {
         return {
@@ -178,7 +178,7 @@ describe.each(
   it("injects a meta tag into the document via DOM API", async () => {
     process.chdir(CSR_APP);
 
-    const htmlPlugin: EvPlugin<unknown> = {
+    const htmlPlugin: EvPlugin = {
       name: "meta-injector",
       setup() {
         return {
@@ -209,7 +209,7 @@ describe.each(
   it("injects a comment node via DOM API", async () => {
     process.chdir(CSR_APP);
 
-    const commentPlugin: EvPlugin<unknown> = {
+    const commentPlugin: EvPlugin = {
       name: "comment-injector",
       setup() {
         return {
@@ -244,7 +244,7 @@ describe.each(BUNDLERS)("transformHtml composition [%s]", (_name, bundler) => {
   it("multiple plugins accumulate DOM mutations", async () => {
     process.chdir(CSR_APP);
 
-    const plugin1: EvPlugin<unknown> = {
+    const plugin1: EvPlugin = {
       name: "meta-1",
       setup: () => ({
         transformHtml(doc) {
@@ -256,7 +256,7 @@ describe.each(BUNDLERS)("transformHtml composition [%s]", (_name, bundler) => {
       }),
     };
 
-    const plugin2: EvPlugin<unknown> = {
+    const plugin2: EvPlugin = {
       name: "meta-2",
       setup: () => ({
         transformHtml(doc) {
