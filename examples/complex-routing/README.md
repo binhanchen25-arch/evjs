@@ -5,7 +5,7 @@ Advanced routing patterns with TanStack Router.
 ## Run
 
 ```bash
-npm run dev -w example-complex-routing
+npm run dev
 ```
 
 ## Key Files

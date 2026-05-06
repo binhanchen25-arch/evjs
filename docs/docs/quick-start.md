@@ -13,11 +13,15 @@ Both arguments are optional — if omitted, the CLI prompts interactively.
 
 | Template | Description |
 |----------|-------------|
-| `basic-csr` | Client-side rendering only, no server functions |
-| `basic-server-fns` | Minimal server functions with `"use server"` |
-| `configured-server-fns` | Server functions with `ev.config.ts` + Query proxy |
+| `basic` | Routing + server functions |
+| `mpa` | Multi-page application setup |
+| `api-routes` | Programmatic REST API routes via `createRoute()` |
 | `complex-routing` | Params, search, layouts, loaders, nested routes |
 | `with-tailwind` | Tailwind CSS via plugin loaders |
+| `with-trpc` | tRPC interop example |
+| `with-sqlite` | Full-stack CRUD with SQLite |
+| `custom-ws-transport` | Custom WebSocket transport |
+| `plugin-authoring` | Plugin lifecycle and bundler hook examples |
 
 ## Development
 
@@ -42,7 +46,7 @@ my-app/
 ├── src/
 │   ├── main.tsx            # App bootstrap
 │   ├── global.ts           # Global typings & transport init
-│   ├── pages/              # Route pages (file-based routing)
+│   ├── pages/              # Route modules (code-defined TanStack Router tree)
 │   │   ├── __root.tsx      # Root layout
 │   │   └── home.tsx        # Home page (index route)
 │   └── api/                # Server function files
@@ -86,7 +90,7 @@ declare module "@tanstack/react-router" {
 | [`@evjs/client`](https://github.com/evaijs/evjs/tree/main/packages/client) | Client runtime (React + TanStack) |
 | [`@evjs/server`](https://github.com/evaijs/evjs/tree/main/packages/server) | Server runtime (Hono) |
 | [`@evjs/build-tools`](https://github.com/evaijs/evjs/tree/main/packages/build-tools) | Server function transforms |
-| [`@evjs/bundler-utoopack`](https://github.com/evaijs/evjs/tree/main/packages/bundler-webpack) | Webpack adapter |
+| [`@evjs/bundler-utoopack`](https://github.com/evaijs/evjs/tree/main/packages/bundler-utoopack) | Utoopack adapter |
 | [`@evjs/manifest`](https://github.com/evaijs/evjs/tree/main/packages/manifest) | Shared manifest schema |
 
 ## Required Dependencies

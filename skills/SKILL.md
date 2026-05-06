@@ -14,8 +14,8 @@ evjs is a React fullstack framework built on TanStack Router, TanStack Query, an
 - **Server Functions** — write backend logic in files (we recommend using the `.server.ts` suffix), call from React as if local
 - **Server Routes** — build programmatic REST endpoints and APIs using the `createRoute()` handler
 - **Query Integration** — type-safe `useQuery(getUsers)` with auto query keys and transport
-- **Type-safe Routing** — TanStack Router with file-based route generation
-- **Plugin System** — extend the framework via `config` and `bundlerConfig` hooks in plugins
+- **Type-safe Routing** — TanStack Router with code-defined route modules and route trees
+- **Plugin System** — extend builds with `buildStart`, `bundlerConfig`, `transformHtml`, and `buildEnd` hooks
 - **Convention over Configuration** — works out of the box, optionally configure via `ev.config.ts`
 
 ## Quick Start
@@ -23,6 +23,7 @@ evjs is a React fullstack framework built on TanStack Router, TanStack Query, an
 ```bash
 npx @evjs/create-app my-app
 cd my-app
+npm install
 npm run dev
 ```
 
@@ -30,7 +31,7 @@ npm run dev
 
 For detailed guides on specific topics, see the `references/` directory:
 
-- [init.md](../docs/docs/quick-start.md) — Scaffolding projects with `npx @evjs/create-app`
+- [quick-start.md](../docs/docs/quick-start.md) — Scaffolding projects with `npx @evjs/create-app`
 - [project-structure.md](../docs/docs/project-structure.md) — Recommended directory structure and domain-driven design (features)
 - [dev.md](../docs/docs/dev.md) — Development server and configuration
 - [build.md](../docs/docs/build.md) — Production builds
@@ -43,7 +44,7 @@ For detailed guides on specific topics, see the `references/` directory:
 ## Key Rules
 
 **Server Functions (RPC):**
-- Server function files must start with `"use server";` directive or Webpack will bypass them
+- Server function files must start with `"use server";` so evjs can transform and register them
 - Use `useQuery(getUsers)` to query server functions directly — type-safe args & data
 - Arguments are spread: `useQuery(getUser, id)` not `useQuery(getUser, [id])`
 - For mutations, wrap args in objects/arrays: `mutate({ name, email })` or `mutate([name, email])`
@@ -60,4 +61,4 @@ For detailed guides on specific topics, see the `references/` directory:
 - Access server function metadata: `myFn.fnId`, `myFn.fnName`, `getFnQueryKey(myFn, ...args)`
 
 **Misc:**
-- Use `plugins` in config to extend the build pipeline via `config` and `bundler` hooks
+- Use `plugins` in config to extend the build pipeline via `buildStart`, `bundlerConfig`, `transformHtml`, and `buildEnd`

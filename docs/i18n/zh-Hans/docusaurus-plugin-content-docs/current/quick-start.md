@@ -13,11 +13,15 @@ cd my-app && npm install
 
 | 模板 | 描述 |
 |------|------|
-| `basic-csr` | 仅客户端渲染，无服务端函数 |
-| `basic-server-fns` | 最小化的 `"use server"` 服务端函数 |
-| `configured-server-fns` | 带 `ev.config.ts` + Query 代理的服务端函数 |
+| `basic` | 路由 + 服务端函数 |
+| `mpa` | 多页面应用模板 |
+| `api-routes` | 通过 `createRoute()` 构建程序化 REST API |
 | `complex-routing` | 参数、搜索、布局、加载器、嵌套路由 |
 | `with-tailwind` | 通过插件加载器使用 Tailwind CSS |
+| `with-trpc` | tRPC 互操作示例 |
+| `with-sqlite` | 基于 SQLite 的全栈 CRUD |
+| `custom-ws-transport` | 自定义 WebSocket 传输层 |
+| `plugin-authoring` | 插件生命周期与构建器钩子示例 |
 
 ## 开发
 
@@ -42,7 +46,7 @@ my-app/
 ├── src/
 │   ├── main.tsx            # 应用启动
 │   ├── global.ts           # 全局类型声明和传输初始化
-│   ├── pages/              # 路由页面（基于文件的路由）
+│   ├── pages/              # 路由模块（以代码定义 TanStack Router 路由树）
 │   │   ├── __root.tsx      # 根布局
 │   │   └── home.tsx        # 首页（索引路由）
 │   └── api/                # 服务端函数文件
@@ -86,7 +90,7 @@ declare module "@tanstack/react-router" {
 | [`@evjs/client`](https://github.com/evaijs/evjs/tree/main/packages/client) | 客户端运行时（React + TanStack） |
 | [`@evjs/server`](https://github.com/evaijs/evjs/tree/main/packages/server) | 服务端运行时（Hono） |
 | [`@evjs/build-tools`](https://github.com/evaijs/evjs/tree/main/packages/build-tools) | 服务端函数转换 |
-| [`@evjs/bundler-utoopack`](https://github.com/evaijs/evjs/tree/main/packages/bundler-webpack) | Webpack 适配器 |
+| [`@evjs/bundler-utoopack`](https://github.com/evaijs/evjs/tree/main/packages/bundler-utoopack) | Utoopack 适配器 |
 | [`@evjs/manifest`](https://github.com/evaijs/evjs/tree/main/packages/manifest) | 共享 Manifest Schema |
 
 ## 必需依赖

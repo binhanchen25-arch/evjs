@@ -62,6 +62,14 @@ URL prefix for all client assets. Use this when deploying static artifacts (JS/C
 
 In development mode, this field is ignored to preserve local HMR. In production, this prefix is automatically injected into bundler chunk lookups, HTML script tags, and exported as a `window.assetPrefix` runtime variable.
 
+Your deployment server may override `window.assetPrefix` before serving `index.html`. This is useful when the CDN origin is only known at deploy time:
+
+```html
+<script>
+  window.assetPrefix = "https://cdn.example.com/app/";
+</script>
+```
+
 ### `entry`
 
 Path to the client entry point. Must export the `createApp()` call.
@@ -150,18 +158,18 @@ See the **[Plugins guide](./plugins.md)** for the full API reference, `EvDocumen
 
 ## Bundler Options
 
-The `bundler` field selects the compilation engine. By default, evjs uses **utoopack** (`@utoo/pack`). You can switch to webpack by passing the utoopack adapter.
+The `bundler` field selects the compilation engine. By default, evjs uses the **Utoopack adapter** from `@evjs/bundler-utoopack`.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `bundler` | `BundlerAdapter` | utoopack | The active bundler adapter. Import `utoopackAdapter` from `@evjs/bundler-utoopack` to use webpack instead. |
+| `bundler` | `BundlerAdapter` | utoopack | The active bundler adapter. Import `utoopackAdapter` from `@evjs/bundler-utoopack` to select the default Utoopack backend explicitly. |
 
 ```ts
 import { defineConfig } from "@evjs/ev";
 import { utoopackAdapter } from "@evjs/bundler-utoopack";
 
 export default defineConfig({
-  bundler: utoopackAdapter,  // Use webpack instead of the default utoopack
+  bundler: utoopackAdapter,
 });
 ```
 
@@ -174,7 +182,6 @@ This example demonstrates a production-ready setup with custom loaders and build
 
 ```ts
 import { defineConfig } from "@evjs/ev";
-import { webpack } from "@evjs/bundler-utoopack";
 import { utoopack } from "@evjs/bundler-utoopack";
 
 export default defineConfig({
@@ -193,14 +200,6 @@ export default defineConfig({
       setup() {
         return {
           bundlerConfig(config, ctx) {
-            // Type-safe config mutation for each bundler
-            webpack((cfg) => {
-              cfg.module?.rules?.push({
-                test: /\.mdx$/,
-                use: ["mdx-loader"],
-              });
-            })(config, ctx);
-
             utoopack((cfg) => {
               cfg.module ??= {};
               cfg.module.rules ??= {};

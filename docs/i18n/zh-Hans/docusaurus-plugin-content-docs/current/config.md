@@ -54,7 +54,15 @@ export default defineConfig({
 
 所有客户端资源的 URL 前缀。在将静态文件（JS/CSS/图片）部署到不同域名的 CDN 时使用。
 
-在开发模式下，该字段会被忽略以确保局部热更新（HMR）。在生产模式下，此前缀会自动注入到 Webpack 分块查找、HTML script 标签中，并且作为 `window.assetPrefix` 运行时变量导出。
+在开发模式下，该字段会被忽略以确保局部热更新（HMR）。在生产模式下，此前缀会自动注入到构建产物的分块查找、HTML script 标签中，并且作为 `window.assetPrefix` 运行时变量导出。
+
+部署服务器也可以在返回 `index.html` 之前覆写 `window.assetPrefix`，适用于 CDN 地址只在部署阶段才能确定的场景：
+
+```html
+<script>
+  window.assetPrefix = "https://cdn.example.com/app/";
+</script>
+```
 
 ## 插件
 
@@ -82,23 +90,23 @@ export default defineConfig({
 
 ## 构建器选项
 
-`bundler` 字段选择编译引擎。默认情况下，evjs 使用 **utoopack**（`@utoo/pack`）。你可以通过传递 webpack 适配器来切换到 webpack。
+`bundler` 字段选择编译引擎。默认情况下，evjs 使用 `@evjs/bundler-utoopack` 提供的 **Utoopack 适配器**。
 
 | 选项 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
-| `bundler` | `BundlerAdapter` | utoopack | 激活的构建器适配器。从 `@evjs/bundler-utoopack` 导入 `utoopackAdapter` 以使用 webpack，而不是默认的 utoopack。 |
+| `bundler` | `BundlerAdapter` | utoopack | 激活的构建器适配器。从 `@evjs/bundler-utoopack` 导入 `utoopackAdapter` 可显式选择默认的 Utoopack 后端。 |
 
 ```ts
 import { defineConfig } from "@evjs/ev";
 import { utoopackAdapter } from "@evjs/bundler-utoopack";
 
 export default defineConfig({
-  bundler: utoopackAdapter,  // 使用 webpack 代替默认的 utoopack
+  bundler: utoopackAdapter,
 });
 ```
 
 ### 内置支持：CSS 和 Tailwind
-evjs 包含**内置的 PostCSS/Tailwind 支持**。如果项目根目录检测到 `postcss.config.js` 文件，内部 Webpack 适配器将自动启用 `postcss-loader`。标准 Tailwind 设置无需插件或自定义钩子。
+evjs 包含**内置的 PostCSS/Tailwind 支持**。如果项目根目录检测到 `postcss.config.js` 文件，当前构建器适配器会自动启用 PostCSS 处理。标准 Tailwind 设置无需插件或自定义钩子。
 
 ## 服务端选项
 
@@ -136,7 +144,7 @@ ECMA 适配器（`@evjs/server/ecma`）只导出一个 `{ fetch }` 处理器 —
 
 ```ts
 import { defineConfig } from "@evjs/ev";
-import { webpack } from "@evjs/bundler-utoopack";
+import { utoopack } from "@evjs/bundler-utoopack";
 
 export default defineConfig({
   entry: "./src/entry-client.tsx",
@@ -154,11 +162,10 @@ export default defineConfig({
       setup() {
         return {
           bundlerConfig(config, ctx) {
-            webpack((cfg) => {
-              cfg.module?.rules?.push({
-                test: /\.mdx$/,
-                use: ["mdx-loader"],
-              });
+            utoopack((cfg) => {
+              cfg.module ??= {};
+              cfg.module.rules ??= {};
+              cfg.module.rules[".mdx"] = { type: "raw" };
             })(config, ctx);
           },
         };

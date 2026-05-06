@@ -5,7 +5,7 @@ The standard starting point for an evjs application. Demonstrates both client-si
 ## Run
 
 ```bash
-npm run dev -w example-basic
+npm run dev
 ```
 
 ## Key Files
@@ -23,5 +23,5 @@ npm run dev -w example-basic
 - Client-side routing with `createApp` and `createRoute`
 - `"use server"` directive for auto-discovered server functions
 - `useQuery(getUsers)` for type-safe data fetching
-- `useMutation({ mutationFn: createUser })` for mutations
+- `useMutation({ mutationFn: createUser })` for server-side mutations
 - `getFnQueryKey(getUsers)` for cache invalidation
