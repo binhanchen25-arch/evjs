@@ -58,8 +58,6 @@ export interface RouteEntry {
 export interface ClientManifest {
   /** Schema version — bump on breaking changes. */
   version: 1;
-  /** URL prefix for all assets when deployed to CDN. Default: "/". */
-  assetPrefix?: string;
   /** Bundle asset paths for HTML injection (SPA mode). */
   assets: {
     /** JavaScript bundle paths. */
@@ -246,8 +244,7 @@ export class ManifestCollector {
     };
   }
 
-  getClientManifest(assetPrefix?: string): ClientManifest {
-    const prefix = assetPrefix && assetPrefix !== "/" ? assetPrefix : undefined;
+  getClientManifest(): ClientManifest {
     const routes = resolveRoutes(this.routes);
 
     // MPA mode: emit per-page assets
@@ -258,7 +255,6 @@ export class ManifestCollector {
       }
       return {
         version: 1,
-        assetPrefix: prefix,
         assets: { js: [], css: [] },
         routes,
         pages,
@@ -268,7 +264,6 @@ export class ManifestCollector {
     // SPA mode
     return {
       version: 1,
-      assetPrefix: prefix,
       assets: { js: this.jsAssets, css: this.cssAssets },
       routes,
     };

@@ -61,8 +61,6 @@ export interface ResolvedServerConfig {
 export interface ResolvedEvConfig<
   TBundlerCfg = import("@utoo/pack").ConfigComplete,
 > {
-  /** Resolved asset prefix for CDN deployment, always ends with "/". */
-  assetPrefix: string;
   /** Client entry point (SPA mode). */
   entry: string;
   /** HTML template path (SPA mode). */
@@ -90,20 +88,6 @@ export interface ResolvedEvConfig<
  * evjs framework configuration.
  */
 export interface EvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
-  /**
-   * URL prefix for all client assets (JS, CSS, images, fonts).
-   * Use this when deploying static assets to a CDN on a different domain.
-   *
-   * At build time, this prefix is applied to all `<script>` and `<link>` tags
-   * in the generated HTML. It is also used as the bundler's runtime `publicPath`,
-   * so dynamically loaded chunks resolve against it. A
-   * `<script>window.assetPrefix = "..."</script>` tag is injected so the value
-   * is available at runtime and can be rewritten at deploy time.
-   *
-   * @example "https://cdn.example.com/assets/"
-   * @default "/"
-   */
-  assetPrefix?: string;
   /** Client entry point. Default: "./src/main.tsx". */
   entry?: string;
   /** HTML template path. Default: "./index.html". */
@@ -191,7 +175,6 @@ export interface EvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
  * Default configuration values.
  */
 export const CONFIG_DEFAULTS = {
-  assetPrefix: "/",
   entry: "./src/main.tsx",
   html: "./index.html",
   port: 3000,
@@ -209,9 +192,6 @@ export function resolveConfig<
   const config = userConfig ?? {};
   const serverEnabled = config.server !== false;
   const serverConfig = config.server === false ? {} : (config.server ?? {});
-
-  const rawPrefix = config.assetPrefix ?? CONFIG_DEFAULTS.assetPrefix;
-  const assetPrefix = rawPrefix.endsWith("/") ? rawPrefix : `${rawPrefix}/`;
 
   const defaultHtml = config.html ?? CONFIG_DEFAULTS.html;
 
@@ -232,7 +212,6 @@ export function resolveConfig<
   const serverPort = serverConfig.dev?.port ?? CONFIG_DEFAULTS.serverPort;
 
   return {
-    assetPrefix,
     entry: config.entry ?? CONFIG_DEFAULTS.entry,
     html: defaultHtml,
     pages: resolvedPages,

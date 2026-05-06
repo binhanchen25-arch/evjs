@@ -110,7 +110,7 @@ export async function createUtoopackConfig(
       path: path.resolve(cwd, serverEnabled ? "dist/client" : "dist"),
       filename: isProduction ? "[name].[contenthash:8].js" : "[name].js",
       chunkFilename: isProduction ? "[name].[contenthash:8].js" : "[name].js",
-      publicPath: isProduction ? config.assetPrefix : "/",
+      publicPath: "/",
       clean: true,
     },
     resolve: {

@@ -6,6 +6,18 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ## [Unreleased]
 
+### ⚠️ Breaking Changes
+
+- **Removed `assetPrefix`** — Deleted the top-level `assetPrefix` config, removed `window.assetPrefix` runtime injection, and dropped `assetPrefix` from emitted client manifests. Client asset URLs now build as root-relative paths.
+
+### ♻️ Refactoring
+
+- **Simplified HTML and bundler asset paths** — `generateHtml()` and the utoopack adapter no longer thread a CDN/public-path prefix through HTML generation, manifest emission, or bundler runtime setup.
+
+### 📝 Documentation
+
+- **Removed stale CDN-prefix guidance** — Updated config and deployment docs to stop advertising `assetPrefix`, and documented that custom asset-base behavior now requires a proxy layer or custom bundler/HTML extension.
+
 ---
 
 ## [0.0.30] — 2026-05-06

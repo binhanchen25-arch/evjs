@@ -14,20 +14,7 @@ npm run build
 - `dist/client/manifest.json` —— 客户端资源映射和路由元数据
 - `dist/server/manifest.json` —— 服务端函数注册表
 
-## CDN 部署 (`assetPrefix`)
-
-如果你在单独的 CDN 而不是应用服务器上托管静态资源，请配置 `ev.config.ts`：
-
-```ts
-export default defineConfig({
-  assetPrefix: "https://my-cdn.com/assets/"
-});
-```
-
-在 `ev build` 时，该前缀会被：
-1. 作为 Webpack 运行时 `publicPath`（通过 `window.assetPrefix`）—— 所有动态加载的 JS/CSS 分块、图片和字体都会基于该前缀进行解析。
-2. 直接写入 `dist/index.html` 的资源标签中。
-3. 作为客户端全局 `window.assetPrefix` 运行时变量暴露。你的部署服务器可以在分发 `index.html` 之前安全地动态替换它。
+客户端资源 URL 现在以根路径形式输出到 `dist/client/` 下。如果你需要 CDN 域名或非根路径资源前缀，请在反向代理层处理，或通过自定义 bundler adapter / HTML transform 插件实现。
 
 ## 方案一：Node.js（默认）
 

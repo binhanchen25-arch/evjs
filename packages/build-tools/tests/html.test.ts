@@ -96,19 +96,6 @@ describe("generateHtml", () => {
     expect(result).toContain('<div id="app">');
   });
 
-  it("respects custom assetPrefix", () => {
-    const doc = generateHtml({
-      template: TEMPLATE_PATH,
-      js: ["main.js"],
-      css: ["main.css"],
-      assetPrefix: "/static/",
-    });
-    const result = doc.toString();
-
-    expect(result).toContain('src="/static/main.js"');
-    expect(result).toContain('href="/static/main.css"');
-  });
-
   it("injects assets in correct order", () => {
     const doc = generateHtml({
       template: TEMPLATE_PATH,

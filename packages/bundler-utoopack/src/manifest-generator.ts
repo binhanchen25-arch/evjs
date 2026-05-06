@@ -116,15 +116,13 @@ function parseServerStats(stats: {
 export class UtoopackManifestGenerator {
   private collector = new ManifestCollector();
   private cwd: string;
-  private assetPrefix?: string;
   private serverEnabled: boolean;
   private watcher: chokidar.FSWatcher | null = null;
   private currentRoutes = new Map<string, ExtractedRoute[]>();
 
-  constructor(cwd: string, serverEnabled: boolean, assetPrefix?: string) {
+  constructor(cwd: string, serverEnabled: boolean) {
     this.cwd = cwd;
     this.serverEnabled = serverEnabled;
-    this.assetPrefix = assetPrefix;
   }
 
   /**
@@ -234,9 +232,7 @@ export class UtoopackManifestGenerator {
     this.rebuildRoutes();
 
     // Client manifest — matches ClientManifest from @evjs/manifest
-    const clientManifest: ClientManifest = this.collector.getClientManifest(
-      this.assetPrefix,
-    );
+    const clientManifest: ClientManifest = this.collector.getClientManifest();
     const clientOutPath = path.resolve(
       this.cwd,
       this.serverEnabled ? "dist/client/manifest.json" : "dist/manifest.json",

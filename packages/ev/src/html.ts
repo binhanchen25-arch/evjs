@@ -4,8 +4,6 @@ import type { EvDocument, EvPluginHooks } from "./config.js";
 export interface BuildHtmlOptions {
   /** Pre-parsed HTML document (from `generateHtml()`). */
   doc: EvDocument;
-  /** Asset prefix for CDN deployment. */
-  assetPrefix?: string;
   // biome-ignore lint/suspicious/noExplicitAny: HTML hooks are bundler agnostic
   hooks: EvPluginHooks<any>[];
   /** Client manifest (passed to transformHtml hooks). */
@@ -21,24 +19,11 @@ export interface BuildHtmlOptions {
  * `generateHtml()` (from `@evjs/build-tools`) and pass the resulting
  * doc here for:
  *
- * 1. `<script>window.assetPrefix=...</script>` injection into `<head>`.
- * 2. `transformHtml` plugin hooks (applied in sequence).
- * 3. Serialization to the final HTML string.
+ * 1. `transformHtml` plugin hooks (applied in sequence).
+ * 2. Serialization to the final HTML string.
  */
 export async function buildHtml(options: BuildHtmlOptions): Promise<string> {
-  const { doc, assetPrefix, hooks, clientManifest, serverManifest } = options;
-
-  // Inject <script>window.assetPrefix = "..."</script> into <head>
-  // so the value is available at runtime for dynamic asset references.
-  if (assetPrefix && assetPrefix !== "/") {
-    const head = doc.querySelector("head");
-    if (head) {
-      head.insertAdjacentHTML(
-        "afterbegin",
-        `<script>window.assetPrefix=${JSON.stringify(assetPrefix)};</script>`,
-      );
-    }
-  }
+  const { doc, hooks, clientManifest, serverManifest } = options;
 
   // Run transformHtml plugin hooks in sequence (mutate doc in place)
   const buildResult = {

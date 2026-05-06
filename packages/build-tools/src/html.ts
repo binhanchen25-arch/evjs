@@ -26,8 +26,6 @@ export interface GenerateHtmlOptions {
   js: HtmlAsset[];
   /** CSS assets to inject (from ClientManifest.assets.css). */
   css: HtmlAsset[];
-  /** Optional prefix for asset URLs (e.g. for CDN deploys). Default: "/". */
-  assetPrefix?: string;
 }
 
 const parser = new DOMParser();
@@ -74,7 +72,7 @@ function normalizeAsset(asset: HtmlAsset): {
  * Returns the parsed DOM document. Call `doc.toString()` to serialize.
  */
 export function generateHtml(options: GenerateHtmlOptions): Document {
-  const { template, js, css, assetPrefix = "/" } = options;
+  const { template, js, css } = options;
 
   const templateContent = fs.readFileSync(template, "utf-8");
   const doc = parser.parseFromString(templateContent, "text/html");
@@ -96,9 +94,7 @@ export function generateHtml(options: GenerateHtmlOptions): Document {
   // Inject CSS <link> tags into <head>
   for (const cssAsset of css) {
     const { url, attrs } = normalizeAsset(cssAsset);
-    const href = escapeAttr(
-      `${assetPrefix}${url.startsWith("/") ? url.slice(1) : url}`,
-    );
+    const href = escapeAttr(url.startsWith("/") ? url : `/${url}`);
     head.insertAdjacentHTML(
       "beforeend",
       `<link rel="stylesheet" href="${href}"${renderAttrs(attrs)}>`,
@@ -108,9 +104,7 @@ export function generateHtml(options: GenerateHtmlOptions): Document {
   // Inject JS <script defer> tags into <body>
   for (const jsAsset of js) {
     const { url, attrs } = normalizeAsset(jsAsset);
-    const src = escapeAttr(
-      `${assetPrefix}${url.startsWith("/") ? url.slice(1) : url}`,
-    );
+    const src = escapeAttr(url.startsWith("/") ? url : `/${url}`);
     // defer is default; user can override via attrs (e.g. { defer: false, async: true })
     const hasLoadStrategy = "async" in attrs || "defer" in attrs;
     const defaultAttrs = hasLoadStrategy ? "" : " defer";

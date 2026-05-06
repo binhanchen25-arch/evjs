@@ -65,13 +65,11 @@ async function generateAndEmitHtml(
         template: path.resolve(cwd, pageConfig.html),
         js: pageManifest.assets.js,
         css: pageManifest.assets.css,
-        assetPrefix: config.assetPrefix,
       });
 
       const finalHtml = await buildHtml({
         // biome-ignore lint/suspicious/noExplicitAny: DOM interfaces
         doc: doc as any,
-        assetPrefix: config.assetPrefix,
         // biome-ignore lint/suspicious/noExplicitAny: Bundler-agnostic hook generic
         hooks: hooks as any,
         clientManifest,
@@ -95,13 +93,11 @@ async function generateAndEmitHtml(
     template: path.resolve(cwd, config.html),
     js: clientManifest.assets.js,
     css: clientManifest.assets.css,
-    assetPrefix: config.assetPrefix,
   });
 
   const finalHtml = await buildHtml({
     // biome-ignore lint/suspicious/noExplicitAny: DOM interfaces
     doc: doc as any,
-    assetPrefix: config.assetPrefix,
     // biome-ignore lint/suspicious/noExplicitAny: Bundler-agnostic hook generic
     hooks: hooks as any,
     clientManifest,
@@ -132,11 +128,7 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
     await build({ config: utoopackConfig });
 
     logger.info`Extracting routes and generating client manifest...`;
-    const generator = new UtoopackManifestGenerator(
-      cwd,
-      config.serverEnabled,
-      config.assetPrefix,
-    );
+    const generator = new UtoopackManifestGenerator(cwd, config.serverEnabled);
     await generator.build();
 
     logger.info`Generating and emitting HTML...`;
@@ -160,11 +152,7 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
     await serve({ config: utoopackConfig });
 
     logger.info`Starting route watcher for dev manifest...`;
-    const generator = new UtoopackManifestGenerator(
-      cwd,
-      config.serverEnabled,
-      config.assetPrefix,
-    );
+    const generator = new UtoopackManifestGenerator(cwd, config.serverEnabled);
     await generator.watch(async () => {
       await generateAndEmitHtml(config, cwd, hooks);
     });

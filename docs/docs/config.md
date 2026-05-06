@@ -13,7 +13,6 @@ All fields are optional. These are the built-in defaults:
 
 | Setting | Default |
 |---------|---------|
-| `assetPrefix` | `"/"` |
 | `entry` | `./src/main.tsx` |
 | `html` | `./index.html` |
 | `dev.port` | `3000` |
@@ -28,7 +27,6 @@ import { defineConfig } from "@evjs/ev";
 
 export default defineConfig({
   // ── Entry & HTML ──
-  assetPrefix: "/",
   entry: "./src/main.tsx",
   html: "./index.html",
 
@@ -55,20 +53,6 @@ export default defineConfig({
 ```
 
 ## Client Options
-
-### `assetPrefix`
-
-URL prefix for all client assets. Use this when deploying static artifacts (JS/CSS/images) to a CDN on a different domain.
-
-In development mode, this field is ignored to preserve local HMR. In production, this prefix is automatically injected into bundler chunk lookups, HTML script tags, and exported as a `window.assetPrefix` runtime variable.
-
-Your deployment server may override `window.assetPrefix` before serving `index.html`. This is useful when the CDN origin is only known at deploy time:
-
-```html
-<script>
-  window.assetPrefix = "https://cdn.example.com/app/";
-</script>
-```
 
 ### `entry`
 

@@ -13,7 +13,6 @@ export default defineConfig({ /* ... */ });
 
 | 设置 | 默认值 |
 |------|--------|
-| `assetPrefix` | `"/"` |
 | `entry` | `./src/main.tsx` |
 | `html` | `./index.html` |
 | `dev.port` | `3000` |
@@ -27,7 +26,6 @@ export default defineConfig({ /* ... */ });
 import { defineConfig } from "@evjs/ev";
 
 export default defineConfig({
-  assetPrefix: "/",
   entry: "./src/main.tsx",
   html: "./index.html",
   dev: {
@@ -49,20 +47,6 @@ export default defineConfig({
 ```
 
 ## 客户端选项
-
-### `assetPrefix`
-
-所有客户端资源的 URL 前缀。在将静态文件（JS/CSS/图片）部署到不同域名的 CDN 时使用。
-
-在开发模式下，该字段会被忽略以确保局部热更新（HMR）。在生产模式下，此前缀会自动注入到构建产物的分块查找、HTML script 标签中，并且作为 `window.assetPrefix` 运行时变量导出。
-
-部署服务器也可以在返回 `index.html` 之前覆写 `window.assetPrefix`，适用于 CDN 地址只在部署阶段才能确定的场景：
-
-```html
-<script>
-  window.assetPrefix = "https://cdn.example.com/app/";
-</script>
-```
 
 ## 插件
 

@@ -41,7 +41,6 @@ describe("CONFIG_DEFAULTS", () => {
     expect(CONFIG_DEFAULTS.serverPort).toBe(3001);
     expect(CONFIG_DEFAULTS.clientProxy).toBe("@evjs/client/transport");
     expect(CONFIG_DEFAULTS.serverRegister).toBe("@evjs/server/register");
-    expect(CONFIG_DEFAULTS.assetPrefix).toBe("/");
   });
 
   it("is readonly", () => {
@@ -54,7 +53,6 @@ describe("CONFIG_DEFAULTS", () => {
       serverPort: 3001,
       clientProxy: "@evjs/client/transport",
       serverRegister: "@evjs/server/register",
-      assetPrefix: "/",
     });
   });
 });
