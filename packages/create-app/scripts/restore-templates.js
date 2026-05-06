@@ -10,19 +10,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const templatesDir = path.resolve(__dirname, "../templates");
 
 const symlinkTargets = {
-  "basic-csr": "../../../examples/basic-csr",
-  "basic-mpa": "../../../examples/basic-mpa",
-  "basic-fns-ecma": "../../../examples/basic-fns-ecma",
-  "basic-plugins": "../../../examples/basic-plugins",
-  "basic-server-fns": "../../../examples/basic-server-fns",
-  "basic-server-routes": "../../../examples/basic-server-routes",
-  "configured-server-fns": "../../../examples/configured-server-fns",
-  "complex-routing": "../../../examples/basic-mpa",
-  "server-fns-query": "../../../examples/server-fns-query",
-  "sqlite-server-fns": "../../../examples/sqlite-server-fns",
-  "trpc-server-fns": "../../../examples/trpc-server-fns",
-  "websocket-fns": "../../../examples/websocket-fns",
+  "api-routes": "../../../examples/api-routes",
+  basic: "../../../examples/basic",
+  "complex-routing": "../../../examples/complex-routing",
+  "custom-ws-transport": "../../../examples/custom-ws-transport",
+  mpa: "../../../examples/mpa",
+  "plugin-authoring": "../../../examples/plugin-authoring",
+  "with-sqlite": "../../../examples/with-sqlite",
   "with-tailwind": "../../../examples/with-tailwind",
+  "with-trpc": "../../../examples/with-trpc",
 };
 
 for (const [name, target] of Object.entries(symlinkTargets)) {

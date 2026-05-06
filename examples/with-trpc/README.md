@@ -1,11 +1,11 @@
-# trpc-server-fns
+# with-trpc
 
 tRPC interop alongside evjs server functions.
 
 ## Run
 
 ```bash
-npm run dev -w example-trpc-server-fns
+npm run dev
 ```
 
 ## Key Files

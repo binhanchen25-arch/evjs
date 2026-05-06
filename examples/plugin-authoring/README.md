@@ -1,4 +1,4 @@
-# basic-plugins
+# plugin-authoring
 
 Demonstrates the evjs plugin system with all available hooks:
 

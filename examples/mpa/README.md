@@ -1,17 +1,17 @@
-# basic-mpa
+# mpa
 
 Minimal multi-page application example using evjs `pages` config.
 
 ## Run
 
 ```bash
-npm run dev -w example-basic-mpa
+npm run dev
 ```
 
 ## Build
 
 ```bash
-npm run build -w example-basic-mpa
+npm run build
 ```
 
 ## Key Files

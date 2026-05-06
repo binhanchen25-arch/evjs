@@ -13,12 +13,14 @@ describe("create-app scaffolding", () => {
 
   it("has all expected templates", () => {
     const expectedTemplates = [
-      "basic-csr",
-      "basic-mpa",
-      "basic-server-fns",
-      "basic-server-routes",
-      "configured-server-fns",
+      "api-routes",
+      "basic",
       "complex-routing",
+      "custom-ws-transport",
+      "mpa",
+      "plugin-authoring",
+      "with-sqlite",
+      "with-trpc",
       "with-tailwind",
     ];
 

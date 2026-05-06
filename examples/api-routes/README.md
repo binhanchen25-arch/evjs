@@ -1,11 +1,11 @@
-# basic-server-routes
+# api-routes
 
 Programmatic REST route handlers using `createRoute()`.
 
 ## Run
 
 ```bash
-npm run dev -w example-basic-server-routes
+npm run dev
 ```
 
 ## Key Files

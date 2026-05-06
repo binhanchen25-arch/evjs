@@ -1,11 +1,11 @@
-# sqlite-server-fns
+# with-sqlite
 
 Full CRUD application with SQLite (node:sqlite) — users and todos.
 
 ## Run
 
 ```bash
-npm run dev -w example-sqlite-server-fns
+npm run dev
 ```
 
 ## Key Files

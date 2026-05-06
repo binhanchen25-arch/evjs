@@ -1,11 +1,11 @@
-# websocket-fns
+# custom-ws-transport
 
 Custom WebSocket transport for server function calls.
 
 ## Run
 
 ```bash
-npm run dev -w example-websocket-fns
+npm run dev
 ```
 
 ## Key Files

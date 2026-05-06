@@ -22,12 +22,15 @@ npx @evjs/create-app [name] [options]
 
 | Name | Description |
 |------|-------------|
-| **`basic-csr`** | Client-side only (React + TanStack Router). |
-| **`basic-mpa`** | Multi-page application with shared HTML template. |
-| **`basic-server-fns`** | Basic full-stack with server functions. |
-| **`configured-server-fns`** | Full-stack with `@evjs/create-app` + `ev.config.ts`. |
+| **`basic`** | Basic full-stack example with routing and server functions. |
+| **`mpa`** | Multi-page application with separate page entries. |
+| **`api-routes`** | Programmatic REST API routes via `createRoute()`. |
 | **`complex-routing`** | Nested layouts, loaders, and search params. |
+| **`custom-ws-transport`** | Custom transport example using WebSockets. |
+| **`plugin-authoring`** | Starter focused on plugin authoring and bundler hooks. |
+| **`with-sqlite`** | Full-stack CRUD example backed by SQLite. |
 | **`with-tailwind`** | Ready-to-go Tailwind CSS integration. |
+| **`with-trpc`** | Example interoperating with tRPC. |
 
 ## Quick Start via npx
 
