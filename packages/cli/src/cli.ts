@@ -2,12 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  configure,
-  defaultTextFormatter,
-  getConsoleSink,
-  getLogger,
-} from "@logtape/logtape";
+import { configure, getConsoleSink, getLogger } from "@logtape/logtape";
 import { Command } from "commander";
 import { build, dev } from "./index.js";
 

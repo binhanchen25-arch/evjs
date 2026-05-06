@@ -6,7 +6,11 @@
  */
 
 import { DEFAULT_ENDPOINT } from "@evjs/shared";
-import type { MiddlewareHandler } from "hono";
+import type {
+  Context as HonoContext,
+  Env as HonoEnv,
+  MiddlewareHandler,
+} from "hono";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { contextStorage } from "hono/context-storage";
@@ -69,11 +73,10 @@ export function createApp(options?: CreateAppOptions): Hono {
   // Mount route handlers (before server function endpoint for priority)
   for (const handler of routes) {
     for (const [method, routeHandlerFn] of Object.entries(handler.methods)) {
-      app.on(
-        method as any,
-        handler.path as any,
-        ...(handler.middlewares as any[]),
-        (c) => (routeHandlerFn as any)(c.req.raw, c),
+      if (!routeHandlerFn) continue;
+
+      app.on([method], [handler.path], ...handler.middlewares, (c) =>
+        routeHandlerFn(c.req.raw, c as HonoContext<HonoEnv, string>),
       );
     }
     // 405 Method Not Allowed for any unregistered methods.

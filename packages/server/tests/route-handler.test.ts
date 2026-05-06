@@ -104,11 +104,11 @@ describe("createRoute", () => {
 
     const handler = createRoute("/api/items", {
       middlewares: [
-        async (c, next) => {
+        async (_c, next) => {
           order.push("mw1");
           return next();
         },
-        async (c, next) => {
+        async (_c, next) => {
           order.push("mw2");
           return next();
         },
@@ -171,7 +171,7 @@ describe("createRoute", () => {
   it("middleware can perform async work before proceeding", async () => {
     const handler = createRoute("/api/items", {
       middlewares: [
-        async (c, next) => {
+        async (_c, next) => {
           // Simulate async work (e.g. DB lookup, auth check)
           await new Promise((r) => setTimeout(r, 5));
           return next();
@@ -211,7 +211,7 @@ describe("createRoute", () => {
 
     const handler = createRoute("/api/items", {
       middlewares: [
-        async (c, next) => {
+        async (_c, next) => {
           mwCount++;
           return next();
         },

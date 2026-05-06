@@ -68,36 +68,39 @@ function UsersPage() {
       </div>
 
       <div style={cardStyle}>
-      <h2>Users (fetched via direct server function call)</h2>
-      <ul>
-        {users.map((u) => (
-          <li key={u.id}>
-            <Link
-              to="/users/$userId"
-              params={{ userId: u.id }}
-              style={linkStyle}
-            >
-              {u.name}
-            </Link>{" "}
-            — {u.email}
-          </li>
-        ))}
-      </ul>
+        <h2>Users (fetched via direct server function call)</h2>
+        <ul>
+          {users.map((u) => (
+            <li key={u.id}>
+              <Link
+                to="/users/$userId"
+                params={{ userId: u.id }}
+                style={linkStyle}
+              >
+                {u.name}
+              </Link>{" "}
+              — {u.email}
+            </li>
+          ))}
+        </ul>
 
-      <h3>Add User</h3>
-      <form onSubmit={handleCreate} style={{ display: "flex", gap: "0.5rem" }}>
-        <input
-          placeholder="Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <input
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <button type="submit">Create</button>
-      </form>
+        <h3>Add User</h3>
+        <form
+          onSubmit={handleCreate}
+          style={{ display: "flex", gap: "0.5rem" }}
+        >
+          <input
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <button type="submit">Create</button>
+        </form>
       </div>
     </div>
   );

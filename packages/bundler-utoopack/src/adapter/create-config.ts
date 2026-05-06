@@ -85,7 +85,8 @@ export async function createUtoopackConfig(
   let finalServerEntry: string | undefined;
 
   if (serverEnabled) {
-    finalServerEntry = config.server.entry || (await ensureGeneratedServerEntry(cwd));
+    finalServerEntry =
+      config.server.entry || (await ensureGeneratedServerEntry(cwd));
   }
 
   if (serverEnabled && !finalServerEntry) {

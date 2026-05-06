@@ -22,7 +22,12 @@ export interface NodeRunnerOptions {
  * Node's built-in crypto module for local development.
  */
 export function serve(
-  app: { fetch: (request: Request, ...args: any[]) => any },
+  app: {
+    fetch: (
+      request: Request,
+      ...args: unknown[]
+    ) => Response | Promise<Response>;
+  },
   options?: NodeRunnerOptions,
 ) {
   const port = options?.port || Number(process.env.PORT) || 3001;

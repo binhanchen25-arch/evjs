@@ -58,7 +58,9 @@ export interface ResolvedServerConfig {
 /**
  * A version of EvConfig where all fields with defaults are guaranteed.
  */
-export interface ResolvedEvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
+export interface ResolvedEvConfig<
+  TBundlerCfg = import("@utoo/pack").ConfigComplete,
+> {
   /** Resolved asset prefix for CDN deployment, always ends with "/". */
   assetPrefix: string;
   /** Client entry point (SPA mode). */
@@ -201,9 +203,9 @@ export const CONFIG_DEFAULTS = {
 /**
  * Deeply merge user configuration with defaults.
  */
-export function resolveConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete>(
-  userConfig?: EvConfig<TBundlerCfg>,
-): ResolvedEvConfig<TBundlerCfg> {
+export function resolveConfig<
+  TBundlerCfg = import("@utoo/pack").ConfigComplete,
+>(userConfig?: EvConfig<TBundlerCfg>): ResolvedEvConfig<TBundlerCfg> {
   const config = userConfig ?? {};
   const serverEnabled = config.server !== false;
   const serverConfig = config.server === false ? {} : (config.server ?? {});

@@ -3,7 +3,9 @@ import type { EvPluginHooks, ResolvedEvConfig } from "./config.js";
 /**
  * Interface that all bundler adapters must implement.
  */
-export interface BundlerAdapter<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
+export interface BundlerAdapter<
+  TBundlerCfg = import("@utoo/pack").ConfigComplete,
+> {
   /** Human-readable bundler name (used by plugin helpers for type-narrowing). */
   readonly name: string;
 

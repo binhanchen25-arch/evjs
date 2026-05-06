@@ -83,7 +83,9 @@ export interface EvDocument {
 /**
  * Context passed to plugin bundler hooks.
  */
-export interface EvBundlerCtx<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
+export interface EvBundlerCtx<
+  TBundlerCfg = import("@utoo/pack").ConfigComplete,
+> {
   /** The current mode. */
   mode: "development" | "production";
   /** The current working directory. */
@@ -116,7 +118,9 @@ export interface EvPlugin<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
 /**
  * Context passed to plugin setup().
  */
-export interface EvPluginContext<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
+export interface EvPluginContext<
+  TBundlerCfg = import("@utoo/pack").ConfigComplete,
+> {
   /** Current mode. */
   mode: "development" | "production";
   /** The current working directory. */
@@ -128,7 +132,9 @@ export interface EvPluginContext<TBundlerCfg = import("@utoo/pack").ConfigComple
 /**
  * Lifecycle hooks returned from plugin setup().
  */
-export interface EvPluginHooks<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
+export interface EvPluginHooks<
+  TBundlerCfg = import("@utoo/pack").ConfigComplete,
+> {
   /** Called before compilation begins. */
   buildStart?: () => void | Promise<void>;
 

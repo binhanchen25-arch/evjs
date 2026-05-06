@@ -135,7 +135,6 @@ test.describe("api-routes", () => {
     expect(fnData.result).toBe("Hello, World! This is from a server function.");
 
     // Wait for the server function response to appear
-    const pre = page.locator("pre").nth(1); // Second pre tag or wait for specific text
     await expect(
       page.getByText("Hello, World! This is from a server function."),
     ).toBeVisible({ timeout: 5_000 });

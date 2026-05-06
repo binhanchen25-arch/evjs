@@ -54,7 +54,7 @@ export interface RouteHandler {
   /** The path pattern for this handler (e.g. `/api/users/:id`). */
   path: string;
   /** The normalized HTTP method handlers. */
-  methods: Partial<Record<HttpMethod, RouteHandlerFn<any>>>;
+  methods: Partial<Record<HttpMethod, RouteHandlerFn<string>>>;
   /** Route-level middleware. */
   middlewares: MiddlewareHandler[];
   /** Allowed HTTP methods for this route (used for 405 responses). */
@@ -124,7 +124,7 @@ export function createRoute<const T extends string>(
 
   return {
     path,
-    methods: methods as Partial<Record<HttpMethod, RouteHandlerFn<any>>>,
+    methods: methods as Partial<Record<HttpMethod, RouteHandlerFn<string>>>,
     middlewares,
     allowedMethods: definedMethods,
   };
