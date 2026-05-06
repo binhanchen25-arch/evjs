@@ -36,6 +36,7 @@
     "@evjs/shared": "*"
   },
   "devDependencies": {
+    "@utoo/pack": "^1.4.2",
     "typescript": "^6.0.2"
   },
   "keywords": [

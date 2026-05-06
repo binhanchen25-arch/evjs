@@ -44,25 +44,25 @@ export interface BuildOptions {
  * Resolve the bundler adapter specified in the configuration.
  * Falls back to utoopack when no bundler is explicitly provided.
  */
-async function getBundlerAdapter(
-  config?: ResolvedEvConfig<unknown>,
-): Promise<BundlerAdapter<unknown>> {
+async function getBundlerAdapter<TBundlerCfg>(
+  config?: ResolvedEvConfig<TBundlerCfg>,
+): Promise<BundlerAdapter<TBundlerCfg>> {
   if (config?.bundler) {
-    return config.bundler as BundlerAdapter<unknown>;
+    return config.bundler;
   }
   // Default: dynamically import utoopack so it's not a hard dependency
   const { utoopackAdapter } = await import("@evjs/bundler-utoopack");
-  return utoopackAdapter as unknown as BundlerAdapter<unknown>;
+  return utoopackAdapter as unknown as BundlerAdapter<TBundlerCfg>;
 }
 
 /**
  * Run plugin setup() hooks and collect lifecycle hooks.
  */
-async function collectPluginHooks(
-  plugins: EvPlugin[],
-  ctx: EvPluginContext,
-): Promise<EvPluginHooks[]> {
-  const allHooks: EvPluginHooks[] = [];
+async function collectPluginHooks<TBundlerCfg>(
+  plugins: EvPlugin<TBundlerCfg>[],
+  ctx: EvPluginContext<TBundlerCfg>,
+): Promise<EvPluginHooks<TBundlerCfg>[]> {
+  const allHooks: EvPluginHooks<TBundlerCfg>[] = [];
   for (const plugin of plugins) {
     if (plugin.setup) {
       const hooks = await plugin.setup(ctx);
@@ -77,7 +77,9 @@ async function collectPluginHooks(
 /**
  * Run all buildStart hooks sequentially.
  */
-async function runBuildStartHooks(hooks: EvPluginHooks[]): Promise<void> {
+async function runBuildStartHooks<TBundlerCfg>(
+  hooks: EvPluginHooks<TBundlerCfg>[],
+): Promise<void> {
   for (const h of hooks) {
     if (h.buildStart) {
       await h.buildStart();
@@ -88,8 +90,8 @@ async function runBuildStartHooks(hooks: EvPluginHooks[]): Promise<void> {
 /**
  * Run all buildEnd hooks sequentially.
  */
-async function runBuildEndHooks(
-  hooks: EvPluginHooks[],
+async function runBuildEndHooks<TBundlerCfg>(
+  hooks: EvPluginHooks<TBundlerCfg>[],
   result: EvBuildResult,
 ): Promise<void> {
   for (const h of hooks) {

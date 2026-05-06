@@ -58,7 +58,7 @@ export interface ResolvedServerConfig {
 /**
  * A version of EvConfig where all fields with defaults are guaranteed.
  */
-export interface ResolvedEvConfig<TBundlerCfg = unknown> {
+export interface ResolvedEvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
   /** Resolved asset prefix for CDN deployment, always ends with "/". */
   assetPrefix: string;
   /** Client entry point (SPA mode). */
@@ -87,7 +87,7 @@ export interface ResolvedEvConfig<TBundlerCfg = unknown> {
 /**
  * evjs framework configuration.
  */
-export interface EvConfig<TBundlerCfg = unknown> {
+export interface EvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
   /**
    * URL prefix for all client assets (JS, CSS, images, fonts).
    * Use this when deploying static assets to a CDN on a different domain.
@@ -201,7 +201,7 @@ export const CONFIG_DEFAULTS = {
 /**
  * Deeply merge user configuration with defaults.
  */
-export function resolveConfig<TBundlerCfg = unknown>(
+export function resolveConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete>(
   userConfig?: EvConfig<TBundlerCfg>,
 ): ResolvedEvConfig<TBundlerCfg> {
   const config = userConfig ?? {};
@@ -274,7 +274,7 @@ export function resolveConfig<TBundlerCfg = unknown>(
  * @param config - The framework configuration object.
  * @returns The exact same configuration object.
  */
-export function defineConfig<TBundlerCfg = unknown>(
+export function defineConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete>(
   config: EvConfig<TBundlerCfg>,
 ): EvConfig<TBundlerCfg> {
   return config;
