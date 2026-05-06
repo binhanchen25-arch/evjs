@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { AnyRoute } from "@tanstack/react-router";
+import type { AnyRoute, RouterHistory } from "@tanstack/react-router";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { createRoot } from "react-dom/client";
 import type { AppRouteContext } from "./context";
@@ -15,6 +15,10 @@ export interface CreateAppOptions<TRouteTree extends AnyRoute> {
    * The base path for the application (e.g., '/app').
    */
   basepath?: string;
+  /**
+   * Optional custom history for the router (e.g., memory or hash history).
+   */
+  history?: RouterHistory;
   /**
    * Optional custom QueryClient instance.
    */
@@ -93,6 +97,7 @@ export function createApp<TRouteTree extends AnyRoute>(
     queryClient = new QueryClient(),
     functions,
     basepath,
+    history,
   } = options;
 
   if (functions?.endpoint) {
@@ -102,6 +107,7 @@ export function createApp<TRouteTree extends AnyRoute>(
   const router = createRouter({
     routeTree,
     basepath,
+    history,
     defaultPreload: "intent",
     context: { queryClient } as AppRouteContext,
   });

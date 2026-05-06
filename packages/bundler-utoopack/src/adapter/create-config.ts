@@ -6,14 +6,61 @@
  * `server.functions.callServerModule` config field.
  */
 
+import fs from "node:fs";
 import path from "node:path";
+import { detectUseServer } from "@evjs/build-tools";
 import {
   type EvBundlerCtx,
   type EvPluginHooks,
   isMpa,
   type ResolvedEvConfig,
 } from "@evjs/ev";
-import type { ConfigComplete } from "@utoo/pack";
+import type { ConfigComplete, DevServerProxy, ProxyRule } from "@utoo/pack";
+import fastGlob from "fast-glob";
+
+async function ensureGeneratedServerEntry(cwd: string): Promise<string> {
+  const files = await fastGlob("src/**/*.{ts,tsx,js,jsx}", {
+    cwd,
+    absolute: true,
+  });
+
+  const serverModules: string[] = [];
+  for (const file of files) {
+    const source = await fs.promises.readFile(file, "utf-8");
+    if (detectUseServer(source)) {
+      serverModules.push(file);
+    }
+  }
+
+  const outputDir = path.resolve(cwd, "node_modules/.cache/evjs");
+  const outputPath = path.join(outputDir, "server-entry.ts");
+  const source = [
+    'import { createApp } from "@evjs/server";',
+    "const app = createApp();",
+    "export default app.fetch;",
+  ].join("\n");
+
+  await fs.promises.mkdir(outputDir, { recursive: true });
+  await fs.promises.writeFile(outputPath, `${source}\n`);
+
+  return outputPath;
+}
+
+function createSpaHistoryFallbackRule(
+  config: ResolvedEvConfig<ConfigComplete>,
+): ProxyRule {
+  const protocol = config.dev.https ? "https" : "http";
+
+  return {
+    context: ["^/(?!api(?:/|$))(?!turbopack-hmr$)(?!.*\\.[^/]+$).+"],
+    target: `${protocol}://localhost:${config.dev.port}`,
+    changeOrigin: true,
+    secure: false,
+    pathRewrite: {
+      "^/.*$": "/",
+    },
+  };
+}
 
 /**
  * Create a utoopack configuration object from EvConfig.
@@ -30,11 +77,19 @@ export async function createUtoopackConfig(
 ): Promise<ConfigComplete> {
   const isProduction = process.env.NODE_ENV === "production";
   const serverEnabled = config.serverEnabled;
+  const devProxy: DevServerProxy = [
+    ...config.dev.proxy,
+    ...(!isMpa(config) ? [createSpaHistoryFallbackRule(config)] : []),
+  ];
 
   let finalServerEntry: string | undefined;
 
   if (serverEnabled) {
-    finalServerEntry = config.server.entry || "@evjs/server/app";
+    finalServerEntry = config.server.entry || (await ensureGeneratedServerEntry(cwd));
+  }
+
+  if (serverEnabled && !finalServerEntry) {
+    throw new Error("Failed to resolve a server entry for the server bundle.");
   }
 
   const utoopackConfig: ConfigComplete = {
@@ -69,7 +124,7 @@ export async function createUtoopackConfig(
     ...(serverEnabled
       ? {
           server: {
-            entry: finalServerEntry!,
+            entry: finalServerEntry,
             output: {
               path: path.resolve(cwd, "dist/server"),
               filename: isProduction
@@ -90,7 +145,7 @@ export async function createUtoopackConfig(
     // Dev server configuration
     devServer: {
       hot: true,
-      proxy: config.dev.proxy,
+      proxy: devProxy,
     },
   };
 

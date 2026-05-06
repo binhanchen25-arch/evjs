@@ -1,10 +1,32 @@
-import { createApp } from "@evjs/client";
+import {
+  createApp,
+  createHashHistory,
+  createMemoryHistory,
+} from "@evjs/client";
 import { rootRoute } from "./pages/__root";
-import { usersRoute } from "./pages/home";
+import {
+  aboutRoute,
+  searchRoute,
+  userDetailRoute,
+  usersRoute,
+} from "./pages/home";
 
-const routeTree = rootRoute.addChildren([usersRoute]);
+const routeTree = rootRoute.addChildren([
+  usersRoute,
+  aboutRoute,
+  userDetailRoute,
+  searchRoute,
+]);
 
-const app = createApp({ routeTree });
+const historyType = localStorage.getItem("router_history") || "browser";
+const history =
+  historyType === "hash"
+    ? createHashHistory()
+    : historyType === "memory"
+      ? createMemoryHistory()
+      : undefined;
+
+const app = createApp({ routeTree, history });
 
 declare module "@tanstack/react-router" {
   interface Register {

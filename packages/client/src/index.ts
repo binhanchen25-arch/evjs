@@ -51,6 +51,7 @@ export type {
   RegisteredRouter,
   RouteComponent,
   RouteMatch,
+  RouterHistory,
   RouterOptions,
   RouterState,
   SearchSchemaInput,
@@ -58,7 +59,9 @@ export type {
 export {
   CatchBoundary,
   CatchNotFound,
+  createHashHistory,
   createLink,
+  createMemoryHistory,
   createRootRoute,
   createRootRouteWithContext,
   createRoute,

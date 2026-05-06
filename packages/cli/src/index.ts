@@ -186,7 +186,7 @@ export async function dev(
     const manifestPath = path.resolve(cwd, "dist/server/manifest.json");
     if (!fs.existsSync(manifestPath)) return;
 
-    let manifest: { version?: number; entry?: string };
+    let manifest: ServerManifest;
     try {
       manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
     } catch (err) {
@@ -223,7 +223,7 @@ export async function dev(
           oldProcess.catch(() => {}),
           new Promise((resolve) => setTimeout(resolve, 3000)),
         ]);
-      } catch (e) {}
+      } catch {}
     }
 
     const serverPort = config?.server?.dev?.port ?? CONFIG_DEFAULTS.serverPort;
