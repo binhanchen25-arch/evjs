@@ -8,6 +8,24 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.0.30] — 2026-05-06
+
+### ✨ Features
+
+- **Basic routing example expansion** — Expanded `examples/basic` with static (`/about`), dynamic (`/users/$userId`), and search-param (`/search?tab=`) routes to demonstrate more routing patterns in one example.
+- **Custom router history support** — Added optional `history` support to `createApp()` and re-exported hash and memory history helpers from `@evjs/client`, allowing examples and apps to switch between browser, hash, and memory routing.
+
+### 🐛 Bug Fixes
+
+- **Default dev server entry fallback** — Projects without an explicit `server.entry` now get a generated default server entry, restoring server function support in dev for minimal examples like `examples/basic`.
+- **Browser-history deep-link fallback in dev** — Utoopack dev serving now falls back to the SPA shell for route URLs like `/about` and `/users/1`, preventing `405` responses on direct navigation.
+
+### 🧹 Code Quality
+
+- **Monorepo lint and type cleanup** — Resolved repository lint issues and tightened plugin hook test typing so push-time validation passes cleanly.
+
+---
+
 ## [0.0.29] — 2026-04-29
 
 ### ✨ Features
