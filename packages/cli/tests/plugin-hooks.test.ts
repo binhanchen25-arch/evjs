@@ -1,4 +1,5 @@
 import type {
+  BundlerAdapter,
   EvBuildResult,
   EvPlugin,
   EvPluginContext,
@@ -55,6 +56,33 @@ describe("resolveConfig", () => {
   it("resolved config uses undefined bundler by default (CLI falls back to utoopack)", () => {
     const config = resolveConfig({});
     expect(config.bundler).toBeUndefined();
+  });
+
+  it("plugin contexts can carry the active default bundler", async () => {
+    const bundler = {
+      name: "utoopack",
+      build: async () => {},
+      dev: async () => {},
+    } as BundlerAdapter;
+
+    const config = {
+      ...resolveConfig({}),
+      bundler,
+    };
+
+    const plugin: EvPlugin = {
+      name: "reads-bundler-name",
+      setup(ctx) {
+        expect(ctx.config.bundler?.name).toBe("utoopack");
+        return {};
+      },
+    };
+
+    await collectPluginHooks([plugin], {
+      mode: "production",
+      cwd: process.cwd(),
+      config,
+    });
   });
 });
 

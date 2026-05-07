@@ -55,6 +55,20 @@ async function getBundlerAdapter<TBundlerCfg>(
   return utoopackAdapter as unknown as BundlerAdapter<TBundlerCfg>;
 }
 
+function withActiveBundler<TBundlerCfg>(
+  config: ResolvedEvConfig<TBundlerCfg>,
+  bundler: BundlerAdapter<TBundlerCfg>,
+): ResolvedEvConfig<TBundlerCfg> {
+  if (config.bundler === bundler) {
+    return config;
+  }
+
+  return {
+    ...config,
+    bundler,
+  };
+}
+
 /**
  * Run plugin setup() hooks and collect lifecycle hooks.
  */
@@ -150,9 +164,12 @@ export async function dev(
   userConfig?: EvConfig,
   options?: DevOptions,
 ): Promise<void> {
-  const config = resolveConfig(userConfig);
+  const resolvedConfig = resolveConfig(userConfig);
   const cwd = options?.cwd ?? process.cwd();
   process.env.NODE_ENV ??= "development";
+
+  const bundler = await getBundlerAdapter(resolvedConfig);
+  const config = withActiveBundler(resolvedConfig, bundler);
 
   // Collect plugin hooks
   const pluginCtx: EvPluginContext = { mode: "development", cwd, config };
@@ -160,8 +177,6 @@ export async function dev(
 
   // Run buildStart hooks
   await runBuildStartHooks(hooks);
-
-  const bundler = await getBundlerAdapter(config);
 
   // Validate HTML files exist
   if (config.pages) {
@@ -284,9 +299,12 @@ export async function build(
   userConfig?: EvConfig,
   options?: BuildOptions,
 ): Promise<void> {
-  const config = resolveConfig(userConfig);
+  const resolvedConfig = resolveConfig(userConfig);
   const cwd = options?.cwd ?? process.cwd();
   process.env.NODE_ENV ??= "production";
+
+  const bundler = await getBundlerAdapter(resolvedConfig);
+  const config = withActiveBundler(resolvedConfig, bundler);
 
   // Collect plugin hooks
   const pluginCtx: EvPluginContext = { mode: "production", cwd, config };
@@ -294,8 +312,6 @@ export async function build(
 
   // Run buildStart hooks
   await runBuildStartHooks(hooks);
-
-  const bundler = await getBundlerAdapter(config);
 
   // Validate HTML files exist
   if (config.pages) {
