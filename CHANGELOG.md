@@ -6,13 +6,23 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ## [Unreleased]
 
+---
+
+## [0.0.32] — 2026-05-07
+
 ### ⚠️ Breaking Changes
 
 - **Removed `assetPrefix`** — Deleted the top-level `assetPrefix` config, removed `window.assetPrefix` runtime injection, and dropped `assetPrefix` from emitted client manifests. Client asset URLs now build as root-relative paths.
+- **Standardized Server Entry Exports** — The server entry point now exports an object `{ fetch }` instead of a bare `fetch` function. `createApp().fetch` should now be exported as `export default { fetch: app.fetch };`.
 
 ### ♻️ Refactoring
 
+- **Server Runtimes Integration** — The `node` and `fetch` runtimes are now integrated internally into `@evjs/server/runtimes`, eliminating external loading discrepancies in E2E testing scenarios.
 - **Simplified HTML and bundler asset paths** — `generateHtml()` and the utoopack adapter no longer thread a CDN/public-path prefix through HTML generation, manifest emission, or bundler runtime setup.
+
+### 🐛 Bug Fixes
+
+- **Template Metadata** — Fixed template metadata for the `create-app` scaffolding CLI to ensure correct package naming and metadata on new projects.
 
 ### 📝 Documentation
 
