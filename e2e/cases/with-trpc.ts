@@ -18,7 +18,7 @@ test.describe("with-trpc", () => {
   test("tRPC section loads data", async ({ page, baseURL }) => {
     const trpcPromise = page.waitForResponse(
       (res) =>
-        res.url().includes("/api/trpc") && res.request().method() === "GET",
+        res.url().includes("/api/fn") && res.request().method() === "POST",
     );
     await page.goto(baseURL);
     const trpcResponse = await trpcPromise;

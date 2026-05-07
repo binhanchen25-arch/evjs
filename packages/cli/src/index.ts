@@ -241,7 +241,7 @@ export async function dev(
         [
           `const handler = require(${JSON.stringify(serverBundlePath)}).default;`,
           `const { serve } = require("@evjs/server/node");`,
-          `serve({ fetch: handler }, { port: ${serverPort}, https: ${JSON.stringify(config.server.dev.https)} });`,
+          `serve({ fetch: handler.fetch }, { port: ${serverPort}, https: ${JSON.stringify(config.server.dev.https)} });`,
         ].join("\n"),
       );
 

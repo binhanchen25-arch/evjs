@@ -226,7 +226,7 @@ export function createExampleTest(exampleName: string) {
           [
             `const handler = require(${JSON.stringify(serverEntryPath)}).default;`,
             `const { serve } = require("@hono/node-server");`,
-            `serve({ fetch: handler, port: ${apiPort} }, (info) => {`,
+            `serve({ fetch: handler.fetch, port: ${apiPort} }, (info) => {`,
             `  console.log("E2E_SERVER_READY:" + info.port);`,
             `});`,
           ].join("\n"),

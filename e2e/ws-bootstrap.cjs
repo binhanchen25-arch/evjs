@@ -27,9 +27,10 @@ if (!serverEntryPath || !distDir || !port) {
 }
 
 // Load the server bundle — this registers all server functions
-require(serverEntryPath);
-const { createApp } = require("@evjs/server");
-const handler = createApp();
+// and exports the fetch handler (app.fetch) as `default`.
+// We use the bundle's own fetch handler to ensure it shares the same
+// server function registry that registerServerReference populated.
+const handler = require(serverEntryPath);
 
 const indexHtml = fs.readFileSync(path.join(distDir, "index.html"), "utf-8");
 
@@ -68,7 +69,7 @@ wss.on("connection", (ws) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fnId, args: args ?? [] }),
     });
-    const response = await handler.fetch(request);
+    const response = await handler.default.fetch(request);
     const result = await response.json();
     ws.send(JSON.stringify({ id, ...result }));
   });

@@ -113,7 +113,7 @@ test.describe("complex-routing", () => {
     const dashboardData = await dashboardResponse.json();
     expect(dashboardData.result).toBeDefined();
     expect(dashboardData.result.totalPosts).toBeDefined();
-    expect(dashboardData.result.totalAuthors).toBeDefined();
+    expect(dashboardData.result.totalUsers).toBeDefined();
 
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({
       timeout: 10_000,

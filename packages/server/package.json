@@ -34,14 +34,19 @@
       "default": "./esm/functions/register.js"
     },
     "./node": {
-      "types": "./esm/environments/node.d.ts",
-      "import": "./esm/environments/node.js",
-      "default": "./esm/environments/node.js"
+      "types": "./esm/runtimes/node.d.ts",
+      "import": "./esm/runtimes/node.js",
+      "default": "./esm/runtimes/node.js"
     },
     "./app": {
       "types": "./esm/app.d.ts",
       "import": "./esm/app.js",
       "default": "./esm/app.js"
+    },
+    "./fetch": {
+      "types": "./esm/runtimes/fetch.d.ts",
+      "import": "./esm/runtimes/fetch.js",
+      "default": "./esm/runtimes/fetch.js"
     }
   },
   "scripts": {

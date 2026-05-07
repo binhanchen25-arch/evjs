@@ -10,4 +10,4 @@ const app = createApp({
   routes: [healthHandler, postsHandler, postHandler],
 });
 
-export default app.fetch;
+export default { fetch: app.fetch };

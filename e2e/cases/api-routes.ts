@@ -90,9 +90,7 @@ test.describe("api-routes", () => {
     );
     await newPostListItem.locator('button:has-text("Delete")').click();
     const deleteResponse = await deleteResponsePromise;
-    expect(deleteResponse.status()).toBe(200);
-    const deleteData = await deleteResponse.json();
-    expect(deleteData).toEqual({ status: "ok" });
+    expect(deleteResponse.status()).toBe(204);
 
     // Verify it is removed
     await expect(page.getByText("E2E Test Post")).not.toBeVisible({

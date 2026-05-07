@@ -6,9 +6,11 @@
  * `server.functions.callServerModule` config field.
  */
 
-import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
-import { detectUseServer } from "@evjs/build-tools";
+
+const require = createRequire(import.meta.url);
+
 import {
   type EvBundlerCtx,
   type EvPluginHooks,
@@ -16,35 +18,6 @@ import {
   type ResolvedEvConfig,
 } from "@evjs/ev";
 import type { ConfigComplete, DevServerProxy, ProxyRule } from "@utoo/pack";
-import fastGlob from "fast-glob";
-
-async function ensureGeneratedServerEntry(cwd: string): Promise<string> {
-  const files = await fastGlob("src/**/*.{ts,tsx,js,jsx}", {
-    cwd,
-    absolute: true,
-  });
-
-  const serverModules: string[] = [];
-  for (const file of files) {
-    const source = await fs.promises.readFile(file, "utf-8");
-    if (detectUseServer(source)) {
-      serverModules.push(file);
-    }
-  }
-
-  const outputDir = path.resolve(cwd, "node_modules/.cache/evjs");
-  const outputPath = path.join(outputDir, "server-entry.ts");
-  const source = [
-    'import { createApp } from "@evjs/server";',
-    "const app = createApp();",
-    "export default app.fetch;",
-  ].join("\n");
-
-  await fs.promises.mkdir(outputDir, { recursive: true });
-  await fs.promises.writeFile(outputPath, `${source}\n`);
-
-  return outputPath;
-}
 
 function createSpaHistoryFallbackRule(
   config: ResolvedEvConfig<ConfigComplete>,
@@ -86,7 +59,7 @@ export async function createUtoopackConfig(
 
   if (serverEnabled) {
     finalServerEntry =
-      config.server.entry || (await ensureGeneratedServerEntry(cwd));
+      config.server.entry || require.resolve("@evjs/server/fetch");
   }
 
   if (serverEnabled && !finalServerEntry) {
