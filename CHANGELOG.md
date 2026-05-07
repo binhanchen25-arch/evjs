@@ -8,6 +8,14 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.0.33] — 2026-05-07
+
+### 🐛 Bug Fixes
+
+- **Default utoopack plugin context** — `ev build` and `ev dev` now inject the active default bundler into plugin setup context before collecting hooks, so `bundlerConfig` helpers like `utoopack()` work even when users rely on the implicit default bundler instead of explicitly setting `bundler: utoopackAdapter`.
+
+---
+
 ## [0.0.32] — 2026-05-07
 
 ### ⚠️ Breaking Changes
