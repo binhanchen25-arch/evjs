@@ -8,6 +8,21 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.0] — 2026-05-07
+
+### ✨ Highlights
+
+- **Initial public milestone** — Promoted evjs to `0.1.0` as the first tagged milestone intended for GitHub-driven releases and npm publication.
+- **Full-stack React framework core** — Ships TanStack Router based client routing, Hono-powered server routes and server functions, plugin hooks, and the `utoopack` bundler integration as the supported framework baseline.
+- **Scaffolding and examples** — Includes `create-app` templates plus runnable examples for API routes, complex routing, MPA, custom websocket transport, Tailwind, tRPC, SQLite, and plugin authoring.
+
+### ⚠️ Important Notes
+
+- **Asset prefix removal** — The top-level `assetPrefix` config and related runtime injection were removed in `0.0.32`; production asset URLs are now emitted as root-relative paths.
+- **Server entry export shape** — Server entries now export an object like `export default { fetch: app.fetch };` instead of exporting `fetch` directly.
+
+---
+
 ## [0.0.33] — 2026-05-07
 
 ### 🐛 Bug Fixes
