@@ -157,14 +157,14 @@ setup() {
 Usually, plugins only need to support the bundler your project actually uses. evjs uses `utoopack` by default. Import the `utoopack()` helper for full TypeScript support:
 
 ```ts
-import { mergeUtoopackConfig, utoopack } from "@evjs/bundler-utoopack";
+import { mergeConfig, utoopack } from "@evjs/bundler-utoopack";
 
 {
   name: "yaml-support",
   setup() {
     return {
       bundlerConfig: utoopack((cfg) => {
-        mergeUtoopackConfig(cfg, {
+        mergeConfig(cfg, {
           module: { rules: { ".yaml": { type: "json" } } },
         });
       }),

@@ -4,12 +4,12 @@ import type { ConfigComplete } from "@utoo/pack";
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 type Builtin = Primitive | RegExp | ((...args: never[]) => unknown);
 
-export type UtoopackConfigPatch<T> = T extends Builtin
+export type ConfigPatch<T> = T extends Builtin
   ? T
   : T extends readonly unknown[]
     ? T
     : T extends object
-      ? { [K in keyof T]?: UtoopackConfigPatch<T[K]> }
+      ? { [K in keyof T]?: ConfigPatch<T[K]> }
       : T;
 
 /**
@@ -47,9 +47,9 @@ export function utoopack<T = unknown>(
   };
 }
 
-export function mergeUtoopackConfig(
+export function mergeConfig(
   config: ConfigComplete,
-  patch: UtoopackConfigPatch<ConfigComplete>,
+  patch: ConfigPatch<ConfigComplete>,
 ): void {
   mergeObject(
     config as unknown as Record<string, unknown>,

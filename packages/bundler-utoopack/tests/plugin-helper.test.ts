@@ -1,8 +1,8 @@
 import type { ConfigComplete } from "@utoo/pack";
 import { describe, expect, it } from "vitest";
-import { mergeUtoopackConfig } from "../src/plugin-helper.js";
+import { mergeConfig } from "../src/plugin-helper.js";
 
-describe("mergeUtoopackConfig", () => {
+describe("mergeConfig", () => {
   it("merges nested config sections", () => {
     const config: ConfigComplete = {
       entry: [],
@@ -13,7 +13,7 @@ describe("mergeUtoopackConfig", () => {
       },
     };
 
-    mergeUtoopackConfig(config, {
+    mergeConfig(config, {
       module: {
         rules: {
           ".mdx": { type: "raw" },
@@ -35,7 +35,7 @@ describe("mergeUtoopackConfig", () => {
       },
     };
 
-    mergeUtoopackConfig(config, {
+    mergeConfig(config, {
       resolve: {
         extensions: [".jsx", ".js"],
       },
