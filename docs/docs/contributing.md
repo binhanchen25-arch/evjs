@@ -58,4 +58,5 @@ npx biome check --write    # Fix lint/format
 ### Release a new version
 1. Create a GitHub Release with a tag like `v0.1.0`
 2. The release workflow automatically syncs versions and publishes to npm
-3. **Do NOT bump versions locally** — the codebase uses `"*"` for internal deps
+3. Keep every published `@evjs/*` package on the same version. Upgrade and release them together; do not publish only one subpackage at a newer version.
+4. **Do NOT bump versions locally** — the codebase uses `"*"` for internal deps
