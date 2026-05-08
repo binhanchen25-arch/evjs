@@ -20,7 +20,7 @@ dist/
 │   ├── main.[hash].js      # Client bundle
 │   └── [chunk].[hash].js   # Code-split chunks
 └── server/
-    ├── manifest.json       # Server function registry
+    ├── manifest.json       # Server function + route registry
     └── main.[hash].js      # Server function bundle (CJS)
 ```
 
@@ -49,29 +49,49 @@ Files with `"use server"` are automatically processed with dual transforms:
 | **Client** | Function bodies are replaced with `createServerReference()` RPC stubs |
 | **Server** | Original function bodies are preserved + `registerServerReference()` injected |
 
-Function IDs are stable SHA-256 hashes derived from `filePath + exportName`.
+Function IDs use the same algorithm as Utoopack server references: `sha256(moduleId + "#" + exportName)`, truncated to 16 hex characters. The manifest generator analyzes source exports and uses Utoopack `stats.json` module IDs when available, so the IDs match the values emitted in client stubs and server registration code.
 
 ### Build Pipeline
 
 1. `loadConfig(cwd)` — loads `ev.config.ts` or convention-based defaults
 2. `BundlerAdapter.build()` — generates bundler config and runs compilation
 3. The active bundler adapter runs during compilation:
-   - Discovers `*.server.ts` files via glob
-   - Applies SWC transforms (client + server variants)
-   - Runs child compiler for server bundle
-   - Emits `dist/server/manifest.json` (function registry) and `dist/client/manifest.json` (asset map + routes)
+   - Runs the client and server bundle compilation
+   - Reads Utoopack stats for emitted asset names and module IDs
+   - Analyzes source files for client routes, server routes, and `"use server"` exports
+   - Computes function IDs with Utoopack-compatible module ID hashing
+   - Emits `dist/server/manifest.json` (function + route registry) and `dist/client/manifest.json` (asset map + client routes)
 
 ## Server Manifest (`dist/server/manifest.json`)
 
-Contains the server function registry:
+Contains the server function and route handler registry:
 
 ```json
 {
   "version": 1,
   "entry": "main.a1b2c3d4.js",
+  "assets": {
+    "js": ["main.a1b2c3d4.js"],
+    "css": []
+  },
   "fns": {
-    "a1b2c3d4": { "moduleId": "f9b6...", "export": "getUsers" }
-  }
+    "a1b2c3d4": {
+      "assets": {
+        "js": ["main.a1b2c3d4.js"],
+        "css": []
+      }
+    }
+  },
+  "routes": [
+    {
+      "path": "/api/users",
+      "methods": ["GET", "POST"],
+      "assets": {
+        "js": ["main.a1b2c3d4.js"],
+        "css": []
+      }
+    }
+  ]
 }
 ```
 

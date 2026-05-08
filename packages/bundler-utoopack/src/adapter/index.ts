@@ -112,6 +112,14 @@ async function generateAndEmitHtml(
   await fs.promises.writeFile(outPath, finalHtml, "utf-8");
 }
 
+async function cleanServerOutput(cwd: string, serverEnabled: boolean) {
+  if (!serverEnabled) return;
+  await fs.promises.rm(path.resolve(cwd, "dist/server"), {
+    recursive: true,
+    force: true,
+  });
+}
+
 export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
   name: "utoopack",
   async build(
@@ -123,6 +131,8 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
     const utoopackConfig = await createUtoopackConfig(config, cwd, hooks);
 
     logger.info`Building for production with utoopack...`;
+
+    await cleanServerOutput(cwd, config.serverEnabled);
 
     const { build } = await import("@utoo/pack");
     await build({ config: utoopackConfig });
@@ -151,12 +161,6 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
     const { serve } = await import("@utoo/pack");
     await serve({ config: utoopackConfig });
 
-    logger.info`Starting route watcher for dev manifest...`;
-    const generator = new UtoopackManifestGenerator(cwd, config.serverEnabled);
-    await generator.watch(async () => {
-      await generateAndEmitHtml(config, cwd, hooks);
-    });
-
     // Watch for server bundle readiness (utoopack emits server output
     // to dist/server/ when "use server" modules are discovered)
     if (config.serverEnabled) {
@@ -177,10 +181,6 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
 
         if (hasBundle) {
           ready = true;
-          // Re-generate manifests now that server stats are available
-          await generator.loadServerStats();
-          await generator.emit();
-          await generateAndEmitHtml(config, cwd, hooks);
           callbacks.onServerBundleReady();
           watcher?.close();
         }

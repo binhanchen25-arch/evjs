@@ -4,12 +4,20 @@
 
 export type { GenerateHtmlOptions, HtmlAsset } from "./html.js";
 export { generateHtml } from "./html.js";
-export type { ExtractedRoute } from "./routes.js";
+export type {
+  ExtractedRoute,
+  ExtractedServerRoute,
+  RouteAnalysis,
+} from "./routes.js";
 export {
+  analyzeRoutes,
   detectServerRouteExports,
-  extractRoutes,
+  extractClientRoutes,
+  extractClientRoutesFromAst,
+  extractServerRoutes,
   resolveRoutes,
 } from "./routes.js";
+export { extractServerFunctionExports } from "./server-fns.js";
 export type { TransformResult } from "./transforms/index.js";
 export { transformServerFile } from "./transforms/index.js";
 export type {
@@ -19,7 +27,7 @@ export type {
 } from "./types.js";
 export {
   detectUseServer,
-  hashString,
+  hashServerFunction,
   makeFnId,
   makeModuleId,
   parseModuleRef,
