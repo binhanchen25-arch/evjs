@@ -45,7 +45,9 @@ interface EvPlugin {
   ) => EvConfig | undefined | Promise<EvConfig | undefined>;
 
   /** 初始化插件，返回生命周期钩子。 */
-  setup?: (ctx: EvPluginContext) => EvPluginHooks | undefined;
+  setup?: (
+    ctx: EvPluginContext,
+  ) => EvPluginHooks | undefined | Promise<EvPluginHooks | undefined>;
 }
 ```
 
@@ -79,6 +81,7 @@ export default defineConfig({
 ```ts
 interface EvPluginContext {
   mode: "development" | "production";
+  cwd: string;
   config: ResolvedEvConfig;
 }
 ```
@@ -103,11 +106,11 @@ flowchart LR
 
 | 钩子 | 签名 | 时机 |
 |------|------|------|
-| `config` | `(config, ctx) => EvConfig \| undefined` | 默认配置解析前 |
-| `buildStart` | `() => void` | 编译开始前 |
+| `config` | `(config, ctx) => EvConfig \| undefined \| Promise<...>` | 默认配置解析前 |
+| `buildStart` | `() => void \| Promise<void>` | 编译开始前 |
 | `bundlerConfig` | `(config, ctx) => void` | 构建器配置创建期间 |
-| `transformHtml` | `(doc, result) => void` | 资源注入后、HTML 输出前 |
-| `buildEnd` | `(result) => void` | 编译完成后 |
+| `transformHtml` | `(doc, result) => void \| Promise<void>` | 资源注入后、HTML 输出前 |
+| `buildEnd` | `(result) => void \| Promise<void>` | 生产构建编译完成后 |
 
 所有钩子均可异步（返回 `Promise`）。
 
@@ -133,13 +136,13 @@ setup() {
 
 ### `bundlerConfig`
 
-直接修改底层构建器配置。`config` 类型默认为 `unknown` —— 使用类型辅助函数获得安全性。
+直接修改底层构建器配置。应使用当前构建器对应的类型辅助函数，避免依赖类型断言或错误的配置结构。
 
 ```ts
 setup() {
   return {
     bundlerConfig(config, ctx) {
-      // `config` 是 `unknown` —— 使用下方的类型辅助函数
+      // 优先使用下方的类型辅助函数修改特定构建器配置。
     },
   };
 }
@@ -229,13 +232,13 @@ import type { EvDocument } from "@evjs/ev";
 
 ### `buildEnd`
 
-编译完成后运行。接收包含两个 manifest 的 `EvBuildResult`：
+生产构建编译完成后运行。接收包含两个 manifest 的 `EvBuildResult`：
 
 ```ts
 interface EvBuildResult {
   clientManifest: ClientManifest;      // 资源、路由
   serverManifest?: ServerManifest;     // entry、fns（server: false 时为 undefined）
-  isRebuild: boolean;                 // 开发模式 watch 时为 true
+  isRebuild: boolean;                 // 常规生产构建为 false
 }
 ```
 

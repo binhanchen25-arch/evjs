@@ -45,7 +45,9 @@ interface EvPlugin {
   ) => EvConfig | undefined | Promise<EvConfig | undefined>;
 
   /** Initialize the plugin, return lifecycle hooks. */
-  setup?: (ctx: EvPluginContext) => EvPluginHooks | undefined;
+  setup?: (
+    ctx: EvPluginContext,
+  ) => EvPluginHooks | undefined | Promise<EvPluginHooks | undefined>;
 }
 ```
 
@@ -79,6 +81,7 @@ The `setup` function receives a context with the current mode and the fully reso
 ```ts
 interface EvPluginContext {
   mode: "development" | "production";
+  cwd: string;
   config: ResolvedEvConfig;
 }
 ```
@@ -91,21 +94,30 @@ Hooks run at specific points in the build pipeline:
 
 ```mermaid
 flowchart LR
-    A[buildStart] --> B[bundlerConfig]
-    B --> C["bundler compile"]
-    C --> D["HTML generation"]
-    D --> E[transformHtml]
-    E --> F[buildEnd]
+    A[config] --> B["resolveConfig"]
+    B --> C[setup]
+    C --> D[buildStart]
+    D --> E[bundlerConfig]
+    E --> F["bundler compile"]
+    F --> G["HTML generation"]
+    G --> H[transformHtml]
+    H --> I[buildEnd]
 ```
 
 | Hook | Signature | When |
 |------|-----------|------|
-| `buildStart` | `() => void` | Before compilation begins |
+| `config` | `(config, ctx) => EvConfig \| undefined \| Promise<...>` | Before defaults are resolved |
+| `buildStart` | `() => void \| Promise<void>` | Before compilation begins |
 | `bundlerConfig` | `(config, ctx) => void` | During bundler config creation |
-| `transformHtml` | `(doc, result) => void` | After asset injection, before HTML is emitted |
-| `buildEnd` | `(result) => void` | After compilation completes |
+| `transformHtml` | `(doc, result) => void \| Promise<void>` | After asset injection, before HTML is emitted |
+| `buildEnd` | `(result) => void \| Promise<void>` | After production compilation completes |
 
 All hooks can be `async` (return a `Promise`).
+
+Use `config` to change evjs framework options. Use `bundlerConfig` only for
+the underlying bundler config; do not use it for runtime protocol settings like
+`server.endpoint`, because those must also affect dev proxy setup and generated
+runtime defines.
 
 ---
 
@@ -127,13 +139,14 @@ setup() {
 
 ### `bundlerConfig`
 
-Mutate the underlying bundler configuration directly. The `config` type is `unknown` by default — use a typed helper for safety.
+Mutate the underlying bundler configuration directly. Use a typed helper for
+the active bundler to avoid depending on casts or the wrong config shape.
 
 ```ts
 setup() {
   return {
     bundlerConfig(config, ctx) {
-      // `config` is `unknown` — cast or use the typed helper below
+      // Prefer the typed helper below for bundler-specific config changes.
     },
   };
 }
@@ -223,13 +236,14 @@ import type { EvDocument } from "@evjs/ev";
 
 ### `buildEnd`
 
-Runs after compilation completes. Receives the `EvBuildResult` containing both manifests:
+Runs after production compilation completes. Receives the `EvBuildResult`
+containing both manifests:
 
 ```ts
 interface EvBuildResult {
   clientManifest: ClientManifest;      // assets, routes
   serverManifest?: ServerManifest;     // entry, fns (undefined if server: false)
-  isRebuild: boolean;                 // true in dev watch mode
+  isRebuild: boolean;                 // false for a normal production build
 }
 ```
 
