@@ -153,14 +153,14 @@ setup() {
 通常情况下，插件只需支持项目实际使用的构建器即可。evjs 默认使用 `utoopack`。导入 `utoopack()` 辅助函数即可获得完整的 TypeScript 支持：
 
 ```ts
-import { mergeConfig, utoopack } from "@evjs/bundler-utoopack";
+import { merge, utoopack } from "@evjs/bundler-utoopack";
 
 {
   name: "yaml-support",
   setup() {
     return {
       bundlerConfig: utoopack((cfg) => {
-        mergeConfig(cfg, {
+        merge(cfg, {
           module: { rules: { ".yaml": { type: "json" } } },
         });
       }),
@@ -262,14 +262,14 @@ setup() {
 ### 注入构建时常量
 
 ```ts
-import { mergeConfig, utoopack } from "@evjs/bundler-utoopack";
+import { merge, utoopack } from "@evjs/bundler-utoopack";
 
 {
   name: "env-inject",
   setup() {
     return {
       bundlerConfig: utoopack((cfg) => {
-        mergeConfig(cfg, {
+        merge(cfg, {
           define: {
             __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
             __APP_VERSION__: JSON.stringify("1.0.0"),

@@ -159,7 +159,7 @@ This example demonstrates a production-ready setup with custom loaders and build
 
 ```ts
 import { defineConfig } from "@evjs/ev";
-import { mergeConfig, utoopack } from "@evjs/bundler-utoopack";
+import { merge, utoopack } from "@evjs/bundler-utoopack";
 
 export default defineConfig({
   entry: "./src/entry-client.tsx",
@@ -181,7 +181,7 @@ export default defineConfig({
       setup() {
         return {
           bundlerConfig: utoopack((cfg) => {
-            mergeConfig(cfg, {
+            merge(cfg, {
               module: { rules: { ".mdx": { type: "raw" } } },
             });
           }),

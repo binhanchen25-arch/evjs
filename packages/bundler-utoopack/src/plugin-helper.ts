@@ -47,7 +47,7 @@ export function utoopack<T = unknown>(
   };
 }
 
-export function mergeConfig(
+export function merge(
   config: ConfigComplete,
   patch: ConfigPatch<ConfigComplete>,
 ): void {
