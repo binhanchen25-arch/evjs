@@ -180,13 +180,11 @@ export default defineConfig({
       name: "mdx-support",
       setup() {
         return {
-          bundlerConfig(config, ctx) {
-            utoopack((cfg) => {
-              mergeConfig(cfg, {
-                module: { rules: { ".mdx": { type: "raw" } } },
-              });
-            })(config, ctx);
-          },
+          bundlerConfig: utoopack((cfg) => {
+            mergeConfig(cfg, {
+              module: { rules: { ".mdx": { type: "raw" } } },
+            });
+          }),
         };
       },
     },

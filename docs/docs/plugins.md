@@ -267,19 +267,20 @@ setup() {
 ### Inject Build-Time Constants
 
 ```ts
-import { utoopack } from "@evjs/bundler-utoopack";
+import { mergeConfig, utoopack } from "@evjs/bundler-utoopack";
 
 {
   name: "env-inject",
   setup() {
     return {
-      bundlerConfig(config, ctx) {
-        utoopack((cfg) => {
-          cfg.define ??= {};
-          cfg.define.__BUILD_TIME__ = JSON.stringify(new Date().toISOString());
-          cfg.define.__APP_VERSION__ = JSON.stringify("1.0.0");
-        })(config, ctx);
-      },
+      bundlerConfig: utoopack((cfg) => {
+        mergeConfig(cfg, {
+          define: {
+            __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+            __APP_VERSION__: JSON.stringify("1.0.0"),
+          },
+        });
+      }),
     };
   },
 }

@@ -32,14 +32,12 @@ export default defineConfig({
 
           // Type-safe bundler config mutation via the utoopack helper.
           // This hook only runs when utoopack is the active bundler.
-          bundlerConfig(config, ctx) {
-            utoopack((cfg) => {
-              // Add custom loaders or rules to utoopack
-              mergeConfig(cfg, {
-                module: { rules: { ".txt": { type: "raw" } } },
-              });
-            })(config, ctx);
-          },
+          bundlerConfig: utoopack((cfg) => {
+            // Add custom loaders or rules to utoopack
+            mergeConfig(cfg, {
+              module: { rules: { ".txt": { type: "raw" } } },
+            });
+          }),
 
           buildEnd(result) {
             console.log(
