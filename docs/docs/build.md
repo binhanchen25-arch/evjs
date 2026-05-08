@@ -112,4 +112,4 @@ Contains client build metadata:
 - Works out of the box with convention-based defaults
 - Client bundles use content-hash filenames for cache busting
 - Server bundle externalizes `node_modules` (except `@evjs/*` packages)
-- No temp config files — webpack is driven via Node API
+- No temp config files — Utoopack is driven through its Node API

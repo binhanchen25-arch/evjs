@@ -21,9 +21,9 @@ The client dev server automatically proxies `/api/*` requests to the API server.
 
 ```mermaid
 flowchart LR
-    Browser -->|":3000"| WDS["Dev Server"]
-    WDS -->|"HMR"| Browser
-    WDS -->|"/api/* proxy"| API["API Server :3001"]
+    Browser -->|":3000"| DEV["Dev Server"]
+    DEV -->|"HMR"| Browser
+    DEV -->|"/api/* proxy"| API["API Server :3001"]
     API --> Hono["Hono App"]
     Hono --> Registry["Server Function Registry"]
 ```
@@ -38,12 +38,11 @@ export default defineConfig({
   entry: "./src/main.tsx",         // Default
   html: "./index.html",            // Default
   dev: {
-    port: 3000,                   // WDS port
+    port: 3000,                   // Client dev server port
     https: false,                 // HTTPS mode
   },
   server: {
     endpoint: "/api/fn",           // Default
-    runtime: "node",               // Or "bun", "deno", etc.
     dev: {
       port: 3001,                 // API port
       https: false,               // HTTPS for API server
@@ -63,19 +62,9 @@ export default defineConfig({
 7. The CLI core auto-starts the API server via `@evjs/server/node`.
 8. Sets up reverse proxy: `devServer.proxy["/api"] → localhost:3001`.
 
-## Custom Runtimes
+## API Server Runtime
 
-The `server.runtime` field supports any executable:
-
-- `"node"` (default) — uses `--watch` for auto-restart
-- `"bun"` — passes args as-is
-- `"deno run --allow-net"` — split on whitespace, extra args forwarded
-
-:::warning
-
-The ECMA environment adapter (`@evjs/server/ecma`) only exports a `{ fetch }` handler — it does **not** start a listening server. For `ev dev`, you **must** use a runtime that starts an HTTP server (default: `"node"`).
-
-:::
+In dev mode, evjs runs the built server bundle through a small Node bootstrap that calls `@evjs/server/node`. For production, deploy the emitted `{ fetch }` handler with the runtime wrapper that matches your host.
 
 ## Programmatic API
 
@@ -98,6 +87,6 @@ await build({ entry: "./src/main.tsx" }, { cwd: "./my-app", bundler: utoopackAda
 
 `initTransport` is called automatically by `createApp()` to configure how the client communicates with the server.
 
-- In **dev mode**: WDS proxies `/api/*` → `:3001`, so the default `/api/fn` endpoint works automatically
+- In **dev mode**: the client dev server proxies `/api/*` → `:3001`, so the default `/api/fn` endpoint works automatically
 - In **production**: client and server are typically on the same origin
 - The transport is **runtime-agnostic** — the client always posts to the same endpoint regardless of server runtime

@@ -21,9 +21,9 @@ ev dev
 
 ```mermaid
 flowchart LR
-    Browser["浏览器"] -->|":3000"| WDS["开发服务器"]
-    WDS -->|"HMR"| Browser
-    WDS -->|"/api/* 代理"| API["API 服务器 :3001"]
+    Browser["浏览器"] -->|":3000"| DEV["开发服务器"]
+    DEV -->|"HMR"| Browser
+    DEV -->|"/api/* 代理"| API["API 服务器 :3001"]
     API --> Hono["Hono 应用"]
     Hono --> Registry["服务端函数注册表"]
 ```
@@ -43,7 +43,6 @@ export default defineConfig({
   },
   server: {
     endpoint: "/api/fn",           // 默认值
-    runtime: "node",               // 或 "bun", "deno" 等
     dev: {
       port: 3001,                 // API 端口
       https: false,               // API 服务器 HTTPS
@@ -63,19 +62,9 @@ export default defineConfig({
 7. CLI 核心通过 `@evjs/server/node` 自动启动 API 服务器。
 8. 设置反向代理：`devServer.proxy["/api"] → localhost:3001`。
 
-## 自定义运行时
+## API 服务器运行时
 
-`server.runtime` 字段支持任何可执行文件：
-
-- `"node"`（默认） — 使用 `--watch` 进行自动重启
-- `"bun"` — 原样传递参数
-- `"deno run --allow-net"` — 根据空格拆分，将额外参数转发
-
-:::warning
-
-ECMA 适配器（`@evjs/server/ecma`）只导出一个 `{ fetch }` 处理器 —— 它**不会**启动监听服务器。在 `ev dev` 中，你**必须**使用启动 HTTP 服务器的运行时（默认：`"node"`）。
-
-:::
+开发模式下，evjs 会通过一个小型 Node bootstrap 运行已构建的服务端 bundle，并调用 `@evjs/server/node`。生产环境中，应根据目标宿主环境选择合适的运行时包装来部署产出的 `{ fetch }` handler。
 
 ## 编程式 API
 

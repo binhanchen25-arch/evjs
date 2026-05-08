@@ -16,7 +16,6 @@ export default defineConfig({ /* ... */ });
 | `entry` | `./src/main.tsx` |
 | `html` | `./index.html` |
 | `dev.port` | `3000` |
-| `server.runtime` | `"node"` |
 | `server.dev.port` | `3001` |
 | `server.endpoint` | `/api/fn` |
 
@@ -36,8 +35,11 @@ export default defineConfig({
   // server: false,
   server: {
     entry: "./src/server.ts",
-    runtime: "node",
     endpoint: "/api/fn",
+    functions: {
+      clientProxy: "@evjs/client/transport",
+      serverRegister: "@evjs/server/register",
+    },
     dev: {
       port: 3001,
       https: false,
@@ -106,19 +108,22 @@ export default defineConfig({ server: false });
 - 任何 `"use server"` 模块都会导致**构建错误**
 - 开发模式下不配置 API 代理
 
-### `server.runtime`
+### `server.entry`
 
-| 值 | 行为 |
-|----|------|
-| `"node"`（默认） | 在开发模式使用 `--watch` 自动重启 |
-| `"bun"` | 直接传递参数 |
-| `"deno run --allow-net"` | 空格分割，额外参数转发 |
+显式服务端入口文件。提供后会覆盖自动生成的 `@evjs/server/fetch` 入口。自定义入口应默认导出带 `fetch` 的对象，通常写作 `export default { fetch: app.fetch };`。
 
-:::warning
+### `server.endpoint`
 
-ECMA 适配器（`@evjs/server/ecma`）只导出一个 `{ fetch }` 处理器 —— 它**不会**启动监听服务器。在 `ev dev` 中，始终使用 `"node"` 作为后端。
+| 选项 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `endpoint` | `string` | `/api/fn` | 服务端函数 RPC 调用路径 |
 
-:::
+### `server.functions`
+
+| 选项 | 类型 | 默认值 | 描述 |
+|------|------|--------|------|
+| `clientProxy` | `string` | `@evjs/client/transport` | 客户端服务端函数桩代码使用的模块 |
+| `serverRegister` | `string` | `@evjs/server/register` | 服务端函数实现注册使用的模块 |
 
 ## 示例
 
@@ -135,6 +140,10 @@ export default defineConfig({
   server: {
     entry: "./src/entry-server.ts",
     endpoint: "/api/rpc",
+    functions: {
+      clientProxy: "@evjs/client/transport",
+      serverRegister: "@evjs/server/register",
+    },
     dev: { port: 4001 },
   },
 
@@ -173,4 +182,3 @@ export default defineConfig({
   ],
 });
 ```
-

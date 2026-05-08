@@ -22,9 +22,11 @@ npm run build
 // server.mjs
 import { serve } from "@evjs/server/node";
 import { serveStatic } from "@hono/node-server/serve-static";
-import * as serverBundle from "./dist/server/main.js";
+import { Hono } from "hono";
+import serverHandler from "./dist/server/main.js";
 
-const app = serverBundle.createApp();
+const app = new Hono();
+app.all("/api/*", (c) => serverHandler.fetch(c.req.raw));
 app.use("/*", serveStatic({ root: "./dist/client" }));
 app.get("*", serveStatic({ path: "./dist/client/index.html" }));
 serve(app, { port: process.env.PORT || 3000 });
@@ -54,9 +56,11 @@ CMD ["node", "server.mjs"]
 
 ```ts
 import { serveStatic } from "hono/deno";
-import * as serverBundle from "./dist/server/main.js";
+import { Hono } from "hono";
+import serverHandler from "./dist/server/main.js";
 
-const app = serverBundle.createApp();
+const app = new Hono();
+app.all("/api/*", (c) => serverHandler.fetch(c.req.raw));
 app.use("/*", serveStatic({ root: "./dist/client" }));
 Deno.serve({ port: 3000 }, app.fetch);
 ```
@@ -64,8 +68,11 @@ Deno.serve({ port: 3000 }, app.fetch);
 ## 方案四：Bun
 
 ```ts
-import * as serverBundle from "./dist/server/main.js";
-const app = serverBundle.createApp();
+import { Hono } from "hono";
+import serverHandler from "./dist/server/main.js";
+
+const app = new Hono();
+app.all("/api/*", (c) => serverHandler.fetch(c.req.raw));
 export default { port: 3000, fetch: app.fetch };
 ```
 

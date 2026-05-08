@@ -100,9 +100,11 @@ Provide route handlers to `createApp()` in your server entry:
 import { createApp } from "@evjs/server";
 import { postsRoute, postDetailsRoute } from "./api/posts.routes";
 
-export const app = createApp({
-  routeHandlers: [postsRoute, postDetailsRoute],
+const app = createApp({
+  routes: [postsRoute, postDetailsRoute],
 });
+
+export default { fetch: app.fetch };
 ```
 
 Then configure the server entry in `ev.config.ts`:
@@ -126,6 +128,6 @@ export default defineConfig({
 
 :::tip
 
-If you combine `routeHandlers` with `"use server"` Server Functions, `createApp()` handles **both**. Route handlers are mounted first; the RPC fallback handles requests at `/api/fn`.
+If you combine `routes` with `"use server"` Server Functions, `createApp()` handles **both**. Route handlers are mounted first; the RPC fallback handles requests at `/api/fn`.
 
 :::

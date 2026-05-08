@@ -110,4 +110,4 @@ dist/
 - 使用基于约定的默认值即可开箱即用
 - 客户端 bundle 使用内容哈希文件名实现缓存失效
 - 服务端 bundle 将 `node_modules` 外部化（`@evjs/*` 包除外）
-- 无临时配置文件 —— webpack 通过 Node API 驱动
+- 无临时配置文件 —— Utoopack 通过 Node API 驱动

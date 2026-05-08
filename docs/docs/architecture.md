@@ -9,10 +9,10 @@ evjs is a React fullstack framework with type-safe routing (TanStack Router), da
 ```
 ┌─────────────────────────── Build Time ───────────────────────────┐
 │                                                                  │
-│  @evjs/cli ──► @evjs/bundler-utoopack ──► @evjs/manifest           │
-│                      ▲                    (manifests)            │
-│  @evjs/build-tools ──┘                                           │
-│  (bundler-agnostic)                                              │
+│  @evjs/cli ──► @evjs/ev ──► BundlerAdapter ──► @evjs/bundler-utoopack │
+│                     │                         ├── @evjs/build-tools  │
+│                     │                         └── @evjs/manifest     │
+│               config, plugins, orchestration        (manifests)      │
 │                                                                  │
 └──────────────────────────────┬───────────────────────────────────┘
                                │
@@ -22,7 +22,7 @@ evjs is a React fullstack framework with type-safe routing (TanStack Router), da
 │                                  │ │                                   │
 │  TanStack Router                 │ │  Hono App (createApp)             │
 │  TanStack Query                  │ │  registerServerReference() + createRoute()│
-│  createServerReference() stubs   │ │  createFetchHandler()             │
+│  createServerReference() stubs   │ │  fetch handler                    │
 │  ServerTransport ────────────────┼─┼──► POST /api/fn ──► registry     │
 │                                  │ │                                   │
 └──────────────────────────────────┘ └───────────────────────────────────┘
@@ -46,10 +46,10 @@ evjs is a React fullstack framework with type-safe routing (TanStack Router), da
 ```
 ev.config.ts ──► defineConfig({ entry, html, dev, server, plugins })
                     │
-                    ├── entry, html ──► webpack entry + HtmlPlugin
+                    ├── entry, html ──► Utoopack entries + HTML templates
                     ├── plugins ──► EvPlugin[] (setup → buildStart/bundler/transformHtml/buildEnd)
                     ├── dev.port ──► dev server port
-                    ├── server.endpoint ──► EvBundlerPlugin + proxy path
+                    ├── server.endpoint ──► server function defines + proxy path
                     ├── server.dev.port ──► API server port
                     └── server.dev.https ──► HTTPS for API server
                     │
@@ -92,26 +92,26 @@ Browser ──(:3000)──► Dev Server ──► HMR (static assets)
                                               registry.get(fnId)(...args)
 ```
 
-`ev dev` uses the bundler Node API directly:
-1. Creates webpack compiler + dev server in-process
+`ev dev` uses the active bundler adapter directly:
+1. Starts the Utoopack dev server for client HMR
 2. Polls for `dist/server/manifest.json`
-3. Writes a CJS bootstrap and runs it with `node --watch`
+3. Writes a CJS bootstrap and runs the server bundle with Node
 
 ## Build Flow (`ev build`)
 
 1. `loadConfig(cwd)` — loads `ev.config.ts` or returns defaults
-2. `createWebpackConfig(config, cwd)` — generates webpack config (no temp files)
-3. Calls `utoopack()` Node API directly
+2. `createUtoopackConfig(config, cwd, hooks)` — maps evjs config into Utoopack config
+3. Calls the Utoopack Node API through `@evjs/bundler-utoopack`
 4. `@evjs/bundler-utoopack` runs during compilation:
-   - Discovers `*.server.ts` via glob
-   - Applies SWC transforms (client + server variants)
-   - Runs child compiler for server bundle
+   - Runs client and server bundle compilation
+   - Uses Utoopack server function config for `"use server"` references
+   - Analyzes stats and source metadata for assets, routes, and functions
    - Emits `dist/server/manifest.json` and `dist/client/manifest.json`
 
 ## Deployment Adapters
 
 ```
 Node.js          server.entry.mjs ──► @hono/node-server
-ECMA (Deno/Bun)  server.entry.mjs ──► createFetchHandler(app)
+Fetch runtimes    server.entry.mjs ──► export default { fetch }
 Service Worker   sw.entry.js ──► self.addEventListener('fetch', ...)
 ```

@@ -25,12 +25,15 @@ The default and simplest deployment option:
 // server.mjs
 import { serve } from "@evjs/server/node";
 import { serveStatic } from "@hono/node-server/serve-static";
-import * as serverBundle from "./dist/server/main.js";
+import { Hono } from "hono";
+import serverHandler from "./dist/server/main.js";
 
-// 1. Initialize the Hono app with server functions
-const app = serverBundle.createApp();
+const app = new Hono();
 
-// 2. Serve the static client bundle
+// 1. Mount evjs API routes and server functions before the SPA fallback
+app.all("/api/*", (c) => serverHandler.fetch(c.req.raw));
+
+// 2. Serve the static client bundle and SPA fallback
 app.use("/*", serveStatic({ root: "./dist/client" }));
 app.get("*", serveStatic({ path: "./dist/client/index.html" }));
 
@@ -67,24 +70,17 @@ CMD ["node", "server.mjs"]
 
 ## Option 3: Deno
 
-Use the ECMA adapter for Deno deployment:
-
-```ts
-// ev.config.ts
-export default defineConfig({
-  server: {
-    runtime: "deno run -A",  // During dev
-  },
-});
-```
+Use the emitted `{ fetch }` handler from the server bundle:
 
 ```ts
 // server.ts
 import { serveStatic } from "hono/deno";
-import * as serverBundle from "./dist/server/main.js";
+import { Hono } from "hono";
+import serverHandler from "./dist/server/main.js";
 
-const app = serverBundle.createApp();
+const app = new Hono();
 
+app.all("/api/*", (c) => serverHandler.fetch(c.req.raw));
 app.use("/*", serveStatic({ root: "./dist/client" }));
 app.get("*", serveStatic({ path: "./dist/client/index.html" }));
 
@@ -99,9 +95,11 @@ Similar to Deno, using Bun's native serve:
 
 ```ts
 // server.ts
-import * as serverBundle from "./dist/server/main.js";
+import { Hono } from "hono";
+import serverHandler from "./dist/server/main.js";
 
-const app = serverBundle.createApp();
+const app = new Hono();
+app.all("/api/*", (c) => serverHandler.fetch(c.req.raw));
 
 export default {
   port: 3000,

@@ -16,7 +16,6 @@ All fields are optional. These are the built-in defaults:
 | `entry` | `./src/main.tsx` |
 | `html` | `./index.html` |
 | `dev.port` | `3000` |
-| `server.runtime` | `"node"` |
 | `server.dev.port` | `3001` |
 | `server.endpoint` | `/api/fn` |
 
@@ -41,8 +40,11 @@ export default defineConfig({
   // server: false,
   server: {
     entry: "./src/server.ts",        // Explicit server entry (optional)
-    runtime: "node",                 // "node" | "bun" | "deno run --allow-net"
     endpoint: "/api/fn",             // Server function RPC endpoint
+    functions: {
+      clientProxy: "@evjs/client/transport",
+      serverRegister: "@evjs/server/register",
+    },
 
     dev: {
       port: 3001,
@@ -85,29 +87,20 @@ When `server: false`:
 
 ### `server.entry`
 
-Explicit server entry file. If provided, overrides the auto-generated entry. Use this when you need to mount custom route handlers.
-
-### `server.runtime`
-
-The runtime command used to start the server:
-
-| Value | Behavior |
-|-------|----------|
-| `"node"` (default) | Uses `--watch` for auto-restart in dev |
-| `"bun"` | Passes args as-is |
-| `"deno run --allow-net"` | Split on whitespace, extra args forwarded |
-
-:::warning
-
-The ECMA adapter (`@evjs/server/ecma`) only exports a `{ fetch }` handler — it does **not** start a listening server. For `ev dev`, always use `"node"` as the runtime. Use ECMA adapters only for production targets like Deno or Bun.
-
-:::
+Explicit server entry file. If provided, overrides the auto-generated `@evjs/server/fetch` entry. Custom entries should export a default object with a `fetch` handler, usually `export default { fetch: app.fetch };`.
 
 ### `server.endpoint`
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `endpoint` | `string` | `/api/fn` | Path for server function RPC calls |
+
+### `server.functions`
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `clientProxy` | `string` | `@evjs/client/transport` | Module used by client-side server function stubs |
+| `serverRegister` | `string` | `@evjs/server/register` | Module used to register server function implementations |
 
 ### `server.dev`
 
@@ -173,6 +166,10 @@ export default defineConfig({
   server: {
     entry: "./src/entry-server.ts",
     endpoint: "/api/rpc",
+    functions: {
+      clientProxy: "@evjs/client/transport",
+      serverRegister: "@evjs/server/register",
+    },
     dev: { port: 4001 },
   },
 
@@ -211,4 +208,3 @@ export default defineConfig({
   ],
 });
 ```
-

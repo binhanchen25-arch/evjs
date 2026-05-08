@@ -253,7 +253,6 @@ setup() {
 ### Inject Build-Time Constants
 
 ```ts
-import { webpack } from "@evjs/bundler-utoopack";
 import { utoopack } from "@evjs/bundler-utoopack";
 
 {
@@ -261,21 +260,10 @@ import { utoopack } from "@evjs/bundler-utoopack";
   setup() {
     return {
       bundlerConfig(config, ctx) {
-        webpack((cfg) => {
-          const { DefinePlugin } = require("webpack");
-          cfg.plugins ??= [];
-          cfg.plugins.push(
-            new DefinePlugin({
-              __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-              __APP_VERSION__: JSON.stringify("1.0.0"),
-            }),
-          );
-        })(config, ctx);
-
         utoopack((cfg) => {
-          cfg.env ??= {};
-          cfg.env.__BUILD_TIME__ = JSON.stringify(new Date().toISOString());
-          cfg.env.__APP_VERSION__ = JSON.stringify("1.0.0");
+          cfg.define ??= {};
+          cfg.define.__BUILD_TIME__ = JSON.stringify(new Date().toISOString());
+          cfg.define.__APP_VERSION__ = JSON.stringify("1.0.0");
         })(config, ctx);
       },
     };

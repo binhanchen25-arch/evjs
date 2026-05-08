@@ -98,9 +98,11 @@ export const protectedRoute = createRoute("/api/protected", {
 import { createApp } from "@evjs/server";
 import { postsRoute, postDetailsRoute } from "./api/posts.routes";
 
-export const app = createApp({
-  routeHandlers: [postsRoute, postDetailsRoute],
+const app = createApp({
+  routes: [postsRoute, postDetailsRoute],
 });
+
+export default { fetch: app.fetch };
 ```
 
 然后在 `ev.config.ts` 中配置服务端入口：
@@ -124,6 +126,6 @@ export default defineConfig({
 
 :::tip
 
-如果你同时使用 `routeHandlers` 和 `"use server"` 服务端函数，`createApp()` 会同时处理**两者**。路由处理器优先挂载；RPC 回退处理 `/api/fn` 的请求。
+如果你同时使用 `routes` 和 `"use server"` 服务端函数，`createApp()` 会同时处理**两者**。路由处理器优先挂载；RPC 回退处理 `/api/fn` 的请求。
 
 :::
