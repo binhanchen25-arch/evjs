@@ -1,4 +1,4 @@
-import { utoopack } from "@evjs/bundler-utoopack";
+import { mergeUtoopackConfig, utoopack } from "@evjs/bundler-utoopack";
 import { defineConfig } from "@evjs/ev";
 
 /**
@@ -35,13 +35,9 @@ export default defineConfig({
           bundlerConfig(config, ctx) {
             utoopack((cfg) => {
               // Add custom loaders or rules to utoopack
-              cfg.module = {
-                ...cfg.module,
-                rules: {
-                  ...cfg.module?.rules,
-                  ".txt": { type: "raw" },
-                },
-              };
+              mergeUtoopackConfig(cfg, {
+                module: { rules: { ".txt": { type: "raw" } } },
+              });
             })(config, ctx);
           },
 

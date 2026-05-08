@@ -6,4 +6,5 @@
  */
 
 export { utoopackAdapter } from "./adapter/index.js";
-export { utoopack } from "./plugin-helper.js";
+export type { UtoopackConfigPatch } from "./plugin-helper.js";
+export { mergeUtoopackConfig, utoopack } from "./plugin-helper.js";
