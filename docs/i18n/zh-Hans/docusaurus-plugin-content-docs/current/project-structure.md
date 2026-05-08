@@ -1,53 +1,180 @@
 # 项目目录结构
 
-在使用 `evjs` 构建应用程序时，我们推荐采用一种受 FSD（Feature-Sliced Design）启发的现代化、可扩展的全栈目录结构。这种约定将前端组件与纯服务端边界进行了清晰的隔离，并在项目规模逐步庞大时，倡导按业务领域（而非技术类型）来组织代码。
+evjs 默认零配置，因此必需目录应该保持很小。先从 `src/main.tsx`、
+`src/pages/` 和 `src/api/` 开始；只有当应用变大时，再引入按业务拆分的
+`features/`。
 
-## 推荐的目录规范
+## 最小应用
+
+一个可用的全栈 evjs 应用最少可以这样组织：
 
 ```text
 my-evjs-app/
-├── ev.config.ts           # evjs 框架配置文件
+├── ev.config.ts              # 可选的框架配置
+├── index.html                # 包含 <div id="app"> 的 HTML 模板
 ├── package.json
 ├── tsconfig.json
-├── public/                # 静态资源目录（图片、字体、favicon 等）
 └── src/
-    ├── main.tsx           # 入口文件：构建路由树、createApp、注册类型
-    │
-    ├── pages/             # (核心) TanStack Router 代码式路由
-    │   ├── __root.tsx     # 根路由布局 (Root Layout) 包裹所有页面
-    │   ├── home.tsx       # 静态路由 (如 `/`)
-    │   └── posts/
-    │       └── index.tsx  # 嵌套路由 (`/posts`, `/posts/$postId`)
-    │
-    ├── api/               # (核心) 后端独占逻辑与服务端职能
-    │   ├── fns/               # 纯服务端函数 (Server Functions，在构建时自动转换为 RPC)
-    │   └── routes/            # [可选] 标准 REST 路由处理器 (由后端的 HTTP Server 接管，比如开放 API/Webhook)
-    │
-    ├── components/        # 全局可复用的基础 UI 组件 (如 Button, Modal, Layout)
-    │
-    ├── features/          # [推荐] 按业务功能拆分的模块 (非常适合中大型项目)
-    │   └── auth/          # 例如：所有的鉴权逻辑与页面片段都收敛于此
-    │       ├── components/# 与 Auth 强绑定的 UI 组件
-    │       ├── hooks/     # 与 Auth 强绑定的自定义 Hooks
-    │       ├── utils.ts   # 业务逻辑代码
-    │       └── types.ts   # 领域特有类型声明
-    │
-    ├── lib/               # 基础库封装与通用底层工具 (如 Axios 实例配置、日志库等)
-    │
-    ├── hooks/             # 全局均可引用的 React 业务逻辑 Hooks
-    │
-    ├── styles/            # 全局样式文件（如 Tailwind 核心入口、CSS 变量声明）
-    │
-    └── global.ts          # (可选) 全局类型声明和传输初始化
+    ├── main.tsx              # 客户端入口：构建路由树并渲染应用
+    ├── pages/
+    │   ├── __root.tsx        # 包含 <Outlet /> 的根布局
+    │   └── home.tsx          # / 路由组件
+    └── api/
+        └── users.server.ts   # "use server" 服务端函数
 ```
 
-## 核心设计考量
+`ev dev` 和 `ev build` 会为 `entry` 与 `html` 使用约定默认值：
 
-### 1. `src/pages/` 是组装车间
-路由通过显式的 `createRoute()` 调用定义，并在 `main.tsx` 中通过 `addChildren()` 组装成路由树。我们**非常不提倡**在路由文件里堆砌成百上千行的复杂业务代码。路由文件应该被视为"胶水层"——它负责声明 URL 逻辑、处理页面级参数，然后引入位于 `features/` 或 `components/` 中的子组件进行界面拼装。这样不仅能避免单个文件过大，还能极大提升代码复用性和可测试性。
+```ts
+// ev.config.ts
+import { defineConfig } from "@evjs/ev";
 
-### 2. 将 `src/api/` 作为不可逾越的服务端边界
-虽然基于 `"use server";` 和 `.server.ts` 后缀，服务端函数可以被放在 `src/` 的任何位置，但我们**强烈推荐**将所有与数据库交互、后端鉴权、核心机密逻辑相关的代码彻底收网到 `src/api/` 这个子目录中。这样做能从物理隔离的源头上，防止服务端特有模块误泄漏至纯客户端构建中。
+export default defineConfig({
+  entry: "./src/main.tsx",
+  html: "./index.html",
+});
+```
 
-### 3. 引入按功能切分的 `features/` 模式
-在中大型 React 应用开发中最常见的灾难就是：平铺的 `components` 渐渐装了几百个文件，到后期根本分不清哪些组件属于哪个业务线。引入 `features/`（业务领域驱动）能将高度耦合（同生共死）的前端资产封装在一个“业务桶”内，这极大地减缓了后续代码的腐化速度。
+## 全栈应用
+
+应用变大后，建议清晰拆分客户端组装、服务端代码和共享 UI：
+
+```text
+src/
+├── main.tsx
+├── global.ts                 # 可选：路由类型注册 / transport 初始化
+├── pages/                    # 路由声明和页面级组装
+│   ├── __root.tsx
+│   ├── home.tsx
+│   └── users/
+│       ├── index.tsx
+│       └── detail.tsx
+├── api/                      # 服务端边界
+│   ├── users.server.ts       # 服务端函数："use server"
+│   ├── posts.server.ts
+│   ├── health.routes.ts      # 可选 HTTP 路由处理器
+│   └── posts.routes.ts
+├── server.ts                 # 可选：自定义服务端入口
+├── components/               # 全局可复用 UI
+├── features/                 # 中大型应用的业务模块
+│   └── auth/
+│       ├── components/
+│       ├── hooks/
+│       ├── model.ts
+│       └── types.ts
+├── lib/                      # 共享客户端、适配器、工具函数
+├── hooks/                    # 全局 React hooks
+└── styles.css                # 全局样式 / Tailwind 入口
+```
+
+## 路由文件
+
+`src/pages/` 用于路由声明和页面组装。evjs 直接使用 TanStack Router API；
+它不要求文件路由生成。
+
+路由文件应保持轻量：
+
+- 使用 `createRoute()` 定义路由。
+- 读取路由参数和搜索参数。
+- 需要时调用 loader 或服务端函数。
+- 从 `features/` 或 `components/` 组合 UI。
+
+业务逻辑通常不应该堆在路由文件里。
+
+## 服务端边界
+
+默认把服务端专用代码放在 `src/api/` 下。
+
+使用 `*.server.ts` 编写服务端函数：
+
+```ts
+// src/api/users.server.ts
+"use server";
+
+export async function getUsers() {
+  return [{ id: 1, name: "Ada" }];
+}
+```
+
+使用 `*.routes.ts` 编写标准 Request/Response 端点：
+
+```ts
+// src/api/health.routes.ts
+import { createRoute } from "@evjs/server";
+
+export const healthRoute = createRoute("/api/health", {
+  GET: async () => Response.json({ ok: true }),
+});
+```
+
+在自定义服务端入口中挂载路由处理器：
+
+```ts
+// src/server.ts
+import { createApp } from "@evjs/server";
+import { healthRoute } from "./api/health.routes";
+
+const app = createApp({
+  routes: [healthRoute],
+});
+
+export default { fetch: app.fetch };
+```
+
+然后在配置中指定这个入口：
+
+```ts
+// ev.config.ts
+import { defineConfig } from "@evjs/ev";
+
+export default defineConfig({
+  server: {
+    entry: "./src/server.ts",
+  },
+});
+```
+
+## MPA 应用
+
+多页应用使用顶层 `pages` 配置。每个页面有独立入口，也可以复用默认 HTML
+模板：
+
+```text
+src/
+├── home/
+│   └── main.tsx
+└── about/
+    └── main.tsx
+```
+
+```ts
+// ev.config.ts
+import { defineConfig } from "@evjs/ev";
+
+export default defineConfig({
+  pages: {
+    home: { entry: "./src/home/main.tsx" },
+    about: { entry: "./src/about/main.tsx" },
+  },
+});
+```
+
+设置 `pages` 后，它会优先于单应用的 `entry` / `html` 字段。
+
+## 生成目录
+
+这些目录是构建产物，不要手动编辑：
+
+```text
+.evjs/          # 开发时生成的路由元数据
+dist/           # 生产构建产物
+.turbo/         # Turborepo 缓存 / 日志输出
+```
+
+## 扩展建议
+
+- 小应用保持扁平即可：`pages/`、`api/`、`components/`。
+- 中型应用建议用 `features/` 收纳领域相关 UI、hooks 和模型代码。
+- 服务端密钥和 Node-only API 应留在 `src/api/`，或只被 `src/api/` 引用的模块中。
+- 浏览器安全的共享工具放在 `lib/`。
+- 静态文件放在 `public/`，应用样式从客户端入口导入。
