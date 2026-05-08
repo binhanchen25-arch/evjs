@@ -8,6 +8,26 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.1] — 2026-05-09
+
+### ✨ Highlights
+
+- **Build orchestration in `@evjs/ev`** — Moved dev/build orchestration out of the CLI package so `@evjs/cli` stays a thin command wrapper around the framework runtime.
+- **Manifest output refinements** — Refactored server manifest asset metadata and wired server function endpoint configuration through build-time defines.
+- **Dev server readiness improvements** — Tightened dev server startup coordination, API process recovery behavior, and server bundle callback recovery so watch-mode failures are easier to recover from.
+
+### 🐛 Bug Fixes
+
+- **tRPC example forwarding** — Updated the tRPC example server function bridge to call arbitrary procedures with the original path, operation type, and input instead of hard-coding one procedure.
+- **CI install stability** — Kept CI on `npm install` so platform-specific optional dependencies do not corrupt lockfile state across macOS and Linux installs.
+
+### 🧪 Testing
+
+- **Broader E2E coverage** — Improved end-to-end assertions across API routes, basic routing, complex routing, MPA, scaffolding, SQLite, Tailwind, and tRPC examples.
+- **Bundler config coverage** — Added utoopack adapter coverage for default configuration behavior and manifest generation edge cases.
+
+---
+
 ## [0.1.0] — 2026-05-07
 
 ### ✨ Highlights
