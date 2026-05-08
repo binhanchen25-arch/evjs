@@ -113,6 +113,12 @@ declare module "@tanstack/react-router" {
 }
 ```
 
+:::important
+
+应用中的所有 `@evjs/*` 包必须保持相同版本。升级 evjs 时，请同时升级 `@evjs/client`、`@evjs/server`、`@evjs/ev`、`@evjs/cli` 以及其他 `@evjs/*` 包。
+
+:::
+
 ## 重要规则
 
 - 配置文件：`ev.config.ts`（不是 `evjs.config.ts`）

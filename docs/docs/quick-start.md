@@ -113,6 +113,12 @@ declare module "@tanstack/react-router" {
 }
 ```
 
+:::important
+
+Keep all `@evjs/*` packages in your app on the same version. When upgrading evjs, upgrade `@evjs/client`, `@evjs/server`, `@evjs/ev`, `@evjs/cli`, and any other `@evjs/*` packages together.
+
+:::
+
 ## Key Rules
 
 - Config file: `ev.config.ts` (not `evjs.config.ts`)
