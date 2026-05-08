@@ -152,6 +152,94 @@ describe("createFetchTransport (default)", () => {
     vi.unstubAllGlobals();
   });
 
+  it("uses the build-time endpoint define by default", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: "ok" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    vi.stubGlobal("__EVJS_FUNCTION_ENDPOINT__", "/api/rpc");
+
+    await callServer("myFn", []);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      new URL("http://localhost/api/rpc"),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("uses the build-time endpoint define when initTransport omits endpoint", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: "ok" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    vi.stubGlobal("__EVJS_FUNCTION_ENDPOINT__", "/api/rpc");
+
+    initTransport({ headers: { Authorization: "Bearer xyz" } });
+    await callServer("myFn", []);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      new URL("http://localhost/api/rpc"),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("resolves the default endpoint from the current origin root", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: "ok" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    vi.stubGlobal("location", new URL("http://app.example.com/posts/1"));
+
+    initTransport({ functions: { endpoint: "/api/rpc" } });
+    await callServer("myFn", []);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      new URL("http://app.example.com/api/rpc"),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("resolves the endpoint against baseUrl with URL semantics", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: "ok" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    initTransport({
+      baseUrl: "https://api.example.com/backend",
+      functions: { endpoint: "/api/rpc" },
+    });
+    await callServer("myFn", []);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      new URL("https://api.example.com/backend/api/rpc"),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("supports a complete URL as the endpoint", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: "ok" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    initTransport({
+      baseUrl: "https://api.example.com/backend",
+      functions: { endpoint: "https://rpc.example.com/api/fn" },
+    });
+    await callServer("myFn", []);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      new URL("https://rpc.example.com/api/fn"),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
   it("adds static headers from config", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -163,7 +251,7 @@ describe("createFetchTransport (default)", () => {
     await callServer("myFn", []);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.any(String),
+      expect.any(URL),
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: "Bearer xyz",
@@ -186,7 +274,7 @@ describe("createFetchTransport (default)", () => {
     await callServer("myFn", []);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.any(String),
+      expect.any(URL),
       expect.objectContaining({
         headers: expect.objectContaining({
           Authorization: "Bearer dynamic-token",

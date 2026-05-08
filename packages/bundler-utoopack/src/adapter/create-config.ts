@@ -22,11 +22,14 @@ import type { ConfigComplete, DevServerProxy, ProxyRule } from "@utoo/pack";
 function createSpaHistoryFallbackRule(
   config: ResolvedEvConfig<ConfigComplete>,
 ): ProxyRule {
-  const protocol = config.dev.https ? "https" : "http";
+  const target = new URL(
+    config.dev.https ? "https://localhost" : "http://localhost",
+  );
+  target.port = String(config.dev.port);
 
   return {
     context: ["^/(?!api(?:/|$))(?!turbopack-hmr$)(?!.*\\.[^/]+$).+"],
-    target: `${protocol}://localhost:${config.dev.port}`,
+    target: target.origin,
     changeOrigin: true,
     secure: false,
     pathRewrite: {
@@ -49,6 +52,7 @@ export async function createUtoopackConfig(
   hooks: EvPluginHooks<ConfigComplete>[],
 ): Promise<ConfigComplete> {
   const isProduction = process.env.NODE_ENV === "production";
+  const mode = isProduction ? "production" : "development";
   const serverEnabled = config.serverEnabled;
   const devProxy: DevServerProxy = [
     ...config.dev.proxy,
@@ -67,7 +71,7 @@ export async function createUtoopackConfig(
   }
 
   const utoopackConfig: ConfigComplete = {
-    mode: isProduction ? "production" : "development",
+    mode,
     // MPA mode: one entry per page; SPA mode: single entry
     entry: isMpa(config)
       ? Object.entries(config.pages ?? {}).map(([name, page]) => ({
@@ -93,6 +97,13 @@ export async function createUtoopackConfig(
     stats: true,
     react: {
       runtime: "automatic",
+    },
+    define: {
+      "process.env.EVJS_FUNCTION_ENDPOINT": JSON.stringify(
+        config.server.endpoint,
+      ),
+      "process.env.NODE_ENV": JSON.stringify(mode),
+      __EVJS_FUNCTION_ENDPOINT__: JSON.stringify(config.server.endpoint),
     },
     // Server functions config — utoopack handles "use server" natively
     ...(serverEnabled
