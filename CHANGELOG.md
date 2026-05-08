@@ -8,6 +8,22 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.2] — 2026-05-09
+
+### ✨ Highlights
+
+- **Type-safe utoopack config merging** — Added the `merge()` helper to `@evjs/bundler-utoopack` so plugins can apply typed nested utoopack config patches without manual `cfg.module ??= {}` style boilerplate.
+- **Cleaner plugin authoring examples** — Simplified utoopack hook examples to use `bundlerConfig: utoopack((cfg) => ...)` directly instead of manually forwarding `(config, ctx)`.
+- **Project structure guide refresh** — Reworked the project structure docs around minimal apps, full-stack layouts, server functions, route handlers, custom server entries, MPA builds, and generated folders.
+
+### 📝 Documentation
+
+- **Plugin lifecycle clarity** — Clarified plugin hook execution order and the difference between generic `bundlerConfig` hooks and typed bundler helpers.
+- **User package version guidance** — Moved `@evjs/*` lockstep version guidance into the user-facing Quick Start docs and updated examples for the `0.1.2` release line.
+- **Roadmap and stale docs cleanup** — Marked completed MPA and server context work, refreshed stale framework guides, and kept English and Simplified Chinese docs aligned.
+
+---
+
 ## [0.1.1] — 2026-05-09
 
 ### ✨ Highlights
