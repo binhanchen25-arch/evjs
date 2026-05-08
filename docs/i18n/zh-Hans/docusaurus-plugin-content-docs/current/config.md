@@ -156,9 +156,13 @@ export default defineConfig({
         return {
           bundlerConfig(config, ctx) {
             utoopack((cfg) => {
-              cfg.module ??= {};
-              cfg.module.rules ??= {};
-              cfg.module.rules[".mdx"] = { type: "raw" };
+              cfg.module = {
+                ...cfg.module,
+                rules: {
+                  ...cfg.module?.rules,
+                  ".mdx": { type: "raw" },
+                },
+              };
             })(config, ctx);
           },
         };

@@ -160,9 +160,13 @@ import { utoopack } from "@evjs/bundler-utoopack";
   setup() {
     return {
       bundlerConfig: utoopack((cfg) => {
-        cfg.module ??= {};
-        cfg.module.rules ??= {};
-        cfg.module.rules[".yaml"] = { type: "json" };
+        cfg.module = {
+          ...cfg.module,
+          rules: {
+            ...cfg.module?.rules,
+            ".yaml": { type: "json" },
+          },
+        };
       }),
     };
   },

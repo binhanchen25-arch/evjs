@@ -35,9 +35,13 @@ export default defineConfig({
           bundlerConfig(config, ctx) {
             utoopack((cfg) => {
               // Add custom loaders or rules to utoopack
-              cfg.module ??= {};
-              cfg.module.rules ??= {};
-              cfg.module.rules[".txt"] = { type: "raw" };
+              cfg.module = {
+                ...cfg.module,
+                rules: {
+                  ...cfg.module?.rules,
+                  ".txt": { type: "raw" },
+                },
+              };
             })(config, ctx);
           },
 
