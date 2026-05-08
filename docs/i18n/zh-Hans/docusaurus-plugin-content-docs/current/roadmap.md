@@ -18,12 +18,14 @@
 - `query(fn).useQuery()` / `mutation(fn).useMutation()` —— 零模板封装
 - 可插拔的 `ServerTransport` 接口
 - 基于 Hono 的多运行时适配器服务器
+- 服务端上下文辅助函数（`request`、`headers`、`cookies`、`waitUntil`）
 - 版本化的 manifest schema（`manifest.json` v1）
 
 ## ✅ 阶段 3 —— 零配置全栈框架
 
 - 零配置 `ev build` / `ev dev` —— 无需 `custom bundler config file`
 - `ev.config.ts` + `defineConfig()` 可选自定义
+- 通过 `pages` 支持 MPA 多入口构建
 - bundler Node API —— 无临时配置文件，无子进程
 
 ## ✅ 阶段 4 —— 插件系统和构建元数据
@@ -36,8 +38,6 @@
 
 正在考虑的未来方向：
 
-- **MPA** —— `client.pages` 字段，支持多入口构建
-- **服务端上下文** —— 服务端函数的请求上下文（headers、cookies、auth）
 - **SSR** —— 带水合的服务端渲染
 - **RSC** —— 通过 Flight 协议实现 React Server Components
 - **更多打包器** —— 通过 `@evjs/build-tools` 实现 Rspack、Vite 插件

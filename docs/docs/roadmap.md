@@ -18,12 +18,14 @@ Call server-side logic from the browser as normal async functions.
 - `query(fn).useQuery()` / `mutation(fn).useMutation()` — zero-boilerplate wrappers
 - Pluggable `ServerTransport` interface
 - Hono-based server with multi-runtime adapters
+- Server context helpers for request access (`request`, `headers`, `cookies`, `waitUntil`)
 - Versioned manifest schema (`manifest.json` v1)
 
 ## ✅ Stage 3 — Zero-Config Fullstack Framework
 
 - Zero-config `ev build` / `ev dev` — no `custom bundler config file` needed
 - `ev.config.ts` with `defineConfig()` for optional customization
+- MPA via `pages` for multi-entry builds
 - bundler Node API — no temp config files, no subprocess spawning
 
 ## ✅ Stage 4 — Plugin System & Build Metadata
@@ -43,8 +45,6 @@ Call server-side logic from the browser as normal async functions.
 
 Future directions under consideration:
 
-- **MPA** — `client.pages` field for multi-entry builds
-- **Server context** — request context (headers, cookies, auth) for server functions
 - **SSR** — server-side rendering with hydration
 - **RSC** — React Server Components via Flight protocol
 - **More bundlers** — Rspack, Vite plugins via `@evjs/build-tools`

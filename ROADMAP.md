@@ -43,6 +43,8 @@ Call server-side logic from the browser as normal async functions.
   - [x] Hono-based server function handler with request validation
   - [x] `createApp()` — configurable API path via `server.functions.endpoint`
   - [x] Multi-runtime: Node.js, ECMA (Deno/Bun/edge) adapters
+  - [x] Server context helpers for request access (`request`, `headers`, `cookies`, `waitUntil`)
+  - [x] Request context is available to server functions without manual parameter passing
 - [x] Manifest
   - [x] Versioned schema (`manifest.json` v1)
   - [x] Maps function IDs → module + export name
@@ -57,6 +59,10 @@ DX improvements: unified CLI and zero-config builds.
 - [x] Zero-config `ev build` / `ev dev` — no `custom bundler config file` needed
 - [x] `ev.config.ts` with `defineConfig()` for optional customization
 - [x] Config split: `ClientConfig` (entry, html, plugins, dev) + `ServerConfig` (entry, runtime, functions, plugins, dev)
+- [x] MPA (Multi-Page Application)
+  - [x] `pages` field: `Record<string, { entry, html? }>`
+  - [x] Multiple bundler entries + per-page `generateHtml()` calls
+  - [x] Takes precedence over `entry` / `html` when set
 - [x] bundler Node API — no temp config files, no subprocess spawning
 - [x] All examples migrated to zero-config
 - [x] E2E tests use `ev build` directly
@@ -94,17 +100,8 @@ Swappable bundler adapters with utoopack as the new default.
 
 Future directions under consideration. Nothing committed yet.
 
-- [ ] **MPA (Multi-Page Application)**
-  - [ ] `client.pages` field: `Record<string, { entry, html? }>`
-  - [ ] Multiple bundler entries + per-page `generateHtml()` calls
-  - [ ] Takes precedence over `client.entry` / `client.html` when set
-- [ ] **Server context** _(next up)_
-  - [ ] Provide request context (headers, cookies, auth) to server functions
-  - [ ] Transparent to user code — no manual parameter passing
-
 - [ ] **SSR**
   - [ ] Server-side rendering with fallback to CSR
   - [ ] HTML streaming and hydration
 - [ ] **RSC**
   - [ ] React Server Components via Flight protocol
-
