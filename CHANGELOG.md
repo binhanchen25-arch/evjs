@@ -13,6 +13,7 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 ### ✨ Runtime
 
 - **Router global catch boundary opt-out** — Added a `createApp()` runtime option that passes through TanStack Router's native `disableGlobalCatchBoundary`.
+- **Broader TanStack Router passthrough** — Re-exported additional TanStack Router components, hooks, history helpers, search middleware utilities, URL rewrite helpers, and router event types from `@evjs/client`.
 
 ---
 

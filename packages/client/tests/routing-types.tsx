@@ -13,7 +13,33 @@
  * meaning the type guard is broken.
  */
 
-import { createApp, createAppRootRoute, createRoute, Link } from "@evjs/client";
+import {
+  Await,
+  Block,
+  ClientOnly,
+  composeRewrites,
+  createApp,
+  createAppRootRoute,
+  createBrowserHistory,
+  createRoute,
+  createRouteMask,
+  defaultParseSearch,
+  defaultStringifySearch,
+  Link,
+  type LocationRewrite,
+  linkOptions,
+  MatchRoute,
+  type RouteMask,
+  type RouterEvents,
+  retainSearchParams,
+  ScrollRestoration,
+  stripSearchParams,
+  type ToOptions,
+  useChildMatches,
+  useLinkProps,
+  useMatches,
+  useParentMatches,
+} from "@evjs/client";
 
 // ── Setup route tree ──
 
@@ -63,6 +89,61 @@ declare module "@tanstack/react-router" {
     router: typeof app.router;
   }
 }
+
+// ── Type assertions: transparent TanStack Router exports ──
+
+export const componentRefs = {
+  Await,
+  Block,
+  ClientOnly,
+  MatchRoute,
+  ScrollRestoration,
+};
+
+const localeRewrite: LocationRewrite = {
+  input: ({ url }) => {
+    url.pathname = url.pathname.replace(/^\/en(?=\/|$)/, "") || "/";
+    return url;
+  },
+};
+
+export const utilityRefs = {
+  composeRewrites,
+  createBrowserHistory,
+  createRouteMask,
+  defaultParseSearch,
+  defaultStringifySearch,
+  retainSearchParams,
+  stripSearchParams,
+};
+
+export const composedRewrite = composeRewrites([localeRewrite]);
+
+export const retainedSearch = retainSearchParams(["q"]);
+export const strippedSearch = stripSearchParams(["debug"]);
+
+export const postLinkOptions = linkOptions({
+  to: "/posts/$postId",
+  params: { postId: "123" },
+});
+
+export const postRouteMask: RouteMask<typeof routeTree> = createRouteMask({
+  routeTree,
+  from: "/",
+  to: "/posts/$postId",
+  params: { postId: "123" },
+});
+
+export const postToOptions: ToOptions<
+  typeof app.router,
+  "/",
+  "/posts/$postId"
+> = {
+  to: "/posts/$postId",
+  params: { postId: "123" },
+};
+
+export const routerEventName: keyof RouterEvents = "onResolved";
 
 // ── Type assertions: useParams ──
 
@@ -119,4 +200,20 @@ export function LinkTests() {
 
   // @ts-expect-error — invalid route path
   <Link to="/not-a-real-route" />;
+}
+
+export function HookExportTests() {
+  const props = useLinkProps({
+    to: "/posts/$postId",
+    params: { postId: "123" },
+  });
+  const matches = useMatches();
+  const parentMatches = useParentMatches();
+  const childMatches = useChildMatches();
+
+  return (
+    <a {...props}>
+      {matches.length + parentMatches.length + childMatches.length}
+    </a>
+  );
 }

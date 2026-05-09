@@ -45,17 +45,44 @@ app.render("#app");
 
 ### 运行时路由选项
 
-在客户端启动时通过 `createApp()` 传入路由运行时选项。`router` 字段接受 TanStack Router options，但 `routeTree` 和 `context` 由 evjs 管理。例如，透传 TanStack Router 原生的全局 catch boundary 关闭选项：
+在客户端启动时通过 `createApp()` 传入路由运行时选项。`router` 字段接受 TanStack Router options，但 `routeTree` 和 `context` 由 evjs 管理。可以透传 TanStack Router 原生的全局 catch boundary 关闭选项、预加载策略、route masks、URL rewrites、搜索参数序列化和导航生命周期订阅：
 
 ```tsx
+import { composeRewrites } from "@evjs/client";
+
+const localeRewrite = {
+  input: ({ url }: { url: URL }) => {
+    url.pathname = url.pathname.replace(/^\/zh(?=\/|$)/, "") || "/";
+    return url;
+  },
+  output: ({ url }: { url: URL }) => {
+    url.pathname = `/zh${url.pathname === "/" ? "" : url.pathname}`;
+    return url;
+  },
+};
+
 const app = createApp({
   routeTree,
   router: {
     disableGlobalCatchBoundary: true,
     defaultPreload: "intent",
+    defaultPendingMs: 300,
+    rewrite: composeRewrites([localeRewrite]),
   },
 });
 ```
+
+需要埋点、链路追踪或路由性能标记时，可以订阅 router events：
+
+```tsx
+const unsubscribe = app.router.subscribe("onResolved", (event) => {
+  console.info("navigated", event.toLocation.href);
+});
+
+// 如果手动注册 listener，在销毁时调用 unsubscribe()
+```
+
+evjs 会设置 `routeTree`，注入 router `context.queryClient`，并在你未配置时把 `defaultPreload` 默认为 `"intent"`。其他 TanStack Router options 保持在 `router` 下透明透传。
 
 ## 根布局
 
@@ -150,6 +177,24 @@ export const searchRoute = createRoute({
 });
 ```
 
+使用 search middlewares 可以在导航时统一保留或清理查询参数：
+
+```tsx
+import { retainSearchParams, stripSearchParams } from "@evjs/client";
+
+export const searchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/search",
+  validateSearch: (search: Record<string, unknown>) => ({
+    q: (search.q as string) || "",
+    debug: search.debug === "true",
+  }),
+  search: {
+    middlewares: [retainSearchParams(["q"]), stripSearchParams(["debug"])],
+  },
+});
+```
+
 ## 路由加载器（预取）
 
 使用 `loader` 在路由渲染前预取数据 —— 消除加载转圈：
@@ -158,6 +203,8 @@ export const searchRoute = createRoute({
 export const usersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/users",
+  staleTime: 30_000,
+  preloadStaleTime: 10_000,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(getFnQueryOptions(getUsers)),
   component: UsersPage,
@@ -208,6 +255,34 @@ navigate({ to: "/posts" });
 <Navigate to="/login" />
 ```
 
+## Route Masks
+
+Route masks 可以让一个内部路由渲染时，浏览器地址栏展示另一个 URL。它适合详情弹层和 modal routes：
+
+```tsx
+import { Link, createRouteMask } from "@evjs/client";
+
+const postModalMask = createRouteMask({
+  routeTree,
+  from: "/posts",
+  to: "/posts/$postId",
+  params: { postId: "123" },
+});
+
+const app = createApp({
+  routeTree,
+  router: { routeMasks: [postModalMask] },
+});
+
+<Link
+  to="/posts/$postId"
+  params={{ postId: "123" }}
+  mask={{ to: "/posts" }}
+>
+  打开弹层
+</Link>;
+```
+
 ## 可用的重新导出
 
 全部从 `@evjs/client` 导入：
@@ -215,6 +290,7 @@ navigate({ to: "/posts" });
 | 类别 | API |
 |------|-----|
 | **路由创建** | `createAppRootRoute`, `createRoute`, `createRouter`, `createRootRouteWithContext`, `createRouteMask` |
-| **组件** | `Link`, `Outlet`, `Navigate`, `RouterProvider`, `ErrorComponent`, `CatchBoundary`, `CatchNotFound` |
-| **Hooks** | `useParams`, `useSearch`, `useNavigate`, `useLocation`, `useMatch`, `useMatchRoute`, `useRouter`, `useRouterState`, `useLoaderData`, `useLoaderDeps`, `useRouteContext`, `useBlocker`, `useCanGoBack` |
-| **工具** | `redirect`, `notFound`, `isRedirect`, `isNotFound`, `getRouteApi`, `linkOptions`, `lazyRouteComponent`, `createLink` |
+| **组件** | `Link`, `Outlet`, `Navigate`, `RouterProvider`, `RouterContextProvider`, `ErrorComponent`, `CatchBoundary`, `CatchNotFound`, `Await`, `ClientOnly`, `Match`, `Matches`, `MatchRoute`, `ScrollRestoration`, `Block` |
+| **Hooks** | `useParams`, `useSearch`, `useNavigate`, `useLocation`, `useMatch`, `useMatchRoute`, `useMatches`, `useParentMatches`, `useChildMatches`, `useRouter`, `useRouterState`, `useLoaderData`, `useLoaderDeps`, `useRouteContext`, `useLinkProps`, `useBlocker`, `useCanGoBack`, `useAwaited`, `useHydrated`, `useElementScrollRestoration` |
+| **工具** | `redirect`, `notFound`, `isRedirect`, `isNotFound`, `getRouteApi`, `RouteApi`, `linkOptions`, `lazyRouteComponent`, `createLink`, `defer`, `retainSearchParams`, `stripSearchParams`, `composeRewrites`, `defaultParseSearch`, `defaultStringifySearch`, `parseSearchWith`, `stringifySearchWith` |
+| **History** | `createBrowserHistory`, `createHashHistory`, `createMemoryHistory` |

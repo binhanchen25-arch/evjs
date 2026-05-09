@@ -64,17 +64,48 @@ app.render("#app");
 Pass router runtime options to `createApp()` when bootstrapping the client.
 The `router` field accepts TanStack Router options, except for `routeTree` and
 `context`, which evjs owns. For example, pass through TanStack Router's native
-global catch boundary opt-out:
+global catch boundary opt-out, preload policy, route masks, URL rewrites,
+search serialization, and navigation lifecycle subscriptions:
 
 ```tsx
+import { composeRewrites } from "@evjs/client";
+
+const localeRewrite = {
+  input: ({ url }: { url: URL }) => {
+    url.pathname = url.pathname.replace(/^\/en(?=\/|$)/, "") || "/";
+    return url;
+  },
+  output: ({ url }: { url: URL }) => {
+    url.pathname = `/en${url.pathname === "/" ? "" : url.pathname}`;
+    return url;
+  },
+};
+
 const app = createApp({
   routeTree,
   router: {
     disableGlobalCatchBoundary: true,
     defaultPreload: "intent",
+    defaultPendingMs: 300,
+    rewrite: composeRewrites([localeRewrite]),
   },
 });
 ```
+
+Subscribe to router events when you need analytics, tracing, or route-level
+performance marks:
+
+```tsx
+const unsubscribe = app.router.subscribe("onResolved", (event) => {
+  console.info("navigated", event.toLocation.href);
+});
+
+// call unsubscribe() during teardown if you register listeners manually
+```
+
+evjs sets `routeTree`, injects the router `context.queryClient`, and defaults
+`defaultPreload` to `"intent"` when you do not provide one. Other TanStack
+Router options stay transparent under `router`.
 
 ## Root Layout
 
@@ -223,6 +254,25 @@ Navigate with search params:
 <Link to="/search" search={{ q: "hello" }}>Search</Link>
 ```
 
+Use search middlewares for shared query string behavior such as retaining or
+stripping keys across navigation:
+
+```tsx
+import { retainSearchParams, stripSearchParams } from "@evjs/client";
+
+export const searchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/search",
+  validateSearch: (search: Record<string, unknown>) => ({
+    q: (search.q as string) || "",
+    debug: search.debug === "true",
+  }),
+  search: {
+    middlewares: [retainSearchParams(["q"]), stripSearchParams(["debug"])],
+  },
+});
+```
+
 ## Route Loaders (Prefetching)
 
 Use `loader` to prefetch data before the route renders — eliminates loading spinners:
@@ -231,6 +281,8 @@ Use `loader` to prefetch data before the route renders — eliminates loading sp
 export const usersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/users",
+  staleTime: 30_000,
+  preloadStaleTime: 10_000,
   loader: ({ context }) =>
     context.queryClient.ensureQueryData(getFnQueryOptions(getUsers)),
   component: UsersPage,
@@ -281,6 +333,35 @@ navigate({ to: "/posts" });
 <Navigate to="/login" />
 ```
 
+## Route Masks
+
+Route masks let one internal route render while the browser shows another URL.
+They are useful for modal routes and detail overlays:
+
+```tsx
+import { Link, createRouteMask } from "@evjs/client";
+
+const postModalMask = createRouteMask({
+  routeTree,
+  from: "/posts",
+  to: "/posts/$postId",
+  params: { postId: "123" },
+});
+
+const app = createApp({
+  routeTree,
+  router: { routeMasks: [postModalMask] },
+});
+
+<Link
+  to="/posts/$postId"
+  params={{ postId: "123" }}
+  mask={{ to: "/posts" }}
+>
+  Open modal
+</Link>;
+```
+
 ## Available Re-exports
 
 All imported from `@evjs/client`:
@@ -288,6 +369,7 @@ All imported from `@evjs/client`:
 | Category | APIs |
 |----------|------|
 | **Route creation** | `createAppRootRoute`, `createRoute`, `createRouter`, `createRootRouteWithContext`, `createRouteMask` |
-| **Components** | `Link`, `Outlet`, `Navigate`, `RouterProvider`, `ErrorComponent`, `CatchBoundary`, `CatchNotFound` |
-| **Hooks** | `useParams`, `useSearch`, `useNavigate`, `useLocation`, `useMatch`, `useMatchRoute`, `useRouter`, `useRouterState`, `useLoaderData`, `useLoaderDeps`, `useRouteContext`, `useBlocker`, `useCanGoBack` |
-| **Utilities** | `redirect`, `notFound`, `isRedirect`, `isNotFound`, `getRouteApi`, `linkOptions`, `lazyRouteComponent`, `createLink` |
+| **Components** | `Link`, `Outlet`, `Navigate`, `RouterProvider`, `RouterContextProvider`, `ErrorComponent`, `CatchBoundary`, `CatchNotFound`, `Await`, `ClientOnly`, `Match`, `Matches`, `MatchRoute`, `ScrollRestoration`, `Block` |
+| **Hooks** | `useParams`, `useSearch`, `useNavigate`, `useLocation`, `useMatch`, `useMatchRoute`, `useMatches`, `useParentMatches`, `useChildMatches`, `useRouter`, `useRouterState`, `useLoaderData`, `useLoaderDeps`, `useRouteContext`, `useLinkProps`, `useBlocker`, `useCanGoBack`, `useAwaited`, `useHydrated`, `useElementScrollRestoration` |
+| **Utilities** | `redirect`, `notFound`, `isRedirect`, `isNotFound`, `getRouteApi`, `RouteApi`, `linkOptions`, `lazyRouteComponent`, `createLink`, `defer`, `retainSearchParams`, `stripSearchParams`, `composeRewrites`, `defaultParseSearch`, `defaultStringifySearch`, `parseSearchWith`, `stringifySearchWith` |
+| **History** | `createBrowserHistory`, `createHashHistory`, `createMemoryHistory` |
