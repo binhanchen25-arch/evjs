@@ -162,16 +162,6 @@ export default defineConfig({
 When `pages` is set, it takes precedence over the single-app `entry` / `html`
 fields.
 
-## Generated Folders
-
-These folders are build artifacts and should not be edited by hand:
-
-```text
-.evjs/          # dev-time generated route metadata
-dist/           # production output
-.turbo/         # Turborepo cache/log output
-```
-
 ## Scaling Guidance
 
 - Small apps can stay flat: `pages/`, `api/`, `components/`.

@@ -161,16 +161,6 @@ export default defineConfig({
 
 设置 `pages` 后，它会优先于单应用的 `entry` / `html` 字段。
 
-## 生成目录
-
-这些目录是构建产物，不要手动编辑：
-
-```text
-.evjs/          # 开发时生成的路由元数据
-dist/           # 生产构建产物
-.turbo/         # Turborepo 缓存 / 日志输出
-```
-
 ## 扩展建议
 
 - 小应用保持扁平即可：`pages/`、`api/`、`components/`。
