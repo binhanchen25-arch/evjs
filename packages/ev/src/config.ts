@@ -97,18 +97,7 @@ export interface EvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
   html?: string;
 
   /** Client dev server options. */
-  dev?: {
-    /** Client dev server port. Default: 3000. */
-    port?: number;
-    /** Enable HTTPS. If an object is provided, it can be explicit key/cert PEM strings or file paths. */
-    https?: boolean | { key: string; cert: string };
-    /**
-     * Dev proxy configuration.
-     * Configures the client dev server to proxy requests to backend services.
-     * Defaults to forwarding DEFAULT_ENDPOINT ("/api/fn") to the local API dev server.
-     */
-    proxy?: DevProxyRule[];
-  };
+  dev?: DevConfig;
 
   /**
    * Server configuration.
@@ -117,34 +106,7 @@ export interface EvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
    * When `false`, build output goes to flat `dist/` instead of `dist/client/` + `dist/server/`,
    * and any `"use server"` module will cause a build error.
    */
-  server?:
-    | false
-    | {
-        /** Explicit server entry file. If provided, overrides auto-generated entry. */
-        entry?: string;
-        /** Server function RPC endpoint path. Default: "/api/fn". */
-        endpoint?: string;
-        /** Server function build configuration. */
-        functions?: {
-          /**
-           * Client-side transport module for server function stubs.
-           * Default: "@evjs/client/transport".
-           */
-          clientProxy?: string;
-          /**
-           * Server-side registration module for server functions.
-           * Default: "@evjs/server/register".
-           */
-          serverRegister?: string;
-        };
-        /** Server dev options. */
-        dev?: {
-          /** API server port (dev mode). Default: 3001. */
-          port?: number;
-          /** Enable HTTPS for the API server. Must provide explicit key/cert payloads or file paths. */
-          https?: { key: string; cert: string } | false;
-        };
-      };
+  server?: false | ServerConfig;
 
   /** Bundler adapter. When omitted, defaults to utoopack. */
   bundler?: BundlerAdapter<TBundlerCfg>;
@@ -174,6 +136,54 @@ export interface EvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
    * ```
    */
   pages?: Record<string, PageConfig>;
+}
+
+/** Client dev server options. */
+export interface DevConfig {
+  /** Client dev server port. Default: 3000. */
+  port?: number;
+  /** Enable HTTPS. If an object is provided, it can be explicit key/cert PEM strings or file paths. */
+  https?: boolean | { key: string; cert: string };
+  /**
+   * Dev proxy configuration.
+   * Configures the client dev server to proxy requests to backend services.
+   * Defaults to forwarding DEFAULT_ENDPOINT ("/api/fn") to the local API dev server.
+   */
+  proxy?: DevProxyRule[];
+}
+
+/** Server configuration. */
+export interface ServerConfig {
+  /** Explicit server entry file. If provided, overrides auto-generated entry. */
+  entry?: string;
+  /** Server function RPC endpoint path. Default: "/api/fn". */
+  endpoint?: string;
+  /** Server function build configuration. */
+  functions?: ServerFunctionsConfig;
+  /** Server dev options. */
+  dev?: ServerDevConfig;
+}
+
+/** Server function build configuration. */
+export interface ServerFunctionsConfig {
+  /**
+   * Client-side transport module for server function stubs.
+   * Default: "@evjs/client/transport".
+   */
+  clientProxy?: string;
+  /**
+   * Server-side registration module for server functions.
+   * Default: "@evjs/server/register".
+   */
+  serverRegister?: string;
+}
+
+/** Server dev options. */
+export interface ServerDevConfig {
+  /** API server port (dev mode). Default: 3001. */
+  port?: number;
+  /** Enable HTTPS for the API server. Must provide explicit key/cert payloads or file paths. */
+  https?: { key: string; cert: string } | false;
 }
 
 /**

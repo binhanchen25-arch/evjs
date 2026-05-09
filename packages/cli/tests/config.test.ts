@@ -1,4 +1,4 @@
-import type { EvConfig } from "@evjs/ev";
+import type { EvConfig, ServerConfig } from "@evjs/ev";
 import { CONFIG_DEFAULTS, defineConfig } from "@evjs/ev";
 import { describe, expect, it } from "vitest";
 
@@ -17,6 +17,11 @@ describe("defineConfig", () => {
   });
 
   it("handles full config", () => {
+    const server: ServerConfig = {
+      entry: "./custom-server.ts",
+      endpoint: "/api/rpc",
+      dev: { port: 4000 },
+    };
     const config: EvConfig = {
       entry: "./src/main.tsx",
       html: "./public/index.html",
@@ -24,10 +29,7 @@ describe("defineConfig", () => {
         port: 5000,
         https: true,
       },
-      server: {
-        entry: "./custom-server.ts",
-        dev: { port: 4000 },
-      },
+      server,
     };
     expect(defineConfig(config)).toBe(config);
   });

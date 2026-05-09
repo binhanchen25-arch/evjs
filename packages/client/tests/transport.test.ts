@@ -216,6 +216,25 @@ describe("createFetchTransport (default)", () => {
     await callServer("myFn", []);
 
     expect(mockFetch).toHaveBeenCalledWith(
+      new URL("https://api.example.com/api/rpc"),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("resolves a relative endpoint against the baseUrl path", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ result: "ok" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    initTransport({
+      baseUrl: "https://api.example.com/backend",
+      functions: { endpoint: "api/rpc" },
+    });
+    await callServer("myFn", []);
+
+    expect(mockFetch).toHaveBeenCalledWith(
       new URL("https://api.example.com/backend/api/rpc"),
       expect.objectContaining({ method: "POST" }),
     );

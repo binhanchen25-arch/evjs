@@ -6,6 +6,7 @@ export type { BundlerAdapter } from "./bundler.js";
 export { type BuildOptions, build, type DevOptions, dev } from "./commands.js";
 export {
   CONFIG_DEFAULTS,
+  type DevConfig,
   defineConfig,
   type EvBuildResult,
   type EvBundlerCtx,
@@ -22,6 +23,9 @@ export {
   type ResolvedServerConfig,
   type ResolvedServerDevConfig,
   resolveConfig,
+  type ServerConfig,
+  type ServerDevConfig,
+  type ServerFunctionsConfig,
 } from "./config.js";
 export { type BuildHtmlOptions, buildHtml } from "./html.js";
 export { type ConfigPatch, merge } from "./merge.js";

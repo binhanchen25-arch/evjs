@@ -92,18 +92,12 @@ function resolveEndpointUrl(
   baseUrl: string | undefined,
   endpoint: string,
 ): URL {
-  try {
-    return new URL(endpoint);
-  } catch {
-    // Relative endpoint: resolve against the configured base URL below.
-  }
-
   const base = resolveBaseUrl(baseUrl);
   if (!base.pathname.endsWith("/")) {
     base.pathname += "/";
   }
 
-  return new URL(endpoint.replace(/^\/+/, ""), base);
+  return new URL(endpoint, base);
 }
 
 /**
