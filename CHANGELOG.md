@@ -8,6 +8,20 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.3] — 2026-05-09
+
+### ✨ Improvements
+
+- **General type-safe config merging** — Moved `merge()` into `@evjs/ev` so plugins can apply typed nested patches to evjs framework config and utoopack config through the same helper.
+- **Utoopack helper simplification** — Kept `@evjs/bundler-utoopack` exporting `merge()` for concise plugin authoring while sharing the generic implementation from `@evjs/ev`.
+
+### 📝 Documentation
+
+- **Release line updates** — Updated user-facing dependency examples to the `0.1.3` release line.
+- **Project structure cleanup** — Removed stale generated-folder notes from the project structure guide.
+
+---
+
 ## [0.1.2] — 2026-05-09
 
 ### ✨ Highlights
