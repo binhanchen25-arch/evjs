@@ -10,6 +10,10 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 - **Server function endpoint config** — Moved the ev config endpoint option to `server.functions.endpoint`, matching the rest of the server function settings and resolved config shape.
 
+### ✨ Runtime
+
+- **Router error boundary opt-out** — Added a `createApp()` runtime option to disable TanStack Router's built-in default error boundary while keeping route-level `errorComponent` support available.
+
 ---
 
 ## [0.1.3] — 2026-05-09

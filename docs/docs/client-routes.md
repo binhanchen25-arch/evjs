@@ -59,6 +59,21 @@ declare module "@tanstack/react-router" {
 app.render("#app");
 ```
 
+### Runtime Router Options
+
+Pass router runtime options to `createApp()` when bootstrapping the client.
+For example, disable TanStack Router's built-in default error boundary while
+keeping route-level `errorComponent` support:
+
+```tsx
+const app = createApp({
+  routeTree,
+  router: {
+    disableDefaultErrorBoundary: true,
+  },
+});
+```
+
 ## Root Layout
 
 Every app needs a root route with `<Outlet />` to render child routes:

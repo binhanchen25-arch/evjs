@@ -43,6 +43,19 @@ declare module "@tanstack/react-router" {
 app.render("#app");
 ```
 
+### 运行时路由选项
+
+在客户端启动时通过 `createApp()` 传入路由运行时选项。例如，禁用 TanStack Router 内置的默认错误边界，同时保留路由级别的 `errorComponent`：
+
+```tsx
+const app = createApp({
+  routeTree,
+  router: {
+    disableDefaultErrorBoundary: true,
+  },
+});
+```
+
 ## 根布局
 
 每个应用都需要一个带 `<Outlet />` 的根路由来渲染子路由：

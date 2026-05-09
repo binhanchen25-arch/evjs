@@ -19,6 +19,15 @@ export interface CreateAppOptions<TRouteTree extends AnyRoute> {
    * Optional custom history for the router (e.g., memory or hash history).
    */
   history?: RouterHistory;
+  /** Client router options. */
+  router?: {
+    /**
+     * Disable TanStack Router's built-in default error boundary.
+     *
+     * Route-level `errorComponent` still works when provided.
+     */
+    disableDefaultErrorBoundary?: boolean;
+  };
   /**
    * Optional custom QueryClient instance.
    */
@@ -98,17 +107,24 @@ export function createApp<TRouteTree extends AnyRoute>(
     functions,
     basepath,
     history,
+    router: routerOptions,
   } = options;
 
   if (functions?.endpoint) {
     initTransport({ functions });
   }
 
+  const disableDefaultErrorBoundary =
+    routerOptions?.disableDefaultErrorBoundary ?? false;
+
   const router = createRouter({
     routeTree,
     basepath,
     history,
     defaultPreload: "intent",
+    ...(disableDefaultErrorBoundary
+      ? { defaultErrorComponent: false as never }
+      : {}),
     context: { queryClient } as AppRouteContext,
   });
 
