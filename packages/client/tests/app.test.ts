@@ -8,18 +8,33 @@ function createRouteTree() {
 }
 
 describe("createApp", () => {
-  it("uses TanStack Router default error boundary by default", () => {
+  it("keeps TanStack Router global catch boundary by default", () => {
     const app = createApp({ routeTree: createRouteTree() });
 
-    expect(app.router.options.defaultErrorComponent).toBeUndefined();
+    expect(app.router.options.disableGlobalCatchBoundary).toBeUndefined();
   });
 
-  it("can disable TanStack Router default error boundary from app options", () => {
+  it("can disable TanStack Router global catch boundary from app options", () => {
     const app = createApp({
       routeTree: createRouteTree(),
-      router: { disableDefaultErrorBoundary: true },
+      router: { disableGlobalCatchBoundary: true },
     });
 
-    expect(app.router.options.defaultErrorComponent).toBe(false);
+    expect(app.router.options.disableGlobalCatchBoundary).toBe(true);
+  });
+
+  it("passes TanStack Router options through", () => {
+    const app = createApp({
+      routeTree: createRouteTree(),
+      router: {
+        basepath: "/app",
+        caseSensitive: true,
+        defaultPreload: false,
+      },
+    });
+
+    expect(app.router.options.basepath).toBe("/app");
+    expect(app.router.options.caseSensitive).toBe(true);
+    expect(app.router.options.defaultPreload).toBe(false);
   });
 });

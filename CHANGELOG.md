@@ -12,7 +12,7 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ### ✨ Runtime
 
-- **Router error boundary opt-out** — Added a `createApp()` runtime option to disable TanStack Router's built-in default error boundary while keeping route-level `errorComponent` support available.
+- **Router global catch boundary opt-out** — Added a `createApp()` runtime option that passes through TanStack Router's native `disableGlobalCatchBoundary`.
 
 ---
 

@@ -62,14 +62,16 @@ app.render("#app");
 ### Runtime Router Options
 
 Pass router runtime options to `createApp()` when bootstrapping the client.
-For example, disable TanStack Router's built-in default error boundary while
-keeping route-level `errorComponent` support:
+The `router` field accepts TanStack Router options, except for `routeTree` and
+`context`, which evjs owns. For example, pass through TanStack Router's native
+global catch boundary opt-out:
 
 ```tsx
 const app = createApp({
   routeTree,
   router: {
-    disableDefaultErrorBoundary: true,
+    disableGlobalCatchBoundary: true,
+    defaultPreload: "intent",
   },
 });
 ```

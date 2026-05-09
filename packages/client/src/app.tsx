@@ -1,14 +1,42 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { AnyRoute, RouterHistory } from "@tanstack/react-router";
+import type {
+  AnyRoute,
+  RouterConstructorOptions,
+  RouterHistory,
+  TrailingSlashOption,
+} from "@tanstack/react-router";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { createRoot } from "react-dom/client";
 import type { AppRouteContext } from "./context";
 import { initTransport } from "./transport";
 
+export type CreateAppRouterOptions<
+  TRouteTree extends AnyRoute,
+  TTrailingSlashOption extends TrailingSlashOption = "never",
+  TDefaultStructuralSharingOption extends boolean = false,
+  TRouterHistory extends RouterHistory = RouterHistory,
+  TDehydrated extends Record<string, unknown> = Record<string, unknown>,
+> = Omit<
+  RouterConstructorOptions<
+    TRouteTree,
+    TTrailingSlashOption,
+    TDefaultStructuralSharingOption,
+    TRouterHistory,
+    TDehydrated
+  >,
+  "context" | "routeTree"
+>;
+
 /**
  * Options for creating an ev application.
  */
-export interface CreateAppOptions<TRouteTree extends AnyRoute> {
+export interface CreateAppOptions<
+  TRouteTree extends AnyRoute,
+  TTrailingSlashOption extends TrailingSlashOption = "never",
+  TDefaultStructuralSharingOption extends boolean = false,
+  TRouterHistory extends RouterHistory = RouterHistory,
+  TDehydrated extends Record<string, unknown> = Record<string, unknown>,
+> {
   /** The root route tree produced by createRootRoute and addChildren. */
   routeTree: TRouteTree;
   /**
@@ -18,16 +46,15 @@ export interface CreateAppOptions<TRouteTree extends AnyRoute> {
   /**
    * Optional custom history for the router (e.g., memory or hash history).
    */
-  history?: RouterHistory;
-  /** Client router options. */
-  router?: {
-    /**
-     * Disable TanStack Router's built-in default error boundary.
-     *
-     * Route-level `errorComponent` still works when provided.
-     */
-    disableDefaultErrorBoundary?: boolean;
-  };
+  history?: TRouterHistory;
+  /** TanStack Router options passed through to `createRouter()`. */
+  router?: CreateAppRouterOptions<
+    TRouteTree,
+    TTrailingSlashOption,
+    TDefaultStructuralSharingOption,
+    TRouterHistory,
+    TDehydrated
+  >;
   /**
    * Optional custom QueryClient instance.
    */
@@ -98,9 +125,31 @@ export interface App<TRouter> {
  * app.render("#app");
  * ```
  */
-export function createApp<TRouteTree extends AnyRoute>(
-  options: CreateAppOptions<TRouteTree>,
-) {
+export function createApp<
+  TRouteTree extends AnyRoute,
+  TTrailingSlashOption extends TrailingSlashOption = "never",
+  TDefaultStructuralSharingOption extends boolean = false,
+  TRouterHistory extends RouterHistory = RouterHistory,
+  TDehydrated extends Record<string, unknown> = Record<string, unknown>,
+>(
+  options: CreateAppOptions<
+    TRouteTree,
+    TTrailingSlashOption,
+    TDefaultStructuralSharingOption,
+    TRouterHistory,
+    TDehydrated
+  >,
+): App<
+  ReturnType<
+    typeof createRouter<
+      TRouteTree,
+      TTrailingSlashOption,
+      TDefaultStructuralSharingOption,
+      TRouterHistory,
+      TDehydrated
+    >
+  >
+> {
   const {
     routeTree,
     queryClient = new QueryClient(),
@@ -114,17 +163,18 @@ export function createApp<TRouteTree extends AnyRoute>(
     initTransport({ functions });
   }
 
-  const disableDefaultErrorBoundary =
-    routerOptions?.disableDefaultErrorBoundary ?? false;
-
-  const router = createRouter({
+  const router = createRouter<
+    TRouteTree,
+    TTrailingSlashOption,
+    TDefaultStructuralSharingOption,
+    TRouterHistory,
+    TDehydrated
+  >({
+    ...routerOptions,
     routeTree,
-    basepath,
-    history,
-    defaultPreload: "intent",
-    ...(disableDefaultErrorBoundary
-      ? { defaultErrorComponent: false as never }
-      : {}),
+    basepath: routerOptions?.basepath ?? basepath,
+    history: routerOptions?.history ?? history,
+    defaultPreload: routerOptions?.defaultPreload ?? "intent",
     context: { queryClient } as AppRouteContext,
   });
 

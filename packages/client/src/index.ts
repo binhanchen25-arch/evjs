@@ -24,7 +24,7 @@ export {
   usePrefetchQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-export type { App, CreateAppOptions } from "./app";
+export type { App, CreateAppOptions, CreateAppRouterOptions } from "./app";
 export { createApp } from "./app";
 export type { AppRouteContext } from "./context";
 export { createAppRootRoute } from "./context";

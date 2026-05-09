@@ -45,13 +45,14 @@ app.render("#app");
 
 ### 运行时路由选项
 
-在客户端启动时通过 `createApp()` 传入路由运行时选项。例如，禁用 TanStack Router 内置的默认错误边界，同时保留路由级别的 `errorComponent`：
+在客户端启动时通过 `createApp()` 传入路由运行时选项。`router` 字段接受 TanStack Router options，但 `routeTree` 和 `context` 由 evjs 管理。例如，透传 TanStack Router 原生的全局 catch boundary 关闭选项：
 
 ```tsx
 const app = createApp({
   routeTree,
   router: {
-    disableDefaultErrorBoundary: true,
+    disableGlobalCatchBoundary: true,
+    defaultPreload: "intent",
   },
 });
 ```
