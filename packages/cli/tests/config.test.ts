@@ -19,7 +19,7 @@ describe("defineConfig", () => {
   it("handles full config", () => {
     const server: ServerConfig = {
       entry: "./custom-server.ts",
-      endpoint: "/api/rpc",
+      functions: { endpoint: "/api/rpc" },
       dev: { port: 4000 },
     };
     const config: EvConfig = {

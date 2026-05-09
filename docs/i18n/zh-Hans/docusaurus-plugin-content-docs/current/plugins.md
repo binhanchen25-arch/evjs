@@ -53,7 +53,7 @@ interface EvPlugin {
 
 ### Config Hook
 
-`config` hook 在 evjs 解析默认配置前执行。它适合修改框架级配置，尤其是那些会影响派生配置、开发代理或运行时代码注入的选项，例如 `server.endpoint`。
+`config` hook 在 evjs 解析默认配置前执行。它适合修改框架级配置，尤其是那些会影响派生配置、开发代理或运行时代码注入的选项，例如 `server.functions.endpoint`。
 
 ```ts
 import { defineConfig, merge } from "@evjs/ev";
@@ -64,7 +64,7 @@ export default defineConfig({
       name: "custom-function-endpoint",
       config(config) {
         merge(config, {
-          server: { endpoint: "/api/rpc" },
+          server: { functions: { endpoint: "/api/rpc" } },
         });
         return config;
       },
@@ -75,7 +75,7 @@ export default defineConfig({
 
 这里的 `merge()` 会按 `EvConfig` 对嵌套 patch 做类型检查。
 
-如果只是应用自己配置服务端函数端点，直接在 `defineConfig` 中设置 `server.endpoint` 即可。只有需要由插件统一注入或封装这类配置时，才使用 `config` hook。
+如果只是应用自己配置服务端函数端点，直接在 `defineConfig` 中设置 `server.functions.endpoint` 即可。只有需要由插件统一注入或封装这类配置时，才使用 `config` hook。
 
 ### Setup 上下文
 

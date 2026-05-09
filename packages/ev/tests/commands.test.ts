@@ -33,7 +33,7 @@ function createMockBundler(
         "utf-8",
       );
       if (config.serverEnabled) {
-        events.push(`bundler.endpoint:${config.server.endpoint}`);
+        events.push(`bundler.endpoint:${config.server.functions.endpoint}`);
       }
     },
     async dev() {
@@ -98,12 +98,17 @@ describe("build", () => {
         events.push(`config:${ctx.mode}`);
         config.server = {
           ...(typeof config.server === "object" ? config.server : {}),
-          endpoint: "/api/rpc",
+          functions: {
+            ...(typeof config.server === "object"
+              ? config.server.functions
+              : {}),
+            endpoint: "/api/rpc",
+          },
         };
         return config;
       },
       setup(ctx) {
-        events.push(`setup:${ctx.config.server.endpoint}`);
+        events.push(`setup:${ctx.config.server.functions.endpoint}`);
       },
     };
 

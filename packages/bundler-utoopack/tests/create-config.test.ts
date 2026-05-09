@@ -15,8 +15,8 @@ describe("createUtoopackConfig", () => {
       },
       serverEnabled: false,
       server: {
-        endpoint: "/api/fn",
         functions: {
+          endpoint: "/api/fn",
           clientProxy: "@evjs/client/transport",
           serverRegister: "@evjs/server/register",
         },

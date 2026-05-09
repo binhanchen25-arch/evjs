@@ -48,7 +48,7 @@ ev.config.ts ──► defineConfig({ entry, html, dev, server, plugins })
                     │
                     ├── entry, html ──► Utoopack 入口 + HTML 模板
                     ├── dev.port ──► dev server 端口
-                    ├── server.endpoint ──► 服务端函数 define + 代理路径
+                    ├── server.functions.endpoint ──► 服务端函数 define + 代理路径
                     └── plugins ──► EvPlugin[]（setup → buildStart/bundlerConfig/transformHtml/buildEnd）
                     │
                     ▼

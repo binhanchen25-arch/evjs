@@ -42,7 +42,9 @@ export default defineConfig({
     https: false,                 // HTTPS 模式
   },
   server: {
-    endpoint: "/api/fn",           // 默认值
+    functions: {
+      endpoint: "/api/fn",         // 默认值
+    },
     dev: {
       port: 3001,                 // API 端口
       https: false,               // API 服务器 HTTPS

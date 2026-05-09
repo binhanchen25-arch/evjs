@@ -18,7 +18,12 @@ export default defineConfig({
       config(config) {
         config.server = {
           ...(typeof config.server === "object" ? config.server : {}),
-          endpoint: "/api/rpc",
+          functions: {
+            ...(typeof config.server === "object"
+              ? config.server.functions
+              : {}),
+            endpoint: "/api/rpc",
+          },
         };
         return config;
       },

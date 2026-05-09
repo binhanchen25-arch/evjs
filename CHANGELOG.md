@@ -6,6 +6,10 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ## [Unreleased]
 
+### ♻️ Refactoring
+
+- **Server function endpoint config** — Moved the ev config endpoint option to `server.functions.endpoint`, matching the rest of the server function settings and resolved config shape.
+
 ---
 
 ## [0.1.3] — 2026-05-09
@@ -346,7 +350,7 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 - Fixed `ServerError` constructor signature in docs (2 args, not 3)
 - Fixed stale package paths (`packages/webpack-plugin` → `packages/bundler-webpack`)
 - Fixed stale dependency graph (`@evjs/shared` now depends on `@evjs/manifest`)
-- Fixed wrong config path (`server.functions.endpoint` → `server.endpoint`)
+- Fixed wrong server function endpoint config path in docs
 - Synced all fixes to Chinese (zh-Hans) documentation
 
 ---

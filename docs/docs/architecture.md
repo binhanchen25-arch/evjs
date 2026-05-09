@@ -49,7 +49,7 @@ ev.config.ts ──► defineConfig({ entry, html, dev, server, plugins })
                     ├── entry, html ──► Utoopack entries + HTML templates
                     ├── plugins ──► EvPlugin[] (setup → buildStart/bundler/transformHtml/buildEnd)
                     ├── dev.port ──► dev server port
-                    ├── server.endpoint ──► server function defines + proxy path
+                    ├── server.functions.endpoint ──► server function defines + proxy path
                     ├── server.dev.port ──► API server port
                     └── server.dev.https ──► HTTPS for API server
                     │

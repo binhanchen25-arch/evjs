@@ -55,7 +55,7 @@ interface EvPlugin {
 
 The `config` hook runs before evjs resolves defaults. Use it for framework-level
 settings that must be visible to dev proxy setup and runtime defines, such as
-`server.endpoint`.
+`server.functions.endpoint`.
 
 ```ts
 import { defineConfig, merge } from "@evjs/ev";
@@ -66,7 +66,7 @@ export default defineConfig({
       name: "custom-function-endpoint",
       config(config) {
         merge(config, {
-          server: { endpoint: "/api/rpc" },
+          server: { functions: { endpoint: "/api/rpc" } },
         });
         return config;
       },
@@ -120,8 +120,8 @@ All hooks can be `async` (return a `Promise`).
 
 Use `config` to change evjs framework options. Use `bundlerConfig` only for
 the underlying bundler config; do not use it for runtime protocol settings like
-`server.endpoint`, because those must also affect dev proxy setup and generated
-runtime defines.
+`server.functions.endpoint`, because those must also affect dev proxy setup and
+generated runtime defines.
 
 ---
 

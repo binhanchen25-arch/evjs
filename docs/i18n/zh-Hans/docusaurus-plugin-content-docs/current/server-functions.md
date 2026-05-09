@@ -81,7 +81,7 @@ getUsers.fnName             // → "getUsers"
 
 ```tsx
 import { initTransport } from "@evjs/client";
-initTransport({ endpoint: "/api/fn" });
+initTransport({ functions: { endpoint: "/api/fn" } });
 ```
 
 ### 自定义传输（如 WebSocket）

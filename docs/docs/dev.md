@@ -42,7 +42,9 @@ export default defineConfig({
     https: false,                 // HTTPS mode
   },
   server: {
-    endpoint: "/api/fn",           // Default
+    functions: {
+      endpoint: "/api/fn",         // Default
+    },
     dev: {
       port: 3001,                 // API port
       https: false,               // HTTPS for API server

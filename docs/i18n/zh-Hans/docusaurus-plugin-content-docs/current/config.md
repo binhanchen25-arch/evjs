@@ -17,7 +17,7 @@ export default defineConfig({ /* ... */ });
 | `html` | `./index.html` |
 | `dev.port` | `3000` |
 | `server.dev.port` | `3001` |
-| `server.endpoint` | `/api/fn` |
+| `server.functions.endpoint` | `/api/fn` |
 
 ## 完整参考
 
@@ -35,8 +35,8 @@ export default defineConfig({
   // server: false,
   server: {
     entry: "./src/server.ts",
-    endpoint: "/api/fn",
     functions: {
+      endpoint: "/api/fn",
       clientProxy: "@evjs/client/transport",
       serverRegister: "@evjs/server/register",
     },
@@ -112,16 +112,11 @@ export default defineConfig({ server: false });
 
 显式服务端入口文件。提供后会覆盖自动生成的 `@evjs/server/fetch` 入口。自定义入口应默认导出带 `fetch` 的对象，通常写作 `export default { fetch: app.fetch };`。
 
-### `server.endpoint`
-
-| 选项 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `endpoint` | `string` | `/api/fn` | 服务端函数 RPC 调用路径 |
-
 ### `server.functions`
 
 | 选项 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
+| `endpoint` | `string` | `/api/fn` | 服务端函数 RPC 调用路径 |
 | `clientProxy` | `string` | `@evjs/client/transport` | 客户端服务端函数桩代码使用的模块 |
 | `serverRegister` | `string` | `@evjs/server/register` | 服务端函数实现注册使用的模块 |
 
@@ -139,8 +134,8 @@ export default defineConfig({
   entry: "./src/entry-client.tsx",
   server: {
     entry: "./src/entry-server.ts",
-    endpoint: "/api/rpc",
     functions: {
+      endpoint: "/api/rpc",
       clientProxy: "@evjs/client/transport",
       serverRegister: "@evjs/server/register",
     },

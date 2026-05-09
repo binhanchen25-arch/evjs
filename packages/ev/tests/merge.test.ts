@@ -6,7 +6,7 @@ describe("merge", () => {
   it("merges nested config sections", () => {
     const config: EvConfig = {
       server: {
-        endpoint: "/api/fn",
+        functions: { endpoint: "/api/fn" },
         dev: { port: 3001 },
       },
     };
@@ -19,7 +19,7 @@ describe("merge", () => {
 
     expect(config).toEqual({
       server: {
-        endpoint: "/api/fn",
+        functions: { endpoint: "/api/fn" },
         dev: { port: 3001, https: false },
       },
     });
@@ -59,7 +59,7 @@ describe("merge", () => {
 
     merge(config, {
       server: {
-        endpoint: "/api/rpc",
+        functions: { endpoint: "/api/rpc" },
       },
     });
 

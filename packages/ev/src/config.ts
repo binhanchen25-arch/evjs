@@ -24,6 +24,8 @@ export interface ResolvedDevConfig {
 
 /** Resolved server functions build configuration. */
 export interface ResolvedServerFunctionsConfig {
+  /** Server function RPC endpoint path. */
+  endpoint: string;
   /** Client-side transport module for server function stubs. */
   clientProxy: string;
   /** Server-side registration module for server functions. */
@@ -50,8 +52,6 @@ export interface ResolvedServerDevConfig {
 export interface ResolvedServerConfig {
   /** Explicit server entry file. Omitted when auto-generated. */
   entry?: string;
-  /** Server function endpoint path. */
-  endpoint: string;
   /** Server function build configuration. */
   functions: ResolvedServerFunctionsConfig;
   /** Server dev options. */
@@ -156,8 +156,6 @@ export interface DevConfig {
 export interface ServerConfig {
   /** Explicit server entry file. If provided, overrides auto-generated entry. */
   entry?: string;
-  /** Server function RPC endpoint path. Default: "/api/fn". */
-  endpoint?: string;
   /** Server function build configuration. */
   functions?: ServerFunctionsConfig;
   /** Server dev options. */
@@ -166,6 +164,8 @@ export interface ServerConfig {
 
 /** Server function build configuration. */
 export interface ServerFunctionsConfig {
+  /** Server function RPC endpoint path. Default: "/api/fn". */
+  endpoint?: string;
   /**
    * Client-side transport module for server function stubs.
    * Default: "@evjs/client/transport".
@@ -226,7 +226,8 @@ export function resolveConfig<
   }
 
   const serverPort = serverConfig.dev?.port ?? CONFIG_DEFAULTS.serverPort;
-  const serverEndpoint = serverConfig.endpoint ?? CONFIG_DEFAULTS.endpoint;
+  const serverEndpoint =
+    serverConfig.functions?.endpoint ?? CONFIG_DEFAULTS.endpoint;
   const serverTarget = new URL(
     serverConfig.dev?.https ? "https://localhost" : "http://localhost",
   );
@@ -254,8 +255,8 @@ export function resolveConfig<
     serverEnabled,
     server: {
       entry: serverConfig.entry,
-      endpoint: serverEndpoint,
       functions: {
+        endpoint: serverEndpoint,
         clientProxy:
           serverConfig.functions?.clientProxy ?? CONFIG_DEFAULTS.clientProxy,
         serverRegister:

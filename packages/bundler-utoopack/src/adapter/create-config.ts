@@ -100,10 +100,12 @@ export async function createUtoopackConfig(
     },
     define: {
       "process.env.EVJS_FUNCTION_ENDPOINT": JSON.stringify(
-        config.server.endpoint,
+        config.server.functions.endpoint,
       ),
       "process.env.NODE_ENV": JSON.stringify(mode),
-      __EVJS_FUNCTION_ENDPOINT__: JSON.stringify(config.server.endpoint),
+      __EVJS_FUNCTION_ENDPOINT__: JSON.stringify(
+        config.server.functions.endpoint,
+      ),
     },
     // Server functions config — utoopack handles "use server" natively
     ...(serverEnabled

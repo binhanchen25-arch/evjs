@@ -114,8 +114,8 @@ export interface EvPlugin<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
   /**
    * Modify the raw user config before defaults are resolved.
    *
-   * Use this for framework-level config such as `server.endpoint` that must be
-   * visible to dev proxy setup and build-time runtime defines.
+   * Use this for framework-level config such as `server.functions.endpoint`
+   * that must be visible to dev proxy setup and build-time runtime defines.
    */
   config?: (
     config: EvConfig<TBundlerCfg>,
