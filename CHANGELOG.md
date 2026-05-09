@@ -6,6 +6,10 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ## [Unreleased]
 
+---
+
+## [0.1.4] — 2026-05-09
+
 ### ♻️ Refactoring
 
 - **Server function endpoint config** — Moved the ev config endpoint option to `server.functions.endpoint`, matching the rest of the server function settings and resolved config shape.
@@ -14,6 +18,10 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 - **Router global catch boundary opt-out** — Added a `createApp()` runtime option that passes through TanStack Router's native `disableGlobalCatchBoundary`.
 - **Broader TanStack Router passthrough** — Re-exported additional TanStack Router components, hooks, history helpers, search middleware utilities, URL rewrite helpers, and router event types from `@evjs/client`.
+
+### 📝 Documentation
+
+- **Release line updates** — Updated user-facing dependency examples to the `0.1.4` release line.
 
 ---
 

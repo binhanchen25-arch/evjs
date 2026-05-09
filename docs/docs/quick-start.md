@@ -98,14 +98,14 @@ declare module "@tanstack/react-router" {
 ```json
 {
   "dependencies": {
-    "@evjs/client": "^0.1.3",
-    "@evjs/server": "^0.1.3",
+    "@evjs/client": "^0.1.4",
+    "@evjs/server": "^0.1.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@evjs/ev": "^0.1.3",
-    "@evjs/cli": "^0.1.3",
+    "@evjs/ev": "^0.1.4",
+    "@evjs/cli": "^0.1.4",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^6.0.2"
