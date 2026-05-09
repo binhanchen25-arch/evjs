@@ -27,7 +27,7 @@ The `utoopack()` helper wraps your plugin hooks for type-safe configuration muta
 
 ```ts
 import { defineConfig } from "@evjs/ev";
-import { utoopack } from "@evjs/bundler-utoopack";
+import { merge, utoopack } from "@evjs/bundler-utoopack";
 
 export default defineConfig({
   plugins: [
@@ -37,8 +37,11 @@ export default defineConfig({
         return {
           bundlerConfig: utoopack((config) => {
             // config is typed as ConfigComplete from @utoo/pack
-            config.env ??= {};
-            config.env.__MY_VAR__ = JSON.stringify("value");
+            merge(config, {
+              define: {
+                __MY_VAR__: JSON.stringify("value"),
+              },
+            });
           }),
         };
       },

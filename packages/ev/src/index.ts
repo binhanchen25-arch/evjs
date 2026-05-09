@@ -24,3 +24,4 @@ export {
   resolveConfig,
 } from "./config.js";
 export { type BuildHtmlOptions, buildHtml } from "./html.js";
+export { type ConfigPatch, merge } from "./merge.js";

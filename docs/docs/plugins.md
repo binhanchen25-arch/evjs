@@ -58,21 +58,25 @@ settings that must be visible to dev proxy setup and runtime defines, such as
 `server.endpoint`.
 
 ```ts
+import { defineConfig, merge } from "@evjs/ev";
+
 export default defineConfig({
   plugins: [
     {
       name: "custom-function-endpoint",
       config(config) {
-        config.server = {
-          ...(typeof config.server === "object" ? config.server : {}),
-          endpoint: "/api/rpc",
-        };
+        merge(config, {
+          server: { endpoint: "/api/rpc" },
+        });
         return config;
       },
     },
   ],
 });
 ```
+
+`merge()` is type-safe for evjs framework config here, so nested patch objects
+are checked against `EvConfig`.
 
 ### Setup Context
 

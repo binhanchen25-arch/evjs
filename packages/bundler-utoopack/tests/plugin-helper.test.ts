@@ -43,4 +43,27 @@ describe("merge", () => {
 
     expect(config.resolve?.extensions).toEqual([".jsx", ".js"]);
   });
+
+  it("type-checks utoopack config patches", () => {
+    const config: ConfigComplete = { entry: [] };
+
+    merge(config, {
+      module: {
+        rules: {
+          ".mdx": { type: "raw" },
+        },
+      },
+    });
+
+    merge(config, {
+      module: {
+        rules: {
+          // @ts-expect-error rule type must be a supported utoopack module type
+          ".bad": {
+            type: "not-a-module-type",
+          },
+        },
+      },
+    });
+  });
 });
