@@ -8,6 +8,19 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.5] — 2026-05-11
+
+### 🐛 Bug Fixes
+
+- **Relative server function endpoint default** — Restored the default server function endpoint to a relative path so generated apps work behind their current origin.
+- **WebSocket transport E2E dispatch** — Fixed the custom WebSocket transport E2E bootstrap to dispatch RPC calls to the server function API endpoint instead of a malformed URL.
+
+### 📝 Documentation
+
+- **Release line updates** — Updated user-facing dependency examples to the `0.1.5` release line.
+
+---
+
 ## [0.1.4] — 2026-05-09
 
 ### ♻️ Refactoring
