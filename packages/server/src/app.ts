@@ -21,7 +21,7 @@ import type { RouteHandler } from "./routes/index.js";
 export interface CreateAppOptions {
   /** Server function configurations */
   functions?: {
-    /** Server function endpoint path. Defaults to "/api/fn". */
+    /** Server function endpoint path. Defaults to "api/fn". */
     endpoint?: string;
     /**
      * Maximum request body size in bytes for server function calls.

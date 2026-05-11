@@ -56,6 +56,6 @@ flowchart LR
     UI --> FETCH
     UI -.->|初始请求| SSR
     UI -.->|RSC 获取| RSC
-    RPC -->|POST /api/fn| SF
+    RPC -->|POST api/fn| SF
     FETCH -->|GET/POST /api| RH
 ```

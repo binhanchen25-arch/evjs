@@ -22,7 +22,7 @@
 │  TanStack Router                 │ │  Hono App (createApp)             │
 │  TanStack Query                  │ │  registerServerReference() + createRoute()     │
 │  createServerReference() stubs   │ │  app.fetch()                      │
-│  ServerTransport ────────────────┼─┼──► POST /api/fn ──► registry     │
+│  ServerTransport ────────────────┼─┼──► POST api/fn ─► registry     │
 │                                  │ │                                   │
 └──────────────────────────────────┘ └───────────────────────────────────┘
 ```
@@ -117,7 +117,7 @@ Browser ──(:3000)──► Dev Server ──► HMR (static assets)
                                                     │
                                               Hono App
                                                     │
-                                              POST /api/fn
+                                              POST api/fn
                                                     │
                                               registry.get(fnId)(...args)
 ```

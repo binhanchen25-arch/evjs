@@ -41,7 +41,7 @@ test.describe("plugin-authoring", () => {
     await expect(page.getByText("Server mode: production")).toBeVisible();
 
     const defaultEndpointResponse = await page.request.post(
-      `${baseURL}/api/fn`,
+      new URL("api/fn", baseURL).toString(),
       {
         data: { fnId: "missing", args: [] },
       },

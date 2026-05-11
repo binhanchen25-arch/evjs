@@ -57,7 +57,7 @@ export interface TransportOptions {
   baseUrl?: string;
   /** Server functions configuration */
   functions?: {
-    /** Path prefix for the server function endpoint. Defaults to `/api/fn`. */
+    /** Path prefix for the server function endpoint. Defaults to `api/fn`. */
     endpoint?: string;
   };
   /** Custom transport. When provided, `baseUrl`, `functions.endpoint`, and `headers` are ignored. */

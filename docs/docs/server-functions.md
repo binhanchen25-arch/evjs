@@ -104,7 +104,7 @@ const { data } = useQuery({
 ```tsx
 import { initTransport } from "@evjs/client";
 
-initTransport({ functions: { endpoint: "/api/fn" } });
+initTransport({ functions: { endpoint: "api/fn" } });
 ```
 
 ### Custom Transport (e.g., WebSocket)
@@ -133,7 +133,7 @@ import { defineConfig } from "@evjs/ev";
 export default defineConfig({
   server: {
     functions: {
-      endpoint: "/api/fn",  // default
+      endpoint: "api/fn",  // default
     },
   },
 });

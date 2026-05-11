@@ -3,7 +3,7 @@
  */
 
 /** Default server function endpoint path, shared between client and server. */
-export const DEFAULT_ENDPOINT = "/api/fn";
+export const DEFAULT_ENDPOINT = "api/fn";
 
 declare const __EVJS_FUNCTION_ENDPOINT__: string | undefined;
 declare const process: {

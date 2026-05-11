@@ -28,7 +28,7 @@ describe("resolveConfig", () => {
     expect(resolved.server.functions.serverRegister).toBe(
       "@evjs/server/register",
     );
-    expect(resolved.server.functions.endpoint).toBe("/api/fn");
+    expect(resolved.server.functions.endpoint).toBe("api/fn");
     expect(resolved.server.dev.port).toBe(CONFIG_DEFAULTS.serverPort);
     expect(resolved.server.dev.https).toBe(false);
     expect(resolved.bundler).toBeUndefined();

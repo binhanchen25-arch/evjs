@@ -43,7 +43,7 @@ export default defineConfig({
   },
   server: {
     functions: {
-      endpoint: "/api/fn",         // 默认值
+      endpoint: "api/fn",         // 默认值
     },
     dev: {
       port: 3001,                 // API 端口
@@ -89,6 +89,6 @@ await build({ entry: "./src/main.tsx" }, { cwd: "./my-app", bundler: utoopackAda
 
 `createApp()` 会自动调用 `initTransport`，用以配置客户端如何与服务端通信。
 
-- 在**开发模式**中：客户端服务器代理 `/api/*` → `:3001`，所以默认的 `/api/fn` 端点会自动生效
+- 在**开发模式**中：客户端服务器代理 `/api/*` → `:3001`，所以默认的 `api/fn` 端点会自动生效
 - 在**生产模式**中：客户端和服务端通常在同一个源下
 - 通信层**与运行时无关** —— 无论后端使用何种运行时，客户端始终会将 POST 请求发送至正确的相同端点

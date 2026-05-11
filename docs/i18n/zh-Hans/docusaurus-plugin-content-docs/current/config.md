@@ -17,7 +17,7 @@ export default defineConfig({ /* ... */ });
 | `html` | `./index.html` |
 | `dev.port` | `3000` |
 | `server.dev.port` | `3001` |
-| `server.functions.endpoint` | `/api/fn` |
+| `server.functions.endpoint` | `api/fn` |
 
 ## 完整参考
 
@@ -36,7 +36,7 @@ export default defineConfig({
   server: {
     entry: "./src/server.ts",
     functions: {
-      endpoint: "/api/fn",
+      endpoint: "api/fn",
       clientProxy: "@evjs/client/transport",
       serverRegister: "@evjs/server/register",
     },
@@ -116,7 +116,7 @@ export default defineConfig({ server: false });
 
 | 选项 | 类型 | 默认值 | 描述 |
 |------|------|--------|------|
-| `endpoint` | `string` | `/api/fn` | 服务端函数 RPC 调用路径 |
+| `endpoint` | `string` | `api/fn` | 服务端函数 RPC 调用路径 |
 | `clientProxy` | `string` | `@evjs/client/transport` | 客户端服务端函数桩代码使用的模块 |
 | `serverRegister` | `string` | `@evjs/server/register` | 服务端函数实现注册使用的模块 |
 

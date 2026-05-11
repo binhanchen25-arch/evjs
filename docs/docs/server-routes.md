@@ -128,6 +128,6 @@ export default defineConfig({
 
 :::tip
 
-If you combine `routes` with `"use server"` Server Functions, `createApp()` handles **both**. Route handlers are mounted first; the RPC fallback handles requests at `/api/fn`.
+If you combine `routes` with `"use server"` Server Functions, `createApp()` handles **both**. Route handlers are mounted first; the RPC fallback handles requests at `api/fn`.
 
 :::

@@ -249,12 +249,12 @@ describe("createFetchTransport (default)", () => {
 
     initTransport({
       baseUrl: "https://api.example.com/backend",
-      functions: { endpoint: "https://rpc.example.com/api/fn" },
+      functions: { endpoint: "https://rpc.example.comapi/fn" },
     });
     await callServer("myFn", []);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      new URL("https://rpc.example.com/api/fn"),
+      new URL("https://rpc.example.comapi/fn"),
       expect.objectContaining({ method: "POST" }),
     );
   });

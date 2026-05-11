@@ -126,6 +126,6 @@ export default defineConfig({
 
 :::tip
 
-如果你同时使用 `routes` 和 `"use server"` 服务端函数，`createApp()` 会同时处理**两者**。路由处理器优先挂载；RPC 回退处理 `/api/fn` 的请求。
+如果你同时使用 `routes` 和 `"use server"` 服务端函数，`createApp()` 会同时处理**两者**。路由处理器优先挂载；RPC 回退处理 `api/fn` 的请求。
 
 :::

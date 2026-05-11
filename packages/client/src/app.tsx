@@ -63,7 +63,7 @@ export interface CreateAppOptions<
   functions?: {
     /**
      * server function endpoint path. When provided, automatically configures the transport.
-     * Defaults to `/api/fn` if not specified.
+     * Defaults to `api/fn` if not specified.
      */
     endpoint?: string;
   };

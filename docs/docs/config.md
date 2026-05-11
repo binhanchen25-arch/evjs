@@ -17,7 +17,7 @@ All fields are optional. These are the built-in defaults:
 | `html` | `./index.html` |
 | `dev.port` | `3000` |
 | `server.dev.port` | `3001` |
-| `server.functions.endpoint` | `/api/fn` |
+| `server.functions.endpoint` | `api/fn` |
 
 ## Full Reference
 
@@ -41,7 +41,7 @@ export default defineConfig({
   server: {
     entry: "./src/server.ts",        // Explicit server entry (optional)
     functions: {
-      endpoint: "/api/fn",           // Server function RPC endpoint
+      endpoint: "api/fn",           // Server function RPC endpoint
       clientProxy: "@evjs/client/transport",
       serverRegister: "@evjs/server/register",
     },
@@ -93,7 +93,7 @@ Explicit server entry file. If provided, overrides the auto-generated `@evjs/ser
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `endpoint` | `string` | `/api/fn` | Path for server function RPC calls |
+| `endpoint` | `string` | `api/fn` | Path for server function RPC calls |
 | `clientProxy` | `string` | `@evjs/client/transport` | Module used by client-side server function stubs |
 | `serverRegister` | `string` | `@evjs/server/register` | Module used to register server function implementations |
 

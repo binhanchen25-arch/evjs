@@ -43,7 +43,7 @@ export default defineConfig({
   },
   server: {
     functions: {
-      endpoint: "/api/fn",         // Default
+      endpoint: "api/fn",         // Default
     },
     dev: {
       port: 3001,                 // API port
@@ -89,6 +89,6 @@ await build({ entry: "./src/main.tsx" }, { cwd: "./my-app", bundler: utoopackAda
 
 `initTransport` is called automatically by `createApp()` to configure how the client communicates with the server.
 
-- In **dev mode**: the client dev server proxies `/api/*` → `:3001`, so the default `/api/fn` endpoint works automatically
+- In **dev mode**: the client dev server proxies `/api/*` → `:3001`, so the default `api/fn` endpoint works automatically
 - In **production**: client and server are typically on the same origin
 - The transport is **runtime-agnostic** — the client always posts to the same endpoint regardless of server runtime

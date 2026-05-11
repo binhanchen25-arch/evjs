@@ -147,7 +147,7 @@ export interface DevConfig {
   /**
    * Dev proxy configuration.
    * Configures the client dev server to proxy requests to backend services.
-   * Defaults to forwarding DEFAULT_ENDPOINT ("/api/fn") to the local API dev server.
+   * Defaults to forwarding DEFAULT_ENDPOINT ("api/fn") to the local API dev server.
    */
   proxy?: DevProxyRule[];
 }
@@ -164,7 +164,7 @@ export interface ServerConfig {
 
 /** Server function build configuration. */
 export interface ServerFunctionsConfig {
-  /** Server function RPC endpoint path. Default: "/api/fn". */
+  /** Server function RPC endpoint path. Default: "api/fn". */
   endpoint?: string;
   /**
    * Client-side transport module for server function stubs.
