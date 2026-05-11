@@ -73,7 +73,7 @@ app.render("#app");
 // src/global.ts
 import { initTransport } from "@evjs/client";
 
-declare module "@tanstack/react-router" {
+declare module "@evjs/client" {
   interface Register {
     router: any;
   }

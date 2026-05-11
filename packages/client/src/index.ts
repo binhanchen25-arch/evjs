@@ -35,6 +35,7 @@ export {
   useQuery,
   useSuspenseQuery,
 } from "./query";
+export type { Register } from "./register";
 export type {
   ActiveLinkOptions,
   AnyRootRoute,
@@ -147,6 +148,7 @@ export {
   useRouterState,
   useSearch,
 } from "./route";
+export type {} from "./tanstack-register";
 export type {
   RequestContext,
   ServerFunction,

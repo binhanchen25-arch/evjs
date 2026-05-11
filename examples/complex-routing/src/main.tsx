@@ -20,7 +20,7 @@ const routeTree = rootRoute.addChildren([
 const app = createApp({ routeTree });
 
 // Register router type for full IDE type-safety on useParams, useSearch, Link, etc.
-declare module "@tanstack/react-router" {
+declare module "@evjs/client" {
   interface Register {
     router: typeof app.router;
   }

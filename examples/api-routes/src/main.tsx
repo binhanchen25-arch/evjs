@@ -6,7 +6,7 @@ const routeTree = rootRoute.addChildren([postsRoute]);
 
 const app = createApp({ routeTree });
 
-declare module "@tanstack/react-router" {
+declare module "@evjs/client" {
   interface Register {
     router: typeof app.router;
   }

@@ -50,7 +50,7 @@ const routeTree = rootRoute.addChildren([
 const app = createApp({ routeTree });
 
 // Required for full type-safety on useParams, useSearch, Link, etc.
-declare module "@tanstack/react-router" {
+declare module "@evjs/client" {
   interface Register {
     router: typeof app.router;
   }

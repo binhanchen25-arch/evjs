@@ -28,7 +28,7 @@ const history =
 
 const app = createApp({ routeTree, history });
 
-declare module "@tanstack/react-router" {
+declare module "@evjs/client" {
   interface Register {
     router: typeof app.router;
   }
