@@ -35,7 +35,16 @@ export {
   useQuery,
   useSuspenseQuery,
 } from "./query";
-export type { Register } from "./register";
+// biome-ignore lint/suspicious/noEmptyInterface: Users augment this interface with their app router type.
+export interface Register {}
+
+type EvRegister = Register;
+
+// Bridge evjs' public Register interface into TanStack Router's global types.
+declare module "@tanstack/react-router" {
+  interface Register extends EvRegister {}
+}
+
 export type {
   ActiveLinkOptions,
   AnyRootRoute,
@@ -148,7 +157,6 @@ export {
   useRouterState,
   useSearch,
 } from "./route";
-export type {} from "./tanstack-register";
 export type {
   RequestContext,
   ServerFunction,

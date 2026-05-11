@@ -10,6 +10,10 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ## [0.1.5] — 2026-05-11
 
+### ✨ Improvements
+
+- **evjs client router type registration** — Added `@evjs/client` as the public module augmentation target for TanStack Router registration, keeping route type setup inside the evjs client API surface.
+
 ### 🐛 Bug Fixes
 
 - **Relative server function endpoint default** — Restored the default server function endpoint to a relative path so generated apps work behind their current origin.
