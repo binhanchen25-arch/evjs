@@ -107,6 +107,19 @@ describe("resolveConfig", () => {
       secure: false,
     });
   });
+
+  it("uses a pathname proxy context for the default relative endpoint", () => {
+    const resolved = resolveConfig();
+
+    expect(resolved.server.functions.endpoint).toBe("api/fn");
+    expect(resolved.dev.proxy).toContainEqual({
+      context: ["/api/fn"],
+      target: "http://localhost:3001",
+      changeOrigin: true,
+      secure: false,
+    });
+  });
+
   it("respects server dev https override", () => {
     const resolved = resolveConfig({
       server: {

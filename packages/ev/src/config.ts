@@ -199,6 +199,10 @@ export const CONFIG_DEFAULTS = {
   serverRegister: "@evjs/server/register",
 } as const;
 
+function toProxyContext(endpoint: string): string {
+  return endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+}
+
 /**
  * Deeply merge user configuration with defaults.
  */
@@ -245,7 +249,7 @@ export function resolveConfig<
         ...(config.dev?.proxy ?? []),
         // Framework always proxies the server function endpoint to the local API dev server
         {
-          context: [serverEndpoint],
+          context: [toProxyContext(serverEndpoint)],
           target: serverTarget.origin,
           changeOrigin: true,
           secure: false,
