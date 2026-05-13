@@ -7,7 +7,6 @@
  */
 
 import { createRequire } from "node:module";
-import path from "node:path";
 
 const require = createRequire(import.meta.url);
 
@@ -18,6 +17,7 @@ import {
   type ResolvedEvConfig,
 } from "@evjs/ev";
 import type { ConfigComplete, DevServerProxy, ProxyRule } from "@utoo/pack";
+import { getOutputPaths } from "./output-paths.js";
 
 function createSpaHistoryFallbackRule(
   config: ResolvedEvConfig<ConfigComplete>,
@@ -70,6 +70,8 @@ export async function createUtoopackConfig(
     throw new Error("Failed to resolve a server entry for the server bundle.");
   }
 
+  const outputPaths = getOutputPaths(cwd, serverEnabled);
+
   const utoopackConfig: ConfigComplete = {
     mode,
     // MPA mode: one entry per page; SPA mode: single entry
@@ -84,7 +86,7 @@ export async function createUtoopackConfig(
           },
         ],
     output: {
-      path: path.resolve(cwd, serverEnabled ? "dist/client" : "dist"),
+      path: outputPaths.clientDir,
       filename: isProduction ? "[name].[contenthash:8].js" : "[name].js",
       chunkFilename: isProduction ? "[name].[contenthash:8].js" : "[name].js",
       publicPath: "/",
@@ -113,7 +115,7 @@ export async function createUtoopackConfig(
           server: {
             entry: finalServerEntry,
             output: {
-              path: path.resolve(cwd, "dist/server"),
+              path: outputPaths.serverDir,
               filename: isProduction
                 ? "[name].[contenthash:8].js"
                 : "[name].js",

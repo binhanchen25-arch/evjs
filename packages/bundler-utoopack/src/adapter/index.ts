@@ -18,6 +18,7 @@ import {
 import { getLogger } from "@logtape/logtape";
 import type { ConfigComplete } from "@utoo/pack";
 import { UtoopackManifestGenerator } from "../manifest-generator.js";
+import { getOutputPaths } from "./output-paths.js";
 
 const logger = getLogger(["evjs", "bundler-utoopack"]);
 
@@ -27,10 +28,8 @@ async function generateAndEmitHtml(
   hooks: EvPluginHooks<ConfigComplete>[],
 ) {
   const isServerEnabled = config.serverEnabled;
-  const clientManifestPath = path.resolve(
-    cwd,
-    isServerEnabled ? "dist/client/manifest.json" : "dist/manifest.json",
-  );
+  const outputPaths = getOutputPaths(cwd, isServerEnabled);
+  const clientManifestPath = path.join(outputPaths.clientDir, "manifest.json");
   if (!fs.existsSync(clientManifestPath)) return;
   const clientManifest = JSON.parse(
     await fs.promises.readFile(clientManifestPath, "utf-8"),
@@ -39,7 +38,10 @@ async function generateAndEmitHtml(
   // biome-ignore lint/suspicious/noExplicitAny: match @evjs/manifest type
   let serverManifest: any;
   if (isServerEnabled) {
-    const serverManifestPath = path.resolve(cwd, "dist/server/manifest.json");
+    const serverManifestPath = path.join(
+      outputPaths.serverDir,
+      "manifest.json",
+    );
     if (fs.existsSync(serverManifestPath)) {
       serverManifest = JSON.parse(
         await fs.promises.readFile(serverManifestPath, "utf-8"),
@@ -76,12 +78,7 @@ async function generateAndEmitHtml(
         serverManifest,
       });
 
-      const outPath = path.resolve(
-        cwd,
-        isServerEnabled
-          ? `dist/client/${pageName}.html`
-          : `dist/${pageName}.html`,
-      );
+      const outPath = path.join(outputPaths.clientDir, `${pageName}.html`);
       await fs.promises.mkdir(path.dirname(outPath), { recursive: true });
       await fs.promises.writeFile(outPath, finalHtml, "utf-8");
     }
@@ -104,20 +101,33 @@ async function generateAndEmitHtml(
     serverManifest,
   });
 
-  const outPath = path.resolve(
-    cwd,
-    isServerEnabled ? "dist/client/index.html" : "dist/index.html",
-  );
+  const outPath = path.join(outputPaths.clientDir, "index.html");
   await fs.promises.mkdir(path.dirname(outPath), { recursive: true });
   await fs.promises.writeFile(outPath, finalHtml, "utf-8");
 }
 
 async function cleanServerOutput(cwd: string, serverEnabled: boolean) {
   if (!serverEnabled) return;
-  await fs.promises.rm(path.resolve(cwd, "dist/server"), {
+  const outputPaths = getOutputPaths(cwd, serverEnabled);
+  await fs.promises.rm(outputPaths.serverDir, {
     recursive: true,
     force: true,
   });
+}
+
+async function generateDevArtifacts(
+  config: ResolvedEvConfig<ConfigComplete>,
+  cwd: string,
+  hooks: EvPluginHooks<ConfigComplete>[],
+) {
+  const outputPaths = getOutputPaths(cwd, config.serverEnabled);
+  const clientStatsPath = path.join(outputPaths.clientDir, "stats.json");
+  if (!fs.existsSync(clientStatsPath)) return;
+
+  logger.info`Generating development manifest and HTML...`;
+  const generator = new UtoopackManifestGenerator(cwd, config.serverEnabled);
+  await generator.build();
+  await generateAndEmitHtml(config, cwd, hooks);
 }
 
 export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
@@ -161,42 +171,44 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
     const { serve } = await import("@utoo/pack");
     await serve({ config: utoopackConfig });
 
+    await generateDevArtifacts(config, cwd, hooks);
+
     // Watch for server bundle readiness (utoopack emits server output
     // to dist/server/ when "use server" modules are discovered)
-    if (config.serverEnabled) {
-      const outDir = path.resolve(cwd, "dist/server");
+    if (!config.serverEnabled) return;
 
-      if (!fs.existsSync(outDir)) {
-        fs.mkdirSync(outDir, { recursive: true });
-      }
+    const outDir = getOutputPaths(cwd, config.serverEnabled).serverDir;
 
-      let ready = false;
-      const checkReady = async (filename?: string) => {
-        if (ready) return;
-        const hasBundle = filename
-          ? filename === "stats.json" || filename.endsWith(".js")
-          : (await fs.promises.readdir(outDir).catch(() => [])).some(
-              (f) => f === "stats.json" || f.endsWith(".js"),
-            );
-
-        if (hasBundle) {
-          ready = true;
-          try {
-            await callbacks.onServerBundleReady();
-            watcher?.close();
-          } catch (err) {
-            logger.error`Server bundle ready callback failed: ${err}`;
-            ready = false;
-          }
-        }
-      };
-
-      const watcher = fs.watch(outDir, (_eventType, filename) => {
-        if (filename) void checkReady(filename);
-      });
-
-      // Initial check in case it was written before the watcher attached
-      await checkReady();
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
     }
+
+    let ready = false;
+    const checkReady = async (filename?: string) => {
+      if (ready) return;
+      const hasBundle = filename
+        ? filename === "stats.json" || filename.endsWith(".js")
+        : (await fs.promises.readdir(outDir).catch(() => [])).some(
+            (f) => f === "stats.json" || f.endsWith(".js"),
+          );
+
+      if (hasBundle) {
+        ready = true;
+        try {
+          await callbacks.onServerBundleReady();
+          watcher?.close();
+        } catch (err) {
+          logger.error`Server bundle ready callback failed: ${err}`;
+          ready = false;
+        }
+      }
+    };
+
+    const watcher = fs.watch(outDir, (_eventType, filename) => {
+      if (filename) void checkReady(filename);
+    });
+
+    // Initial check in case it was written before the watcher attached
+    await checkReady();
   },
 };

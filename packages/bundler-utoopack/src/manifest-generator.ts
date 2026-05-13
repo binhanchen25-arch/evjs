@@ -19,6 +19,10 @@ import {
 import { getLogger } from "@logtape/logtape";
 import chokidar from "chokidar";
 import fastGlob from "fast-glob";
+import {
+  getOutputPaths,
+  type UtoopackOutputPaths,
+} from "./adapter/output-paths.js";
 
 const logger = getLogger(["evjs", "bundler-utoopack", "manifest"]);
 
@@ -210,6 +214,7 @@ export class UtoopackManifestGenerator {
   private collector = new ManifestCollector();
   private cwd: string;
   private serverEnabled: boolean;
+  private outputPaths: UtoopackOutputPaths;
   private watcher: chokidar.FSWatcher | null = null;
   private clientJsAssets: string[] = [];
   private currentRoutes: RouteEntry[] = [];
@@ -221,6 +226,7 @@ export class UtoopackManifestGenerator {
   constructor(cwd: string, serverEnabled: boolean) {
     this.cwd = cwd;
     this.serverEnabled = serverEnabled;
+    this.outputPaths = getOutputPaths(cwd, serverEnabled);
   }
 
   /**
@@ -232,10 +238,7 @@ export class UtoopackManifestGenerator {
    * via `setPageAssets()`. In SPA mode, a single `setAssets()` call is used.
    */
   async loadClientStats() {
-    const statsPath = path.resolve(
-      this.cwd,
-      this.serverEnabled ? "dist/client/stats.json" : "dist/stats.json",
-    );
+    const statsPath = path.join(this.outputPaths.clientDir, "stats.json");
     if (!fs.existsSync(statsPath)) {
       this.collector.setAssets([], []);
       this.clientJsAssets = [];
@@ -282,7 +285,7 @@ export class UtoopackManifestGenerator {
     this.serverAssets = EMPTY_ASSETS;
     this.serverFns = {};
 
-    const statsPath = path.resolve(this.cwd, "dist/server/stats.json");
+    const statsPath = path.join(this.outputPaths.serverDir, "stats.json");
     if (fs.existsSync(statsPath)) {
       try {
         const statsStr = await fs.promises.readFile(statsPath, "utf-8");
@@ -301,7 +304,7 @@ export class UtoopackManifestGenerator {
     }
 
     // Fallback: scan for JS entry in dist/server/
-    const serverDir = path.resolve(this.cwd, "dist/server");
+    const serverDir = this.outputPaths.serverDir;
     if (fs.existsSync(serverDir)) {
       const files = await fs.promises.readdir(serverDir);
       const jsEntry = files.find((f) => f.endsWith(".js"));
@@ -398,9 +401,9 @@ export class UtoopackManifestGenerator {
 
     // Client manifest — matches ClientManifest from @evjs/manifest
     const clientManifest: ClientManifest = this.collector.getClientManifest();
-    const clientOutPath = path.resolve(
-      this.cwd,
-      this.serverEnabled ? "dist/client/manifest.json" : "dist/manifest.json",
+    const clientOutPath = path.join(
+      this.outputPaths.clientDir,
+      "manifest.json",
     );
 
     const clientOutDir = path.dirname(clientOutPath);
@@ -416,7 +419,7 @@ export class UtoopackManifestGenerator {
     if (this.serverEnabled) {
       // Server manifest — matches ServerManifest from @evjs/manifest
       const serverManifest: ServerManifest = this.collector.getServerManifest();
-      const serverOutDir = path.resolve(this.cwd, "dist/server");
+      const serverOutDir = this.outputPaths.serverDir;
       if (!fs.existsSync(serverOutDir)) {
         await fs.promises.mkdir(serverOutDir, { recursive: true });
       }
