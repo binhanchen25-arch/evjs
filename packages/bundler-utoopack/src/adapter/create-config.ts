@@ -149,7 +149,7 @@ export async function createUtoopackConfig(
 
   for (const h of hooks) {
     if (h.bundlerConfig) {
-      h.bundlerConfig(utoopackConfig, ctx);
+      await h.bundlerConfig(utoopackConfig, ctx);
     }
   }
 

@@ -8,6 +8,18 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.7] — 2026-05-13
+
+### ✨ Improvements
+
+- **Async bundler config hooks** — Allowed plugin `bundlerConfig` hooks and the typed `utoopack()` helper to return promises, ensuring async Utoopack config mutations finish before build/dev config is used.
+
+### 📝 Documentation
+
+- **Release line updates** — Updated user-facing dependency examples to the `0.1.7` release line.
+
+---
+
 ## [0.1.6] — 2026-05-13
 
 ### 🐛 Bug Fixes

@@ -172,7 +172,10 @@ export interface EvPluginHooks<
    * by each bundler adapter for type safety (e.g., `utoopack()` from
    * `@evjs/bundler-utoopack`).
    */
-  bundlerConfig?: (config: TBundlerCfg, ctx: EvBundlerCtx<TBundlerCfg>) => void;
+  bundlerConfig?: (
+    config: TBundlerCfg,
+    ctx: EvBundlerCtx<TBundlerCfg>,
+  ) => void | Promise<void>;
 
   /** Called after compilation completes. Receives build result with manifests. */
   buildEnd?: (result: EvBuildResult) => void | Promise<void>;

@@ -69,4 +69,20 @@ describe("createUtoopackConfig", () => {
     ]);
     expect(utoopackConfig.devServer?.proxy).toEqual([]);
   });
+
+  it("awaits async bundlerConfig hooks before returning config", async () => {
+    const config = createResolvedConfig();
+
+    const utoopackConfig = await createUtoopackConfig(config, process.cwd(), [
+      {
+        async bundlerConfig(cfg) {
+          await Promise.resolve();
+          cfg.output ??= {};
+          cfg.output.publicPath = "runtime";
+        },
+      },
+    ]);
+
+    expect(utoopackConfig.output?.publicPath).toBe("runtime");
+  });
 });

@@ -26,11 +26,14 @@ export type { ConfigPatch } from "@evjs/ev";
  * ```
  */
 export function utoopack<T = unknown>(
-  fn: (config: ConfigComplete, ctx: EvBundlerCtx<ConfigComplete>) => void,
-): (config: T, ctx: EvBundlerCtx<T>) => void {
-  return (config, ctx) => {
+  fn: (
+    config: ConfigComplete,
+    ctx: EvBundlerCtx<ConfigComplete>,
+  ) => void | Promise<void>,
+): (config: T, ctx: EvBundlerCtx<T>) => void | Promise<void> {
+  return async (config, ctx) => {
     if (ctx.config.bundler?.name === "utoopack") {
-      fn(
+      await fn(
         config as unknown as ConfigComplete,
         ctx as unknown as EvBundlerCtx<ConfigComplete>,
       );
