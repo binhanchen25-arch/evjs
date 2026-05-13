@@ -98,14 +98,14 @@ declare module "@evjs/client" {
 ```json
 {
   "dependencies": {
-    "@evjs/client": "^0.1.5",
-    "@evjs/server": "^0.1.5",
+    "@evjs/client": "^0.1.6",
+    "@evjs/server": "^0.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@evjs/ev": "^0.1.5",
-    "@evjs/cli": "^0.1.5",
+    "@evjs/ev": "^0.1.6",
+    "@evjs/cli": "^0.1.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^6.0.2"

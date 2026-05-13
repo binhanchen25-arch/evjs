@@ -8,6 +8,19 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.6] — 2026-05-13
+
+### 🐛 Bug Fixes
+
+- **Utoopack dev HTML emission** — Fixed `ev dev` so Utoopack emits development HTML and manifests for both full-stack apps (`dist/client/index.html`) and CSR-only apps (`dist/index.html`).
+- **Relative server function dev proxy** — Fixed the default relative server function endpoint so `POST /api/fn` is proxied to the API dev server instead of returning a client dev-server 405 response.
+
+### 📝 Documentation
+
+- **Release line updates** — Updated user-facing dependency examples to the `0.1.6` release line.
+
+---
+
 ## [0.1.5] — 2026-05-11
 
 ### ✨ Improvements
