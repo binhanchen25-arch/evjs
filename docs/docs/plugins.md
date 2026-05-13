@@ -1,6 +1,6 @@
 # Plugins
 
-evjs plugins extend the build pipeline with custom behavior — from injecting bundler rules and modifying output HTML, to collecting build metadata for CI/CD. Plugins are declared in `ev.config.ts` and run in order.
+evjs plugins extend the build pipeline with custom behavior — from injecting bundler rules and modifying output HTML, to collecting build metadata for CI/CD. Plugins are declared in `ev.config.ts` and run in dependency-resolved order.
 
 ## Quick Example
 
@@ -38,6 +38,9 @@ interface EvPlugin {
   /** Plugin name — used in logs and error messages. */
   name: string;
 
+  /** Names of plugins that must run before this plugin. */
+  dependsOn?: string[];
+
   /** Modify raw user config before defaults are resolved. */
   config?: (
     config: EvConfig,
@@ -50,6 +53,37 @@ interface EvPlugin {
   ) => EvPluginHooks | undefined | Promise<EvPluginHooks | undefined>;
 }
 ```
+
+### Plugin Ordering
+
+Plugins run in the order they appear in `plugins` unless a plugin declares
+`dependsOn`. Dependencies apply to both `config` and `setup`, so all returned
+lifecycle hooks follow the same resolved plugin order.
+
+This lets plugin packages maintain their own internal ordering constraints. App
+users only enable the plugins they need; they do not need to understand or
+manually arrange those plugin internals.
+
+```ts
+plugins: [
+  {
+    name: "plugin-b",
+    dependsOn: ["plugin-a"],
+    setup() {
+      // Runs after plugin-a, even if plugin-b appears first.
+    },
+  },
+  {
+    name: "plugin-a",
+    setup() {
+      // Runs before plugin-b.
+    },
+  },
+]
+```
+
+Plugin names must be unique. evjs reports missing dependencies and circular
+dependencies as configuration errors.
 
 ### Config Hook
 

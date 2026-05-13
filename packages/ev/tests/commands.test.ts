@@ -127,4 +127,162 @@ describe("build", () => {
       "bundler.endpoint:/api/rpc",
     ]);
   });
+
+  it("orders plugin config and lifecycle hooks by dependsOn", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    const pluginA: EvPlugin<Record<string, never>> = {
+      name: "plugin-a",
+      config(config) {
+        events.push("config:a");
+        return config;
+      },
+      setup() {
+        events.push("setup:a");
+        return {
+          buildStart() {
+            events.push("buildStart:a");
+          },
+          buildEnd() {
+            events.push("buildEnd:a");
+          },
+        };
+      },
+    };
+    const pluginB: EvPlugin<Record<string, never>> = {
+      name: "plugin-b",
+      dependsOn: ["plugin-a"],
+      config(config) {
+        events.push("config:b");
+        return config;
+      },
+      setup() {
+        events.push("setup:b");
+        return {
+          buildStart() {
+            events.push("buildStart:b");
+          },
+          buildEnd() {
+            events.push("buildEnd:b");
+          },
+        };
+      },
+    };
+
+    await build(
+      { server: false, plugins: [pluginB, pluginA] },
+      {
+        cwd,
+        bundler,
+      },
+    );
+
+    expect(events).toEqual([
+      "config:a",
+      "config:b",
+      "setup:a",
+      "setup:b",
+      "buildStart:a",
+      "buildStart:b",
+      "bundler.build",
+      "buildEnd:a",
+      "buildEnd:b",
+    ]);
+  });
+
+  it("preserves user order for plugins unrelated to a dependency", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    function plugin(
+      name: string,
+      dependsOn?: string[],
+    ): EvPlugin<Record<string, never>> {
+      return {
+        name,
+        dependsOn,
+        setup() {
+          events.push(`setup:${name}`);
+        },
+      };
+    }
+
+    await build(
+      {
+        server: false,
+        plugins: [
+          plugin("plugin-a", ["plugin-c"]),
+          plugin("plugin-b"),
+          plugin("plugin-c"),
+        ],
+      },
+      {
+        cwd,
+        bundler,
+      },
+    );
+
+    expect(events).toEqual([
+      "setup:plugin-b",
+      "setup:plugin-c",
+      "setup:plugin-a",
+      "bundler.build",
+    ]);
+  });
+
+  it("throws when a plugin dependency is missing", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    await expect(
+      build(
+        {
+          server: false,
+          plugins: [{ name: "plugin-b", dependsOn: ["plugin-a"] }],
+        },
+        { cwd, bundler },
+      ),
+    ).rejects.toThrow('Plugin "plugin-b" depends on missing plugin "plugin-a"');
+  });
+
+  it("throws on circular plugin dependencies", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    await expect(
+      build(
+        {
+          server: false,
+          plugins: [
+            { name: "plugin-a", dependsOn: ["plugin-b"] },
+            { name: "plugin-b", dependsOn: ["plugin-a"] },
+          ],
+        },
+        { cwd, bundler },
+      ),
+    ).rejects.toThrow(
+      "Circular plugin dependency detected: plugin-a -> plugin-b -> plugin-a",
+    );
+  });
+
+  it("throws on duplicate plugin names", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    await expect(
+      build(
+        {
+          server: false,
+          plugins: [{ name: "plugin-a" }, { name: "plugin-a" }],
+        },
+        { cwd, bundler },
+      ),
+    ).rejects.toThrow('Duplicate plugin name "plugin-a"');
+  });
 });

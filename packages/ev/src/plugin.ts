@@ -112,6 +112,16 @@ export interface EvPlugin<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
   name: string;
 
   /**
+   * Names of plugins that must run before this plugin.
+   *
+   * Dependencies are resolved before `config` and `setup` hooks run, so every
+   * lifecycle hook follows the same plugin order. Missing dependencies, cyclic
+   * dependencies, and duplicate plugin names are treated as configuration
+   * errors.
+   */
+  dependsOn?: string[];
+
+  /**
    * Modify the raw user config before defaults are resolved.
    *
    * Use this for framework-level config such as `server.functions.endpoint`

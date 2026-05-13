@@ -63,6 +63,106 @@ function withActiveBundler<TBundlerCfg>(
   };
 }
 
+function orderPluginsByDependencies<TBundlerCfg>(
+  plugins: EvPlugin<TBundlerCfg>[],
+): EvPlugin<TBundlerCfg>[] {
+  const pluginByName = new Map<string, EvPlugin<TBundlerCfg>>();
+  const dependentsByName = new Map<string, string[]>();
+  const dependencyCountByName = new Map<string, number>();
+
+  for (const plugin of plugins) {
+    const existing = pluginByName.get(plugin.name);
+    if (existing) {
+      throw new Error(
+        `[evjs] Duplicate plugin name "${plugin.name}". Plugin names must be unique.`,
+      );
+    }
+    pluginByName.set(plugin.name, plugin);
+    dependentsByName.set(plugin.name, []);
+    dependencyCountByName.set(plugin.name, 0);
+  }
+
+  for (const plugin of plugins) {
+    for (const dependencyName of plugin.dependsOn ?? []) {
+      if (!pluginByName.has(dependencyName)) {
+        throw new Error(
+          `[evjs] Plugin "${plugin.name}" depends on missing plugin "${dependencyName}".`,
+        );
+      }
+      dependentsByName.get(dependencyName)?.push(plugin.name);
+      dependencyCountByName.set(
+        plugin.name,
+        (dependencyCountByName.get(plugin.name) ?? 0) + 1,
+      );
+    }
+  }
+
+  const ready = plugins.filter(
+    (plugin) => dependencyCountByName.get(plugin.name) === 0,
+  );
+  const ordered: EvPlugin<TBundlerCfg>[] = [];
+
+  for (let index = 0; index < ready.length; index++) {
+    const plugin = ready[index];
+    ordered.push(plugin);
+
+    for (const dependentName of dependentsByName.get(plugin.name) ?? []) {
+      const nextDependencyCount =
+        (dependencyCountByName.get(dependentName) ?? 0) - 1;
+      dependencyCountByName.set(dependentName, nextDependencyCount);
+      if (nextDependencyCount === 0) {
+        const dependent = pluginByName.get(dependentName);
+        if (dependent) {
+          ready.push(dependent);
+        }
+      }
+    }
+  }
+
+  if (ordered.length !== plugins.length) {
+    const remainingNames = plugins
+      .filter((plugin) => !ordered.includes(plugin))
+      .map((plugin) => plugin.name);
+    const remaining = new Set(remainingNames);
+
+    for (const pluginName of remainingNames) {
+      const path: string[] = [];
+      const seen = new Set<string>();
+      let currentName = pluginName;
+      let repeatedName: string | undefined;
+
+      while (true) {
+        if (seen.has(currentName)) {
+          repeatedName = currentName;
+          break;
+        }
+        seen.add(currentName);
+        path.push(currentName);
+        const current = pluginByName.get(currentName);
+        const nextName = current?.dependsOn?.find((name) =>
+          remaining.has(name),
+        );
+        if (!nextName) break;
+        currentName = nextName;
+      }
+
+      if (repeatedName) {
+        const cycleStart = path.indexOf(repeatedName);
+        const cycle = [...path.slice(cycleStart), repeatedName].join(" -> ");
+        throw new Error(
+          `[evjs] Circular plugin dependency detected: ${cycle}.`,
+        );
+      }
+    }
+
+    throw new Error(
+      `[evjs] Circular plugin dependency detected among: ${remainingNames.join(", ")}.`,
+    );
+  }
+
+  return ordered;
+}
+
 async function collectPluginHooks<TBundlerCfg>(
   plugins: EvPlugin<TBundlerCfg>[],
   ctx: EvPluginContext<TBundlerCfg>,
@@ -84,8 +184,9 @@ async function runConfigHooks<TBundlerCfg>(
   ctx: EvPluginConfigContext,
 ): Promise<EvConfig<TBundlerCfg> | undefined> {
   let config = userConfig;
+  const plugins = orderPluginsByDependencies(userConfig?.plugins ?? []);
 
-  for (const plugin of userConfig?.plugins ?? []) {
+  for (const plugin of plugins) {
     if (!plugin.config) continue;
 
     const nextConfig = await plugin.config(config ?? {}, ctx);
@@ -297,7 +398,11 @@ export async function dev<TBundlerCfg = import("@utoo/pack").ConfigComplete>(
     mode: "development",
     cwd,
   });
-  const resolvedConfig = resolveConfig(configuredConfig);
+  const rawResolvedConfig = resolveConfig(configuredConfig);
+  const resolvedConfig = {
+    ...rawResolvedConfig,
+    plugins: orderPluginsByDependencies(rawResolvedConfig.plugins),
+  };
 
   const bundler = resolveBundler(resolvedConfig.bundler, options?.bundler);
   const config = withActiveBundler(resolvedConfig, bundler);
@@ -420,7 +525,11 @@ export async function build<TBundlerCfg = import("@utoo/pack").ConfigComplete>(
     mode: "production",
     cwd,
   });
-  const resolvedConfig = resolveConfig(configuredConfig);
+  const rawResolvedConfig = resolveConfig(configuredConfig);
+  const resolvedConfig = {
+    ...rawResolvedConfig,
+    plugins: orderPluginsByDependencies(rawResolvedConfig.plugins),
+  };
 
   const bundler = resolveBundler(resolvedConfig.bundler, options?.bundler);
   const config = withActiveBundler(resolvedConfig, bundler);

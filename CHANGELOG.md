@@ -8,6 +8,19 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.8] — 2026-05-13
+
+### ✨ Improvements
+
+- **Plugin dependency ordering** — Added `dependsOn` for evjs plugins so plugin packages can declare internal ordering constraints while app users only enable the plugins they need.
+
+### 📝 Documentation
+
+- **Plugin ordering guide** — Documented dependency-resolved plugin order and the validation for missing, duplicate, or circular plugin dependencies.
+- **Release line updates** — Updated user-facing dependency examples to the `0.1.8` release line.
+
+---
+
 ## [0.1.7] — 2026-05-13
 
 ### ✨ Improvements

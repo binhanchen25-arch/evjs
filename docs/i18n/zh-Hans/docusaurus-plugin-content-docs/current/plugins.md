@@ -1,6 +1,6 @@
 # 插件
 
-evjs 插件扩展构建流水线的自定义行为 —— 从注入构建器规则、修改输出 HTML，到收集构建元数据用于 CI/CD。插件在 `ev.config.ts` 中声明，按顺序执行。
+evjs 插件扩展构建流水线的自定义行为 —— 从注入构建器规则、修改输出 HTML，到收集构建元数据用于 CI/CD。插件在 `ev.config.ts` 中声明，并按依赖解析后的顺序执行。
 
 ## 快速示例
 
@@ -38,6 +38,9 @@ interface EvPlugin {
   /** 插件名称 —— 用于日志和错误信息。 */
   name: string;
 
+  /** 必须先于当前插件执行的插件名称。 */
+  dependsOn?: string[];
+
   /** 在默认值解析前修改用户原始配置。 */
   config?: (
     config: EvConfig,
@@ -50,6 +53,35 @@ interface EvPlugin {
   ) => EvPluginHooks | undefined | Promise<EvPluginHooks | undefined>;
 }
 ```
+
+### 插件顺序
+
+默认情况下，插件按照 `plugins` 数组中的顺序执行。插件可以通过
+`dependsOn` 声明依赖关系。依赖顺序同时作用于 `config` 和 `setup`，
+因此所有返回的生命周期钩子都会使用同一份解析后的插件顺序。
+
+这让插件包可以在内部维护自己的顺序约束。应用用户只需要启用所需插件，
+不需要理解或手动排列这些插件内部依赖。
+
+```ts
+plugins: [
+  {
+    name: "plugin-b",
+    dependsOn: ["plugin-a"],
+    setup() {
+      // 即使 plugin-b 写在前面，也会在 plugin-a 之后执行。
+    },
+  },
+  {
+    name: "plugin-a",
+    setup() {
+      // 会在 plugin-b 之前执行。
+    },
+  },
+]
+```
+
+插件名称必须唯一。依赖缺失或形成循环依赖时，evjs 会把它们作为配置错误报告。
 
 ### Config Hook
 
