@@ -128,7 +128,7 @@ describe("build", () => {
     ]);
   });
 
-  it("orders plugin config and lifecycle hooks by dependsOn", async () => {
+  it("orders plugin config and lifecycle hooks by dependencies", async () => {
     const cwd = await createProject();
     const events: string[] = [];
     const bundler = createMockBundler(events);
@@ -153,7 +153,7 @@ describe("build", () => {
     };
     const pluginB: EvPlugin<Record<string, never>> = {
       name: "plugin-b",
-      dependsOn: ["plugin-a"],
+      dependencies: ["plugin-a"],
       config(config) {
         events.push("config:b");
         return config;
@@ -199,11 +199,11 @@ describe("build", () => {
 
     function plugin(
       name: string,
-      dependsOn?: string[],
+      dependencies?: string[],
     ): EvPlugin<Record<string, never>> {
       return {
         name,
-        dependsOn,
+        dependencies,
         setup() {
           events.push(`setup:${name}`);
         },
@@ -233,6 +233,91 @@ describe("build", () => {
     ]);
   });
 
+  it("orders plugins by optional dependencies when they are present", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    function plugin(
+      name: string,
+      options: Pick<
+        EvPlugin<Record<string, never>>,
+        "dependencies" | "optionalDependencies"
+      > = {},
+    ): EvPlugin<Record<string, never>> {
+      return {
+        name,
+        ...options,
+        setup() {
+          events.push(`setup:${name}`);
+        },
+      };
+    }
+
+    await build(
+      {
+        server: false,
+        plugins: [
+          plugin("plugin-b", {
+            dependencies: ["plugin-c"],
+            optionalDependencies: ["plugin-a"],
+          }),
+          plugin("plugin-c"),
+          plugin("plugin-a"),
+        ],
+      },
+      {
+        cwd,
+        bundler,
+      },
+    );
+
+    expect(events).toEqual([
+      "setup:plugin-c",
+      "setup:plugin-a",
+      "setup:plugin-b",
+      "bundler.build",
+    ]);
+  });
+
+  it("ignores optional dependencies when they are missing", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    await build(
+      {
+        server: false,
+        plugins: [
+          {
+            name: "plugin-b",
+            dependencies: ["plugin-c"],
+            optionalDependencies: ["plugin-a"],
+            setup() {
+              events.push("setup:plugin-b");
+            },
+          },
+          {
+            name: "plugin-c",
+            setup() {
+              events.push("setup:plugin-c");
+            },
+          },
+        ],
+      },
+      {
+        cwd,
+        bundler,
+      },
+    );
+
+    expect(events).toEqual([
+      "setup:plugin-c",
+      "setup:plugin-b",
+      "bundler.build",
+    ]);
+  });
+
   it("throws when a plugin dependency is missing", async () => {
     const cwd = await createProject();
     const events: string[] = [];
@@ -242,7 +327,7 @@ describe("build", () => {
       build(
         {
           server: false,
-          plugins: [{ name: "plugin-b", dependsOn: ["plugin-a"] }],
+          plugins: [{ name: "plugin-b", dependencies: ["plugin-a"] }],
         },
         { cwd, bundler },
       ),
@@ -259,8 +344,29 @@ describe("build", () => {
         {
           server: false,
           plugins: [
-            { name: "plugin-a", dependsOn: ["plugin-b"] },
-            { name: "plugin-b", dependsOn: ["plugin-a"] },
+            { name: "plugin-a", dependencies: ["plugin-b"] },
+            { name: "plugin-b", dependencies: ["plugin-a"] },
+          ],
+        },
+        { cwd, bundler },
+      ),
+    ).rejects.toThrow(
+      "Circular plugin dependency detected: plugin-a -> plugin-b -> plugin-a",
+    );
+  });
+
+  it("throws when optional dependencies create a cycle", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    await expect(
+      build(
+        {
+          server: false,
+          plugins: [
+            { name: "plugin-a", optionalDependencies: ["plugin-b"] },
+            { name: "plugin-b", dependencies: ["plugin-a"] },
           ],
         },
         { cwd, bundler },

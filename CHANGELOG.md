@@ -8,6 +8,18 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.9] — 2026-05-14
+
+### ⚠️ Breaking Changes
+
+- **Plugin dependency API** — Replaced plugin `dependsOn` with Egg-style `dependencies` and `optionalDependencies`, separating required plugin dependencies from optional ordering dependencies.
+
+### 📝 Documentation
+
+- **Release line updates** — Updated user-facing dependency examples to the `0.1.9` release line.
+
+---
+
 ## [0.1.8] — 2026-05-13
 
 ### ✨ Improvements

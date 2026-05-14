@@ -38,8 +38,11 @@ interface EvPlugin {
   /** Plugin name — used in logs and error messages. */
   name: string;
 
-  /** Names of plugins that must run before this plugin. */
-  dependsOn?: string[];
+  /** Required plugins that must be enabled and run before this plugin. */
+  dependencies?: string[];
+
+  /** Optional plugins that run before this plugin when enabled. */
+  optionalDependencies?: string[];
 
   /** Modify raw user config before defaults are resolved. */
   config?: (
@@ -57,33 +60,47 @@ interface EvPlugin {
 ### Plugin Ordering
 
 Plugins run in the order they appear in `plugins` unless a plugin declares
-`dependsOn`. Dependencies apply to both `config` and `setup`, so all returned
-lifecycle hooks follow the same resolved plugin order.
+`dependencies` or `optionalDependencies`. Dependency ordering applies to both
+`config` and `setup`, so all returned lifecycle hooks follow the same resolved
+plugin order.
 
 This lets plugin packages maintain their own internal ordering constraints. App
 users only enable the plugins they need; they do not need to understand or
 manually arrange those plugin internals.
 
+`dependencies` are required: evjs reports an error when one is missing.
+`optionalDependencies` are ignored when missing, but if they are present they
+must still run before the plugin that declares them.
+
 ```ts
 plugins: [
   {
     name: "plugin-b",
-    dependsOn: ["plugin-a"],
+    dependencies: ["plugin-c"],
+    optionalDependencies: ["plugin-a"],
     setup() {
-      // Runs after plugin-a, even if plugin-b appears first.
+      // Runs after plugin-c.
+      // Also runs after plugin-a when plugin-a is enabled.
     },
   },
   {
     name: "plugin-a",
     setup() {
-      // Runs before plugin-b.
+      // Runs before plugin-b when enabled.
+    },
+  },
+  {
+    name: "plugin-c",
+    setup() {
+      // Required by plugin-b.
     },
   },
 ]
 ```
 
 Plugin names must be unique. evjs reports missing dependencies and circular
-dependencies as configuration errors.
+dependencies, including cycles created through optional dependencies, as
+configuration errors.
 
 ### Config Hook
 

@@ -38,8 +38,11 @@ interface EvPlugin {
   /** 插件名称 —— 用于日志和错误信息。 */
   name: string;
 
-  /** 必须先于当前插件执行的插件名称。 */
-  dependsOn?: string[];
+  /** 必须启用并先于当前插件执行的插件名称。 */
+  dependencies?: string[];
+
+  /** 启用时先于当前插件执行的可选插件名称。 */
+  optionalDependencies?: string[];
 
   /** 在默认值解析前修改用户原始配置。 */
   config?: (
@@ -57,31 +60,44 @@ interface EvPlugin {
 ### 插件顺序
 
 默认情况下，插件按照 `plugins` 数组中的顺序执行。插件可以通过
-`dependsOn` 声明依赖关系。依赖顺序同时作用于 `config` 和 `setup`，
-因此所有返回的生命周期钩子都会使用同一份解析后的插件顺序。
+`dependencies` 或 `optionalDependencies` 声明依赖关系。依赖顺序同时
+作用于 `config` 和 `setup`，因此所有返回的生命周期钩子都会使用同一份
+解析后的插件顺序。
 
 这让插件包可以在内部维护自己的顺序约束。应用用户只需要启用所需插件，
 不需要理解或手动排列这些插件内部依赖。
+
+`dependencies` 是硬依赖：缺失时 evjs 会报错。`optionalDependencies`
+缺失时会被忽略；如果对应插件已启用，则它仍然必须先于当前插件执行。
 
 ```ts
 plugins: [
   {
     name: "plugin-b",
-    dependsOn: ["plugin-a"],
+    dependencies: ["plugin-c"],
+    optionalDependencies: ["plugin-a"],
     setup() {
-      // 即使 plugin-b 写在前面，也会在 plugin-a 之后执行。
+      // 会在 plugin-c 之后执行。
+      // 如果启用了 plugin-a，也会在 plugin-a 之后执行。
     },
   },
   {
     name: "plugin-a",
     setup() {
-      // 会在 plugin-b 之前执行。
+      // 启用时会在 plugin-b 之前执行。
+    },
+  },
+  {
+    name: "plugin-c",
+    setup() {
+      // plugin-b 的硬依赖。
     },
   },
 ]
 ```
 
-插件名称必须唯一。依赖缺失或形成循环依赖时，evjs 会把它们作为配置错误报告。
+插件名称必须唯一。硬依赖缺失或形成循环依赖时，evjs 会把它们作为配置
+错误报告；由可选依赖参与形成的循环也会被报告。
 
 ### Config Hook
 

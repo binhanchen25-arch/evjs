@@ -82,18 +82,30 @@ function orderPluginsByDependencies<TBundlerCfg>(
     dependencyCountByName.set(plugin.name, 0);
   }
 
-  for (const plugin of plugins) {
-    for (const dependencyName of plugin.dependsOn ?? []) {
-      if (!pluginByName.has(dependencyName)) {
-        throw new Error(
-          `[evjs] Plugin "${plugin.name}" depends on missing plugin "${dependencyName}".`,
-        );
-      }
-      dependentsByName.get(dependencyName)?.push(plugin.name);
-      dependencyCountByName.set(
-        plugin.name,
-        (dependencyCountByName.get(plugin.name) ?? 0) + 1,
+  const addDependency = (
+    plugin: EvPlugin<TBundlerCfg>,
+    dependencyName: string,
+    options: { optional: boolean },
+  ) => {
+    if (!pluginByName.has(dependencyName)) {
+      if (options.optional) return;
+      throw new Error(
+        `[evjs] Plugin "${plugin.name}" depends on missing plugin "${dependencyName}".`,
       );
+    }
+    dependentsByName.get(dependencyName)?.push(plugin.name);
+    dependencyCountByName.set(
+      plugin.name,
+      (dependencyCountByName.get(plugin.name) ?? 0) + 1,
+    );
+  };
+
+  for (const plugin of plugins) {
+    for (const dependencyName of plugin.dependencies ?? []) {
+      addDependency(plugin, dependencyName, { optional: false });
+    }
+    for (const dependencyName of plugin.optionalDependencies ?? []) {
+      addDependency(plugin, dependencyName, { optional: true });
     }
   }
 
@@ -139,9 +151,10 @@ function orderPluginsByDependencies<TBundlerCfg>(
         seen.add(currentName);
         path.push(currentName);
         const current = pluginByName.get(currentName);
-        const nextName = current?.dependsOn?.find((name) =>
-          remaining.has(name),
-        );
+        const nextName = [
+          ...(current?.dependencies ?? []),
+          ...(current?.optionalDependencies ?? []),
+        ].find((name) => remaining.has(name));
         if (!nextName) break;
         currentName = nextName;
       }

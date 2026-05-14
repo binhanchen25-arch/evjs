@@ -112,14 +112,19 @@ export interface EvPlugin<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
   name: string;
 
   /**
-   * Names of plugins that must run before this plugin.
+   * Required plugin dependencies that must run before this plugin.
    *
-   * Dependencies are resolved before `config` and `setup` hooks run, so every
-   * lifecycle hook follows the same plugin order. Missing dependencies, cyclic
-   * dependencies, and duplicate plugin names are treated as configuration
-   * errors.
+   * Missing required dependencies are treated as configuration errors.
    */
-  dependsOn?: string[];
+  dependencies?: string[];
+
+  /**
+   * Optional plugin dependencies that run before this plugin when present.
+   *
+   * Missing optional dependencies are ignored. Present optional dependencies
+   * still participate in dependency ordering and cycle detection.
+   */
+  optionalDependencies?: string[];
 
   /**
    * Modify the raw user config before defaults are resolved.
