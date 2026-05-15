@@ -119,15 +119,15 @@ export interface EvConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
   /**
    * MPA (Multi-Page Application) configuration.
    *
-   * Define multiple independent page entries, each with its own JS entry
-   * point and optional HTML template. When set, the build produces one
-   * HTML file per page and the single-entry `entry` / `html` fields are
-   * ignored.
+   * Define multiple independent page entries. A page can be a string entry
+   * path or an object with its own JS entry point and optional HTML template.
+   * When set, the build produces one HTML file per page and the single-entry
+   * `entry` / `html` fields are ignored.
    *
    * @example
    * ```ts
    * pages: {
-   *   home: { entry: "./src/pages/home/main.tsx" },
+   *   home: "./src/pages/home/main.tsx",
    *   about: {
    *     entry: "./src/pages/about/main.tsx",
    *     html: "./src/pages/about/index.html",
@@ -222,9 +222,10 @@ export function resolveConfig<
   if (config.pages && Object.keys(config.pages).length > 0) {
     resolvedPages = {};
     for (const [name, page] of Object.entries(config.pages)) {
+      const pageConfig = typeof page === "string" ? { entry: page } : page;
       resolvedPages[name] = {
-        entry: page.entry,
-        html: page.html ?? defaultHtml,
+        entry: pageConfig.entry,
+        html: pageConfig.html ?? defaultHtml,
       };
     }
   }
@@ -291,7 +292,12 @@ export function defineConfig<TBundlerCfg = import("@utoo/pack").ConfigComplete>(
 /**
  * Configuration for a single page in MPA mode.
  */
-export interface PageConfig {
+export type PageConfig = string | PageObjectConfig;
+
+/**
+ * Object form for a single page in MPA mode.
+ */
+export interface PageObjectConfig {
   /** Client entry point for this page. */
   entry: string;
   /** HTML template path. If omitted, uses the top-level `html` default. */

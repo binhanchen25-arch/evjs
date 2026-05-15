@@ -18,6 +18,7 @@ export {
   type EvPluginHooks,
   isMpa,
   type PageConfig,
+  type PageObjectConfig,
   type ResolvedDevConfig,
   type ResolvedEvConfig,
   type ResolvedServerConfig,

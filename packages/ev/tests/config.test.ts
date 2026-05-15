@@ -156,4 +156,48 @@ describe("resolveConfig", () => {
     expect(a.entry).toBe("./a.tsx");
     expect(b.entry).toBe("./b.tsx");
   });
+
+  it("resolves MPA pages from entry strings", () => {
+    const resolved = resolveConfig({
+      pages: {
+        home: "./src/home/main.tsx",
+        campaign: "./src/campaign/main.tsx",
+      },
+    });
+
+    expect(resolved.pages).toEqual({
+      home: {
+        entry: "./src/home/main.tsx",
+        html: "./index.html",
+      },
+      campaign: {
+        entry: "./src/campaign/main.tsx",
+        html: "./index.html",
+      },
+    });
+  });
+
+  it("resolves MPA pages from entry objects", () => {
+    const resolved = resolveConfig({
+      html: "./app.html",
+      pages: {
+        home: { entry: "./src/home/main.tsx" },
+        campaign: {
+          entry: "./src/campaign/main.tsx",
+          html: "./campaign.html",
+        },
+      },
+    });
+
+    expect(resolved.pages).toEqual({
+      home: {
+        entry: "./src/home/main.tsx",
+        html: "./app.html",
+      },
+      campaign: {
+        entry: "./src/campaign/main.tsx",
+        html: "./campaign.html",
+      },
+    });
+  });
 });
