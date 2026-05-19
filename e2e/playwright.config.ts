@@ -13,6 +13,16 @@ export default defineConfig<ExtTestOptions>({
   projects: [
     {
       name: "utoopack",
+      testIgnore: "cases/scaffold.ts",
+      use: {
+        browserName: "chromium",
+        bundlerName: "utoopack",
+      },
+    },
+    {
+      name: "utoopack-scaffold",
+      testMatch: "cases/scaffold.ts",
+      dependencies: ["utoopack"],
       use: {
         browserName: "chromium",
         bundlerName: "utoopack",

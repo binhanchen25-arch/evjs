@@ -43,6 +43,7 @@ test.describe("Scaffolding CLI E2E", () => {
       if (key.startsWith("npm_")) delete cleanEnv[key];
       if (key === "INIT_CWD") delete cleanEnv[key];
     }
+    delete cleanEnv.NODE_ENV;
 
     // 1. Scaffold the app (scaffold into the pre-created unique temp dir)
     const appName = path.basename(targetDir);
@@ -106,11 +107,14 @@ test.describe("Scaffolding CLI E2E", () => {
     // 3. Install dependencies (use a fresh npm cache to avoid stale 0.0.0 tarballs)
     console.log("Installing dependencies...");
     const npmCache = path.join(targetDir, ".npm-cache");
-    execSync(`npm install --no-fund --no-audit --cache ${npmCache}`, {
-      cwd: targetDir,
-      stdio: "inherit",
-      env: cleanEnv,
-    });
+    execSync(
+      `npm install --include=dev --include=optional --no-fund --no-audit --cache ${npmCache}`,
+      {
+        cwd: targetDir,
+        stdio: "inherit",
+        env: cleanEnv,
+      },
+    );
 
     // Allocate real free ports; deterministic offsets can collide with local
     // processes or with stale servers from a previous failed run.

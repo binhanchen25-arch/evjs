@@ -153,6 +153,7 @@ async function buildExample(
   const exampleConfig = await loadExampleConfig(exampleDir);
 
   const savedCwd = process.cwd();
+  const savedNodeEnv = process.env.NODE_ENV;
   process.chdir(exampleDir);
   process.env.NODE_ENV = "production";
 
@@ -167,6 +168,11 @@ async function buildExample(
     );
   } finally {
     process.chdir(savedCwd);
+    if (savedNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = savedNodeEnv;
+    }
   }
 }
 
