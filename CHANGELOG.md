@@ -8,6 +8,26 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.1.10] — 2026-05-19
+
+### ✨ Improvements
+
+- **MPA page config shorthand** — Added support for string-valued `pages` entries so apps can define page entries without repeating the default HTML template path.
+
+### ♻️ Refactoring
+
+- **Client transport options** — Simplified `@evjs/client` transport option handling and updated the custom transport docs and example to match the public runtime API.
+
+### 🧪 Testing
+
+- **Scaffold E2E isolation** — Isolated scaffold E2E environment setup to avoid cross-test environment leakage in CI.
+
+### 📝 Documentation
+
+- **Release line updates** — Updated user-facing dependency examples to the `0.1.10` release line.
+
+---
+
 ## [0.1.9] — 2026-05-14
 
 ### ⚠️ Breaking Changes
