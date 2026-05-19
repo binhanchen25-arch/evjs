@@ -8,7 +8,6 @@ import type {
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { createRoot } from "react-dom/client";
 import type { AppRouteContext } from "./context";
-import { initTransport } from "./transport";
 
 export type CreateAppRouterOptions<
   TRouteTree extends AnyRoute,
@@ -59,14 +58,6 @@ export interface CreateAppOptions<
    * Optional custom QueryClient instance.
    */
   queryClient?: QueryClient;
-  /** Server functions configuration */
-  functions?: {
-    /**
-     * server function endpoint path. When provided, automatically configures the transport.
-     * Defaults to `api/fn` if not specified.
-     */
-    endpoint?: string;
-  };
 }
 
 /**
@@ -153,15 +144,10 @@ export function createApp<
   const {
     routeTree,
     queryClient = new QueryClient(),
-    functions,
     basepath,
     history,
     router: routerOptions,
   } = options;
-
-  if (functions?.endpoint) {
-    initTransport({ functions });
-  }
 
   const router = createRouter<
     TRouteTree,

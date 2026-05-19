@@ -14,60 +14,78 @@ import {
 
 /**
  * Request context passed through server calls.
- * Used during SSR to forward headers/cookies, and in RSC for streaming.
  *
- * @experimental This interface is reserved for future SSR/RSC support.
- * Do not rely on it in production — the shape may change.
+ * Keep this limited to per-call controls. HTTP request defaults such as
+ * headers and credentials belong on TransportOptions.
+ *
+ * Future SSR/RSC header forwarding should be derived from the real incoming
+ * Request, or from a dedicated SSR request context, with explicit allow-listing
+ * instead of adding generic headers here.
  */
 export interface RequestContext {
-  /** @experimental Request headers to forward (e.g. cookies during SSR). SSR is not yet supported. */
-  headers?: Record<string, string>;
   /** Signal for aborting the request. */
   signal?: AbortSignal;
 }
 
-/**
- * Transport interface for client-server communication.
- * Implement this to use a custom request library or protocol.
- */
-export interface ServerTransport {
-  /** Standard request-response call for server functions. */
-  send(
+export interface TransportAdapter {
+  /** Execute a server function call. */
+  send?(
     fnId: string,
     args: unknown[],
     context?: RequestContext,
   ): Promise<unknown>;
-
   /**
-   * Streaming call for RSC Flight protocol.
-   * Returns a ReadableStream of serialized React elements.
+   * Experimental extension point reserved for future RSC Flight requests.
    *
-   * @experimental Not yet implemented. Reserved for future RSC support.
-   * Do not use — this method signature may change.
+   * Not part of the stable adapter contract yet; this signature may change
+   * when RSC support is implemented.
    */
-  stream?(
-    fnId: string,
-    args: unknown[],
+  flight?(
+    request: Request,
     context?: RequestContext,
-  ): ReadableStream<Uint8Array>;
+  ): Promise<Response | ReadableStream<Uint8Array>>;
+  /**
+   * Experimental extension point reserved for future SSR document rendering.
+   *
+   * Not part of the stable adapter contract yet; this signature may change
+   * when SSR support is implemented.
+   */
+  render?(request: Request, context?: RequestContext): Promise<Response>;
+}
+
+type MaybePromise<T> = T | Promise<T>;
+
+export type HeaderFactory = (
+  context: RequestContext,
+) => MaybePromise<HeadersInit | undefined>;
+
+interface HttpRequestDefaults {
+  /** Credentials policy for HTTP server function requests. */
+  credentials?: RequestCredentials;
+  /** Static headers or a factory evaluated for each transport call. */
+  headers?: HeadersInit | HeaderFactory;
 }
 
 export interface TransportOptions {
   /** Base URL for the server function endpoint. Defaults to the current page URL. */
   baseUrl?: string;
+  /** Credentials policy for HTTP server function requests. */
+  credentials?: RequestCredentials;
+  /** Static headers or a factory evaluated for each transport call. */
+  headers?: HeadersInit | HeaderFactory;
   /** Server functions configuration */
   functions?: {
     /** Path prefix for the server function endpoint. Defaults to `api/fn`. */
     endpoint?: string;
   };
-  /** Custom transport. When provided, `baseUrl`, `functions.endpoint`, and `headers` are ignored. */
-  transport?: ServerTransport;
-  /** Custom headers to send with requests, either static or a dynamic getter (e.g. for auth tokens). */
-  headers?:
-    | Record<string, string>
-    | (() => Record<string, string> | Promise<Record<string, string>>);
+  /** Adapter capabilities for custom runtimes or protocols. */
+  adapter?: TransportAdapter;
   /** Suppress warnings when re-initializing transport. Useful for HMR. */
   silent?: boolean;
+}
+
+interface TransportRuntime {
+  adapter: TransportAdapter;
 }
 
 const FALLBACK_BASE_URL = "http://localhost/";
@@ -100,39 +118,60 @@ function resolveEndpointUrl(
   return new URL(endpoint, base);
 }
 
+function mergeHeaders(...values: (HeadersInit | undefined)[]): Headers {
+  const headers = new Headers();
+  for (const value of values) {
+    if (!value) continue;
+    new Headers(value).forEach((headerValue, headerName) => {
+      headers.set(headerName, headerValue);
+    });
+  }
+  return headers;
+}
+
+async function resolveFetchInit(
+  defaults: HttpRequestDefaults,
+  context?: RequestContext,
+): Promise<RequestInit> {
+  const init: RequestInit = {};
+  if (defaults.credentials !== undefined) {
+    init.credentials = defaults.credentials;
+  }
+
+  const resolvedHeaders =
+    typeof defaults.headers === "function"
+      ? await defaults.headers(context ?? {})
+      : defaults.headers;
+
+  const headers = mergeHeaders(resolvedHeaders);
+  if ([...headers.keys()].length > 0) {
+    init.headers = headers;
+  }
+  return init;
+}
+
 /**
- * Default fetch-based transport.
+ * Default fetch-based adapter.
  */
-function createFetchTransport(
-  baseUrl: string | undefined,
-  endpoint: string,
-  headersFactory?:
-    | Record<string, string>
-    | (() => Record<string, string> | Promise<Record<string, string>>),
-): ServerTransport {
+function createFetchAdapter(
+  resolveUrl: () => URL,
+  requestDefaults: HttpRequestDefaults,
+): TransportAdapter {
   return {
-    async send(
-      fnId: string,
-      args: unknown[],
-      context?: RequestContext,
-    ): Promise<unknown> {
-      const url = resolveEndpointUrl(baseUrl, endpoint);
-
-      const extraHeaders =
-        typeof headersFactory === "function"
-          ? await headersFactory()
-          : headersFactory;
-
-      const res = await fetch(url, {
+    async send(fnId, args, context): Promise<unknown> {
+      const fetchInit = await resolveFetchInit(requestDefaults, context);
+      const init: RequestInit = {
+        ...fetchInit,
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...extraHeaders,
-          ...context?.headers,
-        },
+        headers: mergeHeaders(
+          { "Content-Type": "application/json" },
+          fetchInit.headers,
+        ),
         body: JSON.stringify({ fnId, args }),
         signal: context?.signal,
-      });
+      };
+
+      const res = await fetch(resolveUrl(), init);
 
       if (!res.ok) {
         // Read body as text once, then try to parse as JSON.
@@ -201,35 +240,39 @@ function createFetchTransport(
   };
 }
 
-let _transport: ServerTransport | null = null;
+let _runtime: TransportRuntime | null = null;
 
-function getTransport(): ServerTransport {
-  if (!_transport) {
-    _transport = createFetchTransport(undefined, getFunctionEndpoint());
+function createTransportRuntime(options: TransportOptions): TransportRuntime {
+  const endpoint = options.functions?.endpoint ?? getFunctionEndpoint();
+  return {
+    adapter:
+      options.adapter ??
+      createFetchAdapter(() => resolveEndpointUrl(options.baseUrl, endpoint), {
+        credentials: options.credentials,
+        headers: options.headers,
+      }),
+  };
+}
+
+function getRuntime(): TransportRuntime {
+  if (!_runtime) {
+    _runtime = createTransportRuntime({});
   }
-  return _transport;
+  return _runtime;
 }
 
 /**
- * Configure the server transport. Call once at app startup if you need to
- * customise the endpoint URL or provide a custom transport.
+ * Configure the transport runtime. Call once at app startup if you need to
+ * customize HTTP request defaults, endpoint URLs, or adapter capabilities.
  */
 export function initTransport(options: TransportOptions): void {
-  if (_transport !== null && !options.silent) {
+  if (_runtime !== null && !options.silent) {
     console.warn(
       "[ev] initTransport() was called more than once. " +
         "This overwrites the previous transport configuration.",
     );
   }
-  if (options.transport) {
-    _transport = options.transport;
-  } else {
-    _transport = createFetchTransport(
-      options.baseUrl,
-      options.functions?.endpoint ?? getFunctionEndpoint(),
-      options.headers,
-    );
-  }
+  _runtime = createTransportRuntime(options);
 }
 
 /**
@@ -242,7 +285,13 @@ export async function callServer(
   args: unknown[],
   context?: RequestContext,
 ): Promise<unknown> {
-  return getTransport().send(fnId, args, context);
+  const runtime = getRuntime();
+  const send = runtime.adapter.send;
+  if (!send) {
+    throw new Error("[ev] Transport adapter does not implement send().");
+  }
+
+  return send(fnId, args, context);
 }
 
 /** Minimal callable shape for server function stubs. */
@@ -359,6 +408,6 @@ export function getFnId(fn: AnyFn): string | undefined {
  * @internal
  */
 export function __resetForTesting(): void {
-  _transport = null;
+  _runtime = null;
   fnNameRegistry.clear();
 }
