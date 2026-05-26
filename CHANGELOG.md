@@ -12,7 +12,7 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ### ✨ Improvements
 
-- **Enable publicPath: auto by default** — Upgrade `@utoo/pack` to 1.4.9, enable public: auto in utoopack bundler adapter.
+- **Enable publicPath: auto by default** — Upgrade `@utoo/pack` to 1.4.9, enable `public: "auto"` in utoopack bundler adapter.
 
 ---
 
