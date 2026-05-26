@@ -89,7 +89,7 @@ export async function createUtoopackConfig(
       path: outputPaths.clientDir,
       filename: isProduction ? "[name].[contenthash:8].js" : "[name].js",
       chunkFilename: isProduction ? "[name].[contenthash:8].js" : "[name].js",
-      publicPath: "/",
+      publicPath: "auto",
       clean: true,
     },
     resolve: {
