@@ -1,18 +1,18 @@
 # @evjs/server
 
-> Server-side runtime for the **evjs** fullstack framework.
+> Server runtime core for the **evjs** framework and standalone Hono/fetch apps.
 
 ## Features
 
 - **Hono-based** — Build RESTful APIs alongside your React application.
 - **Server Function Support** — Seamlessly handle `"use server"` function calls with type safety.
 - **Standard Request/Response** — `createRoute()` factory for simplified API endpoint creation.
-- **Multi-Runtime** — First-class support for **Node.js** and ECMA runtimes (**Deno**, **Bun**, **Cloudflare Workers**).
+- **Multi-Runtime** — First-class support for **Node.js** and standard Fetch runtimes (**Deno**, **Bun**, **Cloudflare Workers**).
 
 ## Install
 
 ```bash
-npm install @evjs/server hono
+npm install @evjs/server
 ```
 
 ## Quick Start
@@ -30,7 +30,7 @@ export const GET = createRoute("/api/users", {
 });
 ```
 
-The `path` must be a **string literal** string for compatibility with the framework's build system.
+The `path` must be a **string literal** string so framework build analysis can statically discover it.
 
 ### 2. Server Functions
 
@@ -57,13 +57,18 @@ import { app } from "./app";
 serve(app, { port: 3001 });
 ```
 
-### ECMA (Deno/Bun/Edge)
+### Fetch (Deno/Bun/Edge)
 
 ```ts
-import { createFetchHandler } from "@evjs/server/ecma";
-import { app } from "./app";
+import app from "@evjs/server/fetch";
 
-Deno.serve({ port: 3001 }, createFetchHandler(app).fetch);
+Deno.serve({ port: 3001 }, app.fetch);
+```
+
+Worker-style hosts that discover named module exports can use the same handler:
+
+```ts
+export { fetch } from "@evjs/server/fetch";
 ```
 
 ## Core APIs
@@ -71,6 +76,11 @@ Deno.serve({ port: 3001 }, createFetchHandler(app).fetch);
 ### Routing
 - `createRoute(path, handler)`: Create a REST endpoint.
 - `createApp(options)`: Main application factory.
+
+Application-facing server runtime APIs are exported from `@evjs/server` and
+its runtime subpaths. Use `@evjs/ev` when the app needs framework composition
+such as file-route discovery, server-function transforms, SSR/PPR/RSC build
+validation, manifests, or deployment artifacts.
 
 ## License
 

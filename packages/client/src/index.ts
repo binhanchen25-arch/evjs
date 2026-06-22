@@ -3,7 +3,6 @@
  */
 
 export { ServerFunctionError } from "@evjs/shared";
-// Cherry-picked re-exports from @tanstack/react-query
 export type {
   QueryKey,
   UseInfiniteQueryOptions,
@@ -24,29 +23,59 @@ export {
   usePrefetchQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-export type { App, CreateAppOptions, CreateAppRouterOptions } from "./app";
-export { createApp } from "./app";
-export type { AppRouteContext } from "./context";
-export { createAppRootRoute } from "./context";
+export type { App, CreateAppOptions, CreateAppRouterOptions } from "./app.js";
+export { createApp } from "./app.js";
+export type { AppRouteContext } from "./context.js";
+export { createAppRootRoute } from "./context.js";
+export type {
+  ActiveLinkOptions,
+  LinkOptions,
+  LinkProps,
+  NavigateOptions,
+  Redirect,
+  RedirectOptions,
+  ToOptions,
+  UseLinkPropsOptions,
+} from "./navigation.js";
+export {
+  isNotFound,
+  isRedirect,
+  Link,
+  Navigate,
+  notFound,
+  redirect,
+  useLinkProps,
+  useLocation,
+  useNavigate,
+} from "./navigation.js";
+export {
+  usePageContext,
+  usePageLoaderData,
+  usePageParams,
+  usePageSearch,
+} from "./page-context.js";
 export {
   getFnQueryKey,
   getFnQueryOptions,
   useMutation,
   useQuery,
   useSuspenseQuery,
-} from "./query";
-// biome-ignore lint/suspicious/noEmptyInterface: Users augment this interface with their app router type.
+} from "./query.js";
+// biome-ignore lint/suspicious/noEmptyInterface: Generated SPA route types augment this interface.
 export interface Register {}
 
-type EvRegister = Register;
-
-// Bridge evjs' public Register interface into TanStack Router's global types.
-declare module "@tanstack/react-router" {
-  interface Register extends EvRegister {}
-}
-
 export type {
-  ActiveLinkOptions,
+  RscDebugPayload,
+  RscDebugPayloadMountOptions,
+  RscFlightFetchOptions,
+} from "./react.js";
+export {
+  fetchRscDebugPayload,
+  fetchRscFlight,
+  loadRscDebugPage,
+  mountRscDebugPayload,
+} from "./react.js";
+export type {
   AnyRootRoute,
   AnyRoute,
   AnyRouteMatch,
@@ -57,12 +86,9 @@ export type {
   ErrorRouteComponent,
   HistoryLocation,
   HistoryState,
-  LinkOptions,
-  LinkProps,
   LocationRewrite,
   LocationRewriteFunction,
   MatchRouteOptions,
-  NavigateOptions,
   NotFoundError,
   NotFoundRouteComponent,
   NotFoundRouteProps,
@@ -88,11 +114,9 @@ export type {
   SearchSerializer,
   ShouldBlockFn,
   ToMaskOptions,
-  ToOptions,
   UseBlockerOpts,
-  UseLinkPropsOptions,
   UseMatchRouteOptions,
-} from "./route";
+} from "./route.js";
 export {
   Await,
   Block,
@@ -115,22 +139,16 @@ export {
   defer,
   ErrorComponent,
   getRouteApi,
-  isNotFound,
-  isRedirect,
-  Link,
   lazyRouteComponent,
   linkOptions,
   Match,
   Matches,
   MatchRoute,
-  Navigate,
-  notFound,
   Outlet,
   parseSearchWith,
   RouteApi,
   RouterContextProvider,
   RouterProvider,
-  redirect,
   retainSearchParams,
   rootRouteWithContext,
   ScrollRestoration,
@@ -142,26 +160,40 @@ export {
   useChildMatches,
   useElementScrollRestoration,
   useHydrated,
-  useLinkProps,
   useLoaderData,
   useLoaderDeps,
-  useLocation,
   useMatch,
   useMatches,
   useMatchRoute,
-  useNavigate,
   useParams,
   useParentMatches,
   useRouteContext,
   useRouter,
   useRouterState,
   useSearch,
-} from "./route";
+} from "./route.js";
+export type {
+  PageRouteLoaderData,
+  PageRouteParams,
+  PageRoutePath,
+  PageRouteSearch,
+} from "./route-types.js";
+export type {
+  ReactRscModelOptions,
+  ReactRscMountOptions,
+  ReactRscRuntimeBootstrap,
+} from "./rsc.js";
+export {
+  createReactRscModel,
+  mountReactRscPage,
+  startReactRscPageRuntime,
+  unmountReactRscPage,
+} from "./rsc.js";
 export type {
   HeaderFactory,
   RequestContext,
   ServerFunction,
   TransportAdapter,
   TransportOptions,
-} from "./transport";
-export { getFnName, initTransport } from "./transport";
+} from "./transport.js";
+export { getFnName, initTransport } from "./transport.js";

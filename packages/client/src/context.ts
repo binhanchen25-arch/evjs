@@ -7,21 +7,6 @@ export interface AppRouteContext {
 }
 
 /**
- * Create a root route with the app's default context (queryClient).
- *
- * Use this instead of `createRootRoute` when you want typed access
- * to `context.queryClient` in `loader` / `beforeLoad`.
- *
- * @example
- * ```tsx
- * const rootRoute = createAppRootRoute({ component: Root });
- *
- * const usersRoute = createRoute({
- *   getParentRoute: () => rootRoute,
- *   path: "/users",
- *   loader: ({ context }) =>
- *     context.queryClient.ensureQueryData(query(getUsers).queryOptions()),
- * });
- * ```
+ * Create a root route with the app's default query client context.
  */
 export const createAppRootRoute = createRootRouteWithContext<AppRouteContext>();

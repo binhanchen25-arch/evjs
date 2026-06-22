@@ -1,5 +1,10 @@
-import type { ClientManifest, ServerManifest } from "@evjs/manifest";
-import type { EvConfig, ResolvedEvConfig } from "./config.js";
+import type {
+  AssetGroup,
+  BuildEnvironment,
+  BuildOutput,
+} from "@evjs/shared/manifest";
+import type { Logger } from "@logtape/logtape";
+import type { Config, DefaultBundlerConfig, ResolvedConfig } from "./config.js";
 
 /**
  * Minimal DOM element / document interface for plugin HTML manipulation.
@@ -8,13 +13,13 @@ import type { EvConfig, ResolvedEvConfig } from "./config.js";
  * implementation is provided by the underlying parser (`domparser-rs`), but
  * plugins only depend on this interface.
  */
-export interface EvDocument {
+export interface HtmlDocument {
   // ── Querying ──────────────────────────────────────────────────────────
-  querySelector(selectors: string): EvDocument | null;
-  querySelectorAll(selectors: string): EvDocument[];
-  getElementById(id: string): EvDocument | null;
-  getElementsByTagName(tagName: string): EvDocument[];
-  getElementsByClassName(classNames: string): EvDocument[];
+  querySelector(selectors: string): HtmlDocument | null;
+  querySelectorAll(selectors: string): HtmlDocument[];
+  getElementById(id: string): HtmlDocument | null;
+  getElementsByTagName(tagName: string): HtmlDocument[];
+  getElementsByClassName(classNames: string): HtmlDocument[];
 
   // ── Attributes ────────────────────────────────────────────────────────
   getAttribute(name: string): string | null;
@@ -24,26 +29,29 @@ export interface EvDocument {
   hasAttribute(name: string): boolean;
 
   // ── Tree mutation ─────────────────────────────────────────────────────
-  appendChild(newChild: EvDocument): EvDocument;
-  removeChild(child: EvDocument): EvDocument;
-  insertBefore(newNode: EvDocument, refNode?: EvDocument | null): EvDocument;
-  replaceChild(newChild: EvDocument, oldChild: EvDocument): EvDocument;
-  append(newChild: EvDocument): void;
-  prepend(newChild: EvDocument): void;
-  before(newSibling: EvDocument): void;
-  after(newSibling: EvDocument): void;
+  appendChild(newChild: HtmlDocument): HtmlDocument;
+  removeChild(child: HtmlDocument): HtmlDocument;
+  insertBefore(
+    newNode: HtmlDocument,
+    refNode?: HtmlDocument | null,
+  ): HtmlDocument;
+  replaceChild(newChild: HtmlDocument, oldChild: HtmlDocument): HtmlDocument;
+  append(newChild: HtmlDocument): void;
+  prepend(newChild: HtmlDocument): void;
+  before(newSibling: HtmlDocument): void;
+  after(newSibling: HtmlDocument): void;
   remove(): void;
-  replaceWith(newNode: EvDocument): void;
+  replaceWith(newNode: HtmlDocument): void;
 
   // ── Content insertion ─────────────────────────────────────────────────
   insertAdjacentHTML(position: string, html: string): void;
   insertAdjacentText(position: string, text: string): void;
-  insertAdjacentElement(position: string, element: EvDocument): void;
+  insertAdjacentElement(position: string, element: HtmlDocument): void;
 
   // ── Creation (document-level) ─────────────────────────────────────────
-  createElement(tagName: string): EvDocument;
-  createTextNode(data: string): EvDocument;
-  createComment(data: string): EvDocument;
+  createElement(tagName: string): HtmlDocument;
+  createTextNode(data: string): HtmlDocument;
+  createComment(data: string): HtmlDocument;
 
   // ── Properties ────────────────────────────────────────────────────────
   readonly tagName: string | null;
@@ -54,52 +62,129 @@ export interface EvDocument {
   textContent: string;
 
   // ── Traversal ─────────────────────────────────────────────────────────
-  readonly parentNode: EvDocument | null;
-  readonly parentElement: EvDocument | null;
-  readonly firstChild: EvDocument | null;
-  readonly lastChild: EvDocument | null;
-  readonly firstElementChild: EvDocument | null;
-  readonly lastElementChild: EvDocument | null;
-  readonly previousSibling: EvDocument | null;
-  readonly nextSibling: EvDocument | null;
-  readonly previousElementSibling: EvDocument | null;
-  readonly nextElementSibling: EvDocument | null;
-  readonly children: EvDocument[];
-  readonly childNodes: EvDocument[];
+  readonly parentNode: HtmlDocument | null;
+  readonly parentElement: HtmlDocument | null;
+  readonly firstChild: HtmlDocument | null;
+  readonly lastChild: HtmlDocument | null;
+  readonly firstElementChild: HtmlDocument | null;
+  readonly lastElementChild: HtmlDocument | null;
+  readonly previousSibling: HtmlDocument | null;
+  readonly nextSibling: HtmlDocument | null;
+  readonly previousElementSibling: HtmlDocument | null;
+  readonly nextElementSibling: HtmlDocument | null;
+  readonly children: HtmlDocument[];
+  readonly childNodes: HtmlDocument[];
   readonly childElementCount: number;
   hasChildNodes(): boolean;
-  contains(otherNode: EvDocument): boolean;
+  contains(otherNode: HtmlDocument): boolean;
 
   // ── Document-level accessors ──────────────────────────────────────────
-  readonly head: EvDocument | null;
-  readonly body: EvDocument | null;
+  readonly head: HtmlDocument | null;
+  readonly body: HtmlDocument | null;
   readonly title: string;
-  readonly documentElement: EvDocument | null;
+  readonly documentElement: HtmlDocument | null;
 
   // ── Cloning ───────────────────────────────────────────────────────────
-  cloneNode(deep?: boolean): EvDocument;
+  cloneNode(deep?: boolean): HtmlDocument;
+
+  // ── Serialization ─────────────────────────────────────────────────────
+  toString(): string;
+}
+
+/** JavaScript and CSS assets exposed to plugin manifest views. */
+export interface ManifestAssets {
+  /** JavaScript bundle paths. */
+  js: string[];
+  /** CSS bundle paths. */
+  css: string[];
+}
+
+/** A discovered client route exposed to plugin manifest views. */
+export interface RouteEntry {
+  /** Route path, e.g. "/", "/posts/$postId", or "*". */
+  path: string;
+}
+
+/** Per-page client manifest entry exposed to plugin hooks. */
+export interface PageManifestEntry {
+  /** Bundle asset paths for this page. */
+  assets: ManifestAssets;
+  /** Discovered routes for this page. */
+  routes?: RouteEntry[];
+}
+
+/** Client-focused manifest view derived from the linked framework output. */
+export interface ClientManifest {
+  /** Schema version for this manifest view. */
+  version: 1;
+  /** Bundle asset paths for SPA HTML injection. */
+  assets: ManifestAssets;
+  /** Discovered client routes. */
+  routes?: RouteEntry[];
+  /** Per-page assets for page-style outputs. */
+  pages?: Record<string, PageManifestEntry>;
+}
+
+/** Server function entry exposed to plugin manifest views. */
+export interface ServerFnEntry {
+  /** Emitted assets containing this function. */
+  assets: ManifestAssets;
+}
+
+/** Server route entry exposed to plugin manifest views. */
+export interface ServerRouteEntry {
+  /** URL path pattern handled by this route. */
+  path: string;
+  /** HTTP methods explicitly handled by this route. */
+  methods: string[];
+  /** Emitted assets containing this route handler. */
+  assets: ManifestAssets;
+}
+
+/** Server-focused manifest view derived from the linked framework output. */
+export interface ServerManifest {
+  /** Schema version for this manifest view. */
+  version: 1;
+  /** Server bundle entry filename. */
+  entry?: string;
+  /** Server bundle asset paths. */
+  assets: ManifestAssets;
+  /** Registered server functions. */
+  fns: Record<string, ServerFnEntry>;
+  /** Registered server route handlers. */
+  routes?: ServerRouteEntry[];
 }
 
 /**
  * Context passed to plugin bundler hooks.
  */
-export interface EvBundlerCtx<
-  TBundlerCfg = import("@utoo/pack").ConfigComplete,
-> {
+export interface BundlerCtx<TBundlerCfg = DefaultBundlerConfig> {
   /** The current mode. */
   mode: "development" | "production";
+  /** The current command. */
+  command: "dev" | "build";
   /** The current working directory. */
   cwd: string;
   /** The fully resolved framework config. */
-  config: ResolvedEvConfig<TBundlerCfg>;
+  config: ResolvedConfig<TBundlerCfg>;
+  /** Selected bundler adapter name. */
+  bundlerName: string;
+  /** Environment currently being configured when known. */
+  environment?: BuildEnvironment | "mixed";
+  /** Logger plugins can use for framework-scoped messages. */
+  logger: Logger;
+  /** Adds an extra framework-level watch file in dev mode. */
+  addWatchFile(file: string): void;
 }
 
 /**
  * Context passed to plugin config hooks.
  */
-export interface EvPluginConfigContext {
+export interface PluginConfigContext {
   /** The current mode. */
   mode: "development" | "production";
+  /** The current command. */
+  command: "dev" | "build";
   /** The current working directory. */
   cwd: string;
 }
@@ -107,7 +192,7 @@ export interface EvPluginConfigContext {
 /**
  * An evjs plugin.
  */
-export interface EvPlugin<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
+export interface Plugin<TBundlerCfg = DefaultBundlerConfig> {
   /** Plugin name for debugging and logging. */
   name: string;
 
@@ -127,18 +212,25 @@ export interface EvPlugin<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
   optionalDependencies?: string[];
 
   /**
+   * Relative ordering tier for plugins without an explicit dependency edge.
+   *
+   * Dependencies still win over enforce ordering.
+   */
+  enforce?: "pre" | "normal" | "post";
+
+  /**
    * Modify the raw user config before defaults are resolved.
    *
-   * Use this for framework-level config such as `server.functions.endpoint`
-   * that must be visible to dev proxy setup and build-time runtime defines.
+   * Use this for framework-level config such as `server.basePath` that must
+   * be visible to dev proxy setup and build-time runtime defines.
    */
   config?: (
-    config: EvConfig<TBundlerCfg>,
-    ctx: EvPluginConfigContext,
+    config: Config<TBundlerCfg>,
+    ctx: PluginConfigContext,
   ) =>
-    | EvConfig<TBundlerCfg>
+    | Config<TBundlerCfg>
     | undefined
-    | Promise<EvConfig<TBundlerCfg> | undefined>;
+    | Promise<Config<TBundlerCfg> | undefined>;
 
   /**
    * Initialize the plugin and return lifecycle hooks.
@@ -147,76 +239,248 @@ export interface EvPlugin<TBundlerCfg = import("@utoo/pack").ConfigComplete> {
    * hooks share state through closure.
    */
   setup?: (
-    ctx: EvPluginContext<TBundlerCfg>,
+    ctx: PluginContext<TBundlerCfg>,
   ) =>
-    | EvPluginHooks<TBundlerCfg>
+    | PluginHooks<TBundlerCfg>
     | undefined
-    | Promise<EvPluginHooks<TBundlerCfg> | undefined>;
+    | Promise<PluginHooks<TBundlerCfg> | undefined>;
 }
 
 /**
  * Context passed to plugin setup().
  */
-export interface EvPluginContext<
-  TBundlerCfg = import("@utoo/pack").ConfigComplete,
-> {
+export interface PluginContext<TBundlerCfg = DefaultBundlerConfig> {
   /** Current mode. */
   mode: "development" | "production";
+  /** Current command. */
+  command: "dev" | "build";
   /** The current working directory. */
   cwd: string;
   /** The fully resolved framework config. */
-  config: ResolvedEvConfig<TBundlerCfg>;
+  config: ResolvedConfig<TBundlerCfg>;
+  /** Logger plugins can use for framework-scoped messages. */
+  logger: Logger;
+  /** Adds an extra framework-level watch file in dev mode. */
+  addWatchFile(file: string): void;
 }
+
+export interface BuildStartContext<TBundlerCfg = DefaultBundlerConfig>
+  extends PluginContext<TBundlerCfg> {}
+
+export interface BuildOutputContext<TBundlerCfg = DefaultBundlerConfig>
+  extends PluginContext<TBundlerCfg> {}
+
+export interface DisposeContext<TBundlerCfg = DefaultBundlerConfig>
+  extends PluginContext<TBundlerCfg> {}
 
 /**
  * Lifecycle hooks returned from plugin setup().
- *
- * TODO: Narrow each hook context and standardize signatures as subject-first,
- * ctx-second before allowing hooks beyond `config` to mutate framework state.
  */
-export interface EvPluginHooks<
-  TBundlerCfg = import("@utoo/pack").ConfigComplete,
-> {
+export interface PluginHooks<TBundlerCfg = DefaultBundlerConfig> {
   /** Called before compilation begins. */
-  buildStart?: () => void | Promise<void>;
+  buildStart?: (ctx: BuildStartContext<TBundlerCfg>) => void | Promise<void>;
+
+  /**
+   * Inspect or mutate the linked framework build output before it is emitted
+   * as `dist/manifest.json` and before HTML documents are transformed.
+   *
+   * Deployment adapters should use this hook to add deployment metadata to the
+   * single framework output emitted as `dist/manifest.json`.
+   */
+  buildOutput?: (
+    output: BuildOutput,
+    ctx: BuildOutputContext<TBundlerCfg>,
+  ) => void | Promise<void>;
 
   /**
    * Modify the underlying bundler configuration directly.
    *
-   * The config type is `unknown` by default. Use the typed helper exported
-   * by each bundler adapter for type safety (e.g., `utoopack()` from
+   * The config type defaults to the framework-agnostic
+   * `DefaultBundlerConfig`. Use the typed helper exported by each bundler
+   * adapter for type safety (e.g., `utoopack()` from
    * `@evjs/bundler-utoopack`).
    */
   bundlerConfig?: (
     config: TBundlerCfg,
-    ctx: EvBundlerCtx<TBundlerCfg>,
+    ctx: BundlerCtx<TBundlerCfg>,
   ) => void | Promise<void>;
 
   /** Called after compilation completes. Receives build result with manifests. */
-  buildEnd?: (result: EvBuildResult) => void | Promise<void>;
+  buildEnd?: (result: BuildResult) => void | Promise<void>;
+
+  /** Called when the command is shutting down or after a build finishes. */
+  dispose?: (ctx: DisposeContext<TBundlerCfg>) => void | Promise<void>;
 
   /**
    * Transform the output HTML document after asset injection.
    *
-   * Receives the parsed DOM document and the build result (with manifests).
+   * Receives the parsed DOM document and the current HTML document context.
    * Mutate the document in place (e.g. `doc.head.insertAdjacentHTML(...)`).
    * Runs after evjs injects `<script>` / `<link>` tags but before the
    * document is serialized and emitted. Multiple plugins are applied in order.
    */
   transformHtml?: (
-    doc: EvDocument,
-    result: EvBuildResult,
+    doc: HtmlDocument,
+    ctx: HtmlTransformContext<TBundlerCfg>,
   ) => void | Promise<void>;
 }
 
 /**
  * Build result passed to the buildEnd hook.
  */
-export interface EvBuildResult {
-  /** The client manifest (assets, routes). */
+export interface BuildResult {
+  /** Single framework build output. */
+  output: BuildOutput;
+  /** Client-focused manifest view derived from `output`. */
   clientManifest: ClientManifest;
-  /** The server manifest (entry, fns). Undefined if server is disabled. */
+  /** Server-focused manifest view derived from `output`, when server output exists. */
   serverManifest?: ServerManifest;
   /** True if this is a rebuild triggered by file change (dev watch mode only). */
   isRebuild: boolean;
+}
+
+export type HtmlDocumentInfo =
+  | {
+      /** Framework owner type for the HTML document. */
+      kind: "app";
+      /** Stable HTML document id. */
+      htmlId: string;
+      /** Owning app id. */
+      appId: string;
+      /** Source HTML template path from resolved config. */
+      template: string;
+      /** Output HTML filename. */
+      fileName: string;
+      /** Assets injected into this HTML document. */
+      assets: AssetGroup;
+    }
+  | {
+      /** Framework owner type for the HTML document. */
+      kind: "page";
+      /** Stable HTML document id. */
+      htmlId: string;
+      /** Owning page id. */
+      pageId: string;
+      /** Source HTML template path from resolved config. */
+      template: string;
+      /** Output HTML filename. */
+      fileName: string;
+      /** Assets injected into this HTML document. */
+      assets: AssetGroup;
+    };
+
+export type HtmlTransformContext<TBundlerCfg = DefaultBundlerConfig> =
+  BuildResult &
+    HtmlDocumentInfo &
+    PluginContext<TBundlerCfg> & {
+      buildId: string;
+      publicPath: BuildOutput["publicPath"];
+    };
+export type BuildOutputHookContext<TBundlerCfg = DefaultBundlerConfig> =
+  BuildOutputContext<TBundlerCfg>;
+
+export type EvBuildResult = BuildResult;
+export type EvBundlerCtx<TBundlerCfg = DefaultBundlerConfig> =
+  BundlerCtx<TBundlerCfg>;
+export type EvDocument = HtmlDocument;
+export type EvPlugin<TBundlerCfg = DefaultBundlerConfig> = Plugin<TBundlerCfg>;
+export type EvPluginConfigContext = PluginConfigContext;
+export type EvPluginContext<TBundlerCfg = DefaultBundlerConfig> =
+  PluginContext<TBundlerCfg>;
+export type EvPluginHooks<TBundlerCfg = DefaultBundlerConfig> =
+  PluginHooks<TBundlerCfg>;
+
+const EMPTY_ASSETS: ManifestAssets = { js: [], css: [] };
+
+export function createBuildResult(
+  output: BuildOutput,
+  isRebuild: boolean,
+): BuildResult {
+  const serverManifest = createServerManifest(output);
+
+  return {
+    output,
+    clientManifest: createClientManifest(output),
+    ...(serverManifest ? { serverManifest } : {}),
+    isRebuild,
+  };
+}
+
+function createClientManifest(output: BuildOutput): ClientManifest {
+  const pageEntries = Object.entries(output.pages).filter(
+    ([, page]) => page.document,
+  );
+  const routes = createRouteEntries(output);
+  const pages =
+    pageEntries.length > 0
+      ? Object.fromEntries(
+          pageEntries.map(([pageId, page]) => {
+            const pageRoutes = createRouteEntries(output, pageId);
+            return [
+              pageId,
+              {
+                assets: cloneAssets(page.assets),
+                ...(pageRoutes.length > 0 ? { routes: pageRoutes } : {}),
+              },
+            ];
+          }),
+        )
+      : undefined;
+
+  return {
+    version: 1,
+    assets: pages
+      ? cloneAssets(EMPTY_ASSETS)
+      : cloneAssets(getAppAssets(output)),
+    ...(routes.length > 0 ? { routes } : {}),
+    ...(pages ? { pages } : {}),
+  };
+}
+
+function createServerManifest(output: BuildOutput): ServerManifest | undefined {
+  if (!output.server) return undefined;
+
+  const routes = output.server.routes.map((route) => ({
+    path: route.path,
+    methods: [...route.methods],
+    assets: cloneAssets(route.assets),
+  }));
+
+  return {
+    version: 1,
+    ...(output.server.entry ? { entry: output.server.entry } : {}),
+    assets: cloneAssets(output.server.assets),
+    fns: Object.fromEntries(
+      Object.entries(output.server.functions).map(([id, fn]) => [
+        id,
+        { assets: cloneAssets(fn.assets) },
+      ]),
+    ),
+    ...(routes.length > 0 ? { routes } : {}),
+  };
+}
+
+function createRouteEntries(
+  output: BuildOutput,
+  pageId?: string,
+): RouteEntry[] {
+  return output.routes
+    .filter((route) => pageId === undefined || route.pageId === pageId)
+    .map((route) => ({ path: route.path }));
+}
+
+function getAppAssets(output: BuildOutput): AssetGroup {
+  return (
+    output.apps.default?.assets ??
+    Object.values(output.apps)[0]?.assets ??
+    Object.values(output.assets)[0] ??
+    EMPTY_ASSETS
+  );
+}
+
+function cloneAssets(assets: AssetGroup): ManifestAssets {
+  return {
+    js: [...assets.js],
+    css: [...assets.css],
+  };
 }

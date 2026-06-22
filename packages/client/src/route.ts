@@ -1,11 +1,7 @@
 /**
- * Routing utilities re-exported from @tanstack/react-router.
- *
- * This module provides the core primitives for building file-based
- * or code-based routing in the ev framework.
+ * Routing utilities re-exported from TanStack Router for standalone CSR apps.
  */
 
-// Types
 export type {
   ActiveLinkOptions,
   AnyRootRoute,
@@ -29,6 +25,8 @@ export type {
   NotFoundRouteProps,
   ParsedLocation,
   ParsedPath,
+  Redirect,
+  RedirectOptions,
   RegisteredRouter,
   RouteComponent,
   RouteMask,
@@ -56,9 +54,9 @@ export type {
 } from "@tanstack/react-router";
 
 import {
-  createRoute as _createRoute,
   type AnyContext,
   type AnyRoute,
+  createRoute as createTanStackRoute,
   type ResolveFullPath,
   type ResolveId,
   type ResolveParams,
@@ -131,8 +129,7 @@ export {
 } from "@tanstack/react-router";
 
 /**
- * Restricted version of createRoute that only accepts string literals for the 'path' property.
- * This ensures that routes are statically analyzable by the ev build system.
+ * Restricted createRoute wrapper that only accepts literal path values.
  */
 export function createRoute<
   TRegister = unknown,
@@ -145,9 +142,8 @@ export function createRoute<
   TParams = ResolveParams<TPath>,
   TRouteContextFn = AnyContext,
   TBeforeLoadFn = AnyContext,
-  // biome-ignore lint/suspicious/noExplicitAny: TanStack Router's TLoaderDeps constraint requires `any`
-  // biome-ignore lint/complexity/noBannedTypes: TanStack Router's default type requires `{}`
-  TLoaderDeps extends Record<string, any> = {},
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Router's TLoaderDeps constraint requires any.
+  TLoaderDeps extends Record<string, any> = Record<string, never>,
   TLoaderFn = undefined,
   TChildren = unknown,
   TSSR = unknown,
@@ -188,6 +184,5 @@ export function createRoute<
   TSSR,
   TServerMiddlewares
 > {
-  // biome-ignore lint/suspicious/noExplicitAny: Bridge our restricted wrapper to upstream's broader type
-  return _createRoute(options as any);
+  return createTanStackRoute(options as never);
 }

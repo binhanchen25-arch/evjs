@@ -1,11 +1,13 @@
 import type {
+  BuildOutput,
+  BuildResult,
   BundlerAdapter,
-  EvBuildResult,
-  EvPlugin,
-  EvPluginContext,
-  EvPluginHooks,
+  Plugin,
+  PluginContext,
+  PluginHooks,
 } from "@evjs/ev";
 import { resolveConfig } from "@evjs/ev";
+import { getLogger } from "@logtape/logtape";
 import { describe, expect, it } from "vitest";
 
 /**
@@ -17,10 +19,10 @@ import { describe, expect, it } from "vitest";
 
 // Re-implement private functions for isolated testing.
 async function collectPluginHooks(
-  plugins: EvPlugin[],
-  ctx: EvPluginContext,
-): Promise<EvPluginHooks[]> {
-  const allHooks: EvPluginHooks[] = [];
+  plugins: Plugin[],
+  ctx: PluginContext,
+): Promise<PluginHooks[]> {
+  const allHooks: PluginHooks[] = [];
   for (const plugin of plugins) {
     if (plugin.setup) {
       const hooks = await plugin.setup(ctx);
@@ -30,15 +32,18 @@ async function collectPluginHooks(
   return allHooks;
 }
 
-async function runBuildStartHooks(hooks: EvPluginHooks[]): Promise<void> {
+async function runBuildStartHooks(
+  hooks: PluginHooks[],
+  ctx: PluginContext = CTX,
+): Promise<void> {
   for (const h of hooks) {
-    if (h.buildStart) await h.buildStart();
+    if (h.buildStart) await h.buildStart(ctx);
   }
 }
 
 async function runBuildEndHooks(
-  hooks: EvPluginHooks[],
-  result: EvBuildResult,
+  hooks: PluginHooks[],
+  result: BuildResult,
 ): Promise<void> {
   for (const h of hooks) {
     if (h.buildEnd) await h.buildEnd(result);
@@ -46,11 +51,64 @@ async function runBuildEndHooks(
 }
 
 const TEST_CONFIG = resolveConfig({});
-const CTX: EvPluginContext = {
+const CTX: PluginContext = {
   mode: "production",
+  command: "build",
   cwd: process.cwd(),
   config: TEST_CONFIG,
+  logger: getLogger(["evjs", "test"]),
+  addWatchFile() {},
 };
+const TEST_OUTPUT: BuildOutput = {
+  version: 1,
+  buildId: "test",
+  distDir: "dist",
+  publicPath: "/",
+  runtime: {},
+  assets: {
+    main: { js: ["main.js"], css: [] },
+  },
+  apps: {
+    default: {
+      assets: { js: ["main.js"], css: [] },
+      entry: "./src/main.tsx",
+    },
+  },
+  pages: {},
+  routes: [],
+};
+
+function createTestBuildResult(
+  output: BuildOutput,
+  isRebuild: boolean,
+): BuildResult {
+  return {
+    output,
+    clientManifest: {
+      version: 1,
+      assets: output.apps.default?.assets ?? { js: [], css: [] },
+    },
+    ...(output.server
+      ? {
+          serverManifest: {
+            version: 1 as const,
+            ...(output.server.entry ? { entry: output.server.entry } : {}),
+            assets: output.server.assets,
+            fns: Object.fromEntries(
+              Object.entries(output.server.functions).map(([id, fn]) => [
+                id,
+                { assets: fn.assets },
+              ]),
+            ),
+            ...(output.server.routes.length > 0
+              ? { routes: output.server.routes }
+              : {}),
+          },
+        }
+      : {}),
+    isRebuild,
+  };
+}
 
 describe("resolveConfig", () => {
   it("resolved config uses undefined bundler by default (CLI falls back to utoopack)", () => {
@@ -61,7 +119,7 @@ describe("resolveConfig", () => {
   it("plugin contexts can carry the active default bundler", async () => {
     const bundler = {
       name: "utoopack",
-      build: async () => {},
+      build: async () => ({}),
       dev: async () => {},
     } as BundlerAdapter;
 
@@ -70,7 +128,7 @@ describe("resolveConfig", () => {
       bundler,
     };
 
-    const plugin: EvPlugin = {
+    const plugin: Plugin = {
       name: "reads-bundler-name",
       setup(ctx) {
         expect(ctx.config.bundler?.name).toBe("utoopack");
@@ -80,15 +138,18 @@ describe("resolveConfig", () => {
 
     await collectPluginHooks([plugin], {
       mode: "production",
+      command: "build",
       cwd: process.cwd(),
       config,
+      logger: getLogger(["evjs", "test"]),
+      addWatchFile() {},
     });
   });
 });
 
 describe("plugin setup edge cases", () => {
   it("plugins without setup or returning void are silently skipped", async () => {
-    const plugins: EvPlugin[] = [
+    const plugins: Plugin[] = [
       { name: "no-setup" },
       { name: "void-setup", setup: () => undefined },
       { name: "real", setup: () => ({ buildStart: () => {} }) },
@@ -99,7 +160,7 @@ describe("plugin setup edge cases", () => {
 
   it("async setup is awaited before collecting next plugin", async () => {
     const order: string[] = [];
-    const plugins: EvPlugin[] = [
+    const plugins: Plugin[] = [
       {
         name: "slow",
         async setup() {
@@ -125,7 +186,7 @@ describe("plugin setup edge cases", () => {
 describe("async hook sequencing", () => {
   it("slow hooks block subsequent hooks (no parallel execution)", async () => {
     const order: number[] = [];
-    const hooks: EvPluginHooks[] = [
+    const hooks: PluginHooks[] = [
       {
         async buildStart() {
           await new Promise((r) => setTimeout(r, 20));
@@ -149,32 +210,21 @@ describe("isRebuild flag (dev-mode simulation)", () => {
   it("distinguishes initial build from hot rebuild via isRebuild", async () => {
     const results: { isRebuild: boolean; jsCount: number }[] = [];
 
-    const hooks: EvPluginHooks[] = [
+    const hooks: PluginHooks[] = [
       {
         buildEnd(r) {
           results.push({
             isRebuild: r.isRebuild,
-            jsCount: r.clientManifest.assets.js.length,
+            jsCount: r.output.assets.main.js.length,
           });
         },
       },
     ];
 
-    const manifest = {
-      version: 1 as const,
-      assets: { js: ["main.js"], css: [] },
-    };
-
     // Initial build
-    await runBuildEndHooks(hooks, {
-      clientManifest: manifest,
-      isRebuild: false,
-    });
+    await runBuildEndHooks(hooks, createTestBuildResult(TEST_OUTPUT, false));
     // Hot rebuild in dev mode
-    await runBuildEndHooks(hooks, {
-      clientManifest: manifest,
-      isRebuild: true,
-    });
+    await runBuildEndHooks(hooks, createTestBuildResult(TEST_OUTPUT, true));
 
     expect(results[0].isRebuild).toBe(false);
     expect(results[1].isRebuild).toBe(true);
@@ -185,7 +235,7 @@ describe("closure-based shared state between hooks", () => {
   it("enables typical analytics plugin pattern", async () => {
     let reported = { mode: "", elapsed: 0, assets: 0 };
 
-    const analyticsPlugin: EvPlugin = {
+    const analyticsPlugin: Plugin = {
       name: "analytics",
       setup(ctx) {
         let t0 = 0;
@@ -197,7 +247,7 @@ describe("closure-based shared state between hooks", () => {
             reported = {
               mode: ctx.mode,
               elapsed: 200 - t0, // simulated
-              assets: result.clientManifest.assets.js.length,
+              assets: result.output.assets.main.js.length,
             };
           },
         };
@@ -206,10 +256,18 @@ describe("closure-based shared state between hooks", () => {
 
     const hooks = await collectPluginHooks([analyticsPlugin], CTX);
     await runBuildStartHooks(hooks);
-    await runBuildEndHooks(hooks, {
-      clientManifest: { version: 1, assets: { js: ["a.js", "b.js"], css: [] } },
-      isRebuild: false,
-    });
+    await runBuildEndHooks(
+      hooks,
+      createTestBuildResult(
+        {
+          ...TEST_OUTPUT,
+          assets: {
+            main: { js: ["a.js", "b.js"], css: [] },
+          },
+        },
+        false,
+      ),
+    );
 
     expect(reported.mode).toBe("production");
     expect(reported.elapsed).toBe(100);
