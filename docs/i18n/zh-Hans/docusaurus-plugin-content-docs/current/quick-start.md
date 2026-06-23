@@ -29,7 +29,8 @@ cd my-app && npm install
 ev dev
 ```
 
-浏览器将自动打开 `http://localhost:3000`，支持热模块替换。显式 app/page/server 根下的 `"use server"` 模块会被自动发现。
+开发服务器运行在 `http://localhost:3000`，支持热模块替换。app、page 和
+server entry import graph 中可达的 `"use server"` 模块会被自动发现。
 
 ## 生产构建
 
@@ -144,8 +145,10 @@ server functions、server routes、框架渲染或部署运行时包装时声明
 
 :::important
 
-应用中的所有 `@evjs/*` 包必须保持相同版本。多数应用只需要 `@evjs/ev`
-和 `@evjs/cli`；如果额外添加直接 runtime 包或 adapter 包，升级时也要一起升级。
+应用中的所有 `@evjs/*` 包必须保持相同版本。应用源码直接 import 的 runtime
+包需要显式声明；脚手架生成的全栈模板通常会在 `@evjs/ev` 和 `@evjs/cli`
+之外包含 `@evjs/client` 与 `@evjs/server`。如果额外添加 adapter 包，升级时也要和
+其他框架包一起升级。
 
 :::
 

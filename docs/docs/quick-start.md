@@ -29,9 +29,9 @@ Both arguments are optional — if omitted, the CLI prompts interactively.
 ev dev
 ```
 
-Your browser opens to `http://localhost:3000` with Hot Module Replacement.
-Server functions in `"use server"` modules are auto-discovered from explicit
-app/page/server roots.
+The dev server runs at `http://localhost:3000` with Hot Module Replacement.
+Server functions in reachable `"use server"` modules are auto-discovered from
+app, page, and server entry import graphs.
 
 ## Production Build
 
@@ -151,9 +151,11 @@ server routes, framework rendering, or deployment runtime wrappers.
 
 :::important
 
-Keep all `@evjs/*` packages in your app on the same version. Most applications
-only need `@evjs/ev` plus `@evjs/cli`; if you add direct runtime or adapter
-packages, upgrade them together.
+Keep all `@evjs/*` packages in your app on the same version. Declare runtime
+packages that application source imports directly; scaffolded full-stack
+templates usually include `@evjs/client` and `@evjs/server` alongside
+`@evjs/ev` and `@evjs/cli`. If you add adapter packages, upgrade them together
+with the rest of the framework packages.
 
 :::
 

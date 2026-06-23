@@ -61,8 +61,6 @@ my-evjs-app/
   "./src/app/pages"` 会写入 `src/app/evjs-route-types.d.ts`。MPA 模式会移除旧的生成路由类型文件。
   生成声明使用生成专用的 `@evjs/client/internal/route-types` helper，
   并增强 client runtime 导航类型。保持忽略生成的 route types，不要在应用代码里导入它们。
-- `.evjs/` 是 dev/build 元信息使用的框架生成工作目录。保持忽略它，不要放入模板、
-  脚手架源码，也不要从应用代码导入。
 - 渲染元信息放在页面模块旁边。
 - `api/*.server.ts` 放 server functions。
 - `api/*.routes.ts` 放标准 HTTP route handlers。
@@ -110,7 +108,6 @@ my-evjs-app/
 | `<routing-dir-parent>/layout.{tsx,ts,jsx,js}` 或 `<routing-dir-parent>/layout/index.{tsx,ts,jsx,js}` | 可选外部 SPA 根布局 | 包裹已发现 SPA 路由树的一层应用 shell | MPA 公共外框、route-specific 嵌套布局或多个根布局候选 |
 | `src/pages/**/layout.{tsx,ts,jsx,js}` 或 `src/pages/**/layout/index.{tsx,ts,jsx,js}` | SPA route layout | 在同一 URL 前缀下包裹子路由的 pathless layout route | MPA 公共外框，或命名为 `layout` 的非 layout helper 目录 |
 | `<routing-dir-parent>/evjs-route-types.d.ts` | SPA 导航类型生成物 | 编辑器和类型检查支持 | 手工修改、从应用代码导入、放入模板或脚手架源码，或用于 MPA 模式 |
-| `.evjs/` | 框架生成工作目录 | 本地 dev/build 元信息 | 提交到源码、放入模板/脚手架源码，或从应用代码导入 |
 | `src/api/*.server.ts` | 推荐的 server function 边界 | 以 `"use server";` 开头并导出命名 callable server functions 的文件 | 需要在 `server: false` 下运行的客户端导入、默认导出或 runtime re-export |
 | `src/api/*.routes.ts` | 推荐的 server route 边界 | 使用 Web `Request`/`Response` 的 `createRoute()` handlers | Server functions，或把同一个 URL shape 拆到多个文件 |
 | `src/server.ts` | Framework server entry | `createApp({ routes, middlewares, framework })` 和部署运行时 glue | 浏览器代码或按页面拆分的 client bootstrap |

@@ -65,7 +65,7 @@ function useFeatures() {
       description: translate({
         id: "homepage.feature.dataFetching.description",
         message:
-          "TanStack Query with built-in proxies — query(fn).useQuery() / mutation(fn).useMutation(), zero boilerplate.",
+          "TanStack Query helpers for server functions — useQuery(fn, ...args), useMutation(fn), and stable query keys.",
       }),
     },
     {

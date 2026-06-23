@@ -36,7 +36,7 @@
     "description": "Title for Data Fetching feature"
   },
   "homepage.feature.dataFetching.description": {
-    "message": "内置 TanStack Query 代理 —— query(fn).useQuery() / mutation(fn).useMutation()，零样板代码。",
+    "message": "面向服务端函数的 TanStack Query helper —— useQuery(fn, ...args)、useMutation(fn) 和稳定 query key。",
     "description": "Description for Data Fetching feature"
   },
   "homepage.feature.multiRuntime.title": {

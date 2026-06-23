@@ -71,8 +71,6 @@ This shape covers the complete framework surface:
   `@evjs/client/internal/route-types` helper and augments the client runtime
   navigation types. Keep generated route types ignored and do not import them
   from application code.
-- `.evjs/` is the generated framework working directory for dev/build metadata.
-  Keep it ignored and out of templates, scaffolds, and application imports.
 - Rendering metadata lives with page modules.
 - `api/*.server.ts` contains server functions.
 - `api/*.routes.ts` contains standard HTTP route handlers.
@@ -129,7 +127,6 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 | `<routing-dir-parent>/layout.{tsx,ts,jsx,js}` or `<routing-dir-parent>/layout/index.{tsx,ts,jsx,js}` | Optional external SPA root layout | One app shell around the discovered SPA route tree | MPA shared chrome, route-specific nested layouts, or multiple root layout candidates |
 | `src/pages/**/layout.{tsx,ts,jsx,js}` or `src/pages/**/layout/index.{tsx,ts,jsx,js}` | SPA route layout | Pathless layout routes that wrap child routes at the same URL prefix | MPA shared chrome or non-layout helper folders named `layout` |
 | `<routing-dir-parent>/evjs-route-types.d.ts` | Generated SPA navigation types | Editor and type-checker support | Manual edits, imports from app code, template/scaffold source, or MPA mode |
-| `.evjs/` | Generated framework working directory | Local dev/build metadata | Committed source, template/scaffold source, or application imports |
 | `src/api/*.server.ts` | Recommended server-function boundary | Files that start with `"use server";` and export named callable server functions | Client imports that should run with `server: false`, default exports, or runtime re-exports |
 | `src/api/*.routes.ts` | Recommended server-route boundary | `createRoute()` handlers using Web `Request`/`Response` | Server functions or multiple files for the same URL shape |
 | `src/server.ts` | Framework server entry | `createApp({ routes, middlewares, framework })` and deployment runtime glue | Browser code or per-page client bootstrap |
