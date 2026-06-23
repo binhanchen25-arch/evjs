@@ -2,11 +2,7 @@ export {
   createHistoryDriver,
   createPageDriver,
 } from "./shell/drivers.js";
-export {
-  loadSharedDependency,
-  registerSharedDependency,
-  registerShellModule,
-} from "./shell/registry.js";
+export { registerShellModule } from "./shell/registry.js";
 export { createActivationRequestFromUrl } from "./shell/routing.js";
 export { createShell } from "./shell/runtime.js";
 export type {
@@ -17,8 +13,6 @@ export type {
   HistoryDriverOptions,
   PageDriver,
   PageDriverOptions,
-  SharedScope,
-  SharedScopeEntry,
   Shell,
   ShellDriver,
   ShellErrorContext,

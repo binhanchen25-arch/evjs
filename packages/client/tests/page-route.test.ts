@@ -31,8 +31,6 @@ describe("page route hooks", () => {
     expect("createShell" in client).toBe(false);
     expect("createPageDriver" in client).toBe(false);
     expect("createHistoryDriver" in client).toBe(false);
-    expect("registerSharedDependency" in client).toBe(false);
-    expect("loadSharedDependency" in client).toBe(false);
     expect("registerShellModule" in client).toBe(false);
     expect("createServerReference" in client).toBe(false);
     expect("callServer" in client).toBe(false);

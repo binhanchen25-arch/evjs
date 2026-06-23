@@ -7,6 +7,31 @@ framework-level features that need multiple server build entries or dynamic dev
 plan updates can be exercised before Utoopack exposes equivalent lower-level
 APIs.
 
+To switch a project to webpack, pass the adapter explicitly:
+
+```ts
+import { defineConfig } from "@evjs/ev";
+import { webpack, webpackAdapter, type WebpackConfig } from "@evjs/bundler-webpack";
+
+export default defineConfig<WebpackConfig>({
+  bundler: webpackAdapter,
+  plugins: [
+    {
+      name: "webpack-customization",
+      setup() {
+        return {
+          bundlerConfig: webpack((configs) => {
+            for (const cfg of configs) {
+              cfg.resolve ??= {};
+            }
+          }),
+        };
+      },
+    },
+  ],
+});
+```
+
 Implemented capabilities:
 
 - production build through webpack;

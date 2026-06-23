@@ -156,17 +156,24 @@ export interface ServerManifest {
 }
 
 /**
- * Context passed to plugin bundler hooks.
+ * Context passed to 0.1-compatible plugin bundler hooks.
  */
-export interface BundlerCtx<TBundlerCfg = DefaultBundlerConfig> {
+export interface EvBundlerCtx<TBundlerCfg = DefaultBundlerConfig> {
   /** The current mode. */
   mode: "development" | "production";
-  /** The current command. */
-  command: "dev" | "build";
   /** The current working directory. */
   cwd: string;
   /** The fully resolved framework config. */
   config: ResolvedConfig<TBundlerCfg>;
+}
+
+/**
+ * Context passed to plugin bundler hooks.
+ */
+export interface BundlerCtx<TBundlerCfg = DefaultBundlerConfig>
+  extends EvBundlerCtx<TBundlerCfg> {
+  /** The current command. */
+  command: "dev" | "build";
   /** Selected bundler adapter name. */
   bundlerName: string;
   /** Environment currently being configured when known. */
@@ -178,21 +185,48 @@ export interface BundlerCtx<TBundlerCfg = DefaultBundlerConfig> {
 }
 
 /**
- * Context passed to plugin config hooks.
+ * Context passed to 0.1-compatible plugin config hooks.
  */
-export interface PluginConfigContext {
+export interface EvPluginConfigContext {
   /** The current mode. */
   mode: "development" | "production";
-  /** The current command. */
-  command: "dev" | "build";
   /** The current working directory. */
   cwd: string;
 }
 
 /**
+ * Context passed to plugin config hooks.
+ */
+export interface PluginConfigContext extends EvPluginConfigContext {
+  /** The current command. */
+  command: "dev" | "build";
+}
+
+type ConfigHookResult<TBundlerCfg> =
+  | Config<TBundlerCfg>
+  | undefined
+  | void
+  | Promise<Config<TBundlerCfg> | undefined>
+  | Promise<void>;
+
+type EvPluginSetupResult<TBundlerCfg> =
+  | EvPluginHooks<TBundlerCfg>
+  | undefined
+  | void
+  | Promise<EvPluginHooks<TBundlerCfg> | undefined>
+  | Promise<void>;
+
+type PluginSetupResult<TBundlerCfg> =
+  | PluginHooks<TBundlerCfg>
+  | undefined
+  | void
+  | Promise<PluginHooks<TBundlerCfg> | undefined>
+  | Promise<void>;
+
+/**
  * An evjs plugin.
  */
-export interface Plugin<TBundlerCfg = DefaultBundlerConfig> {
+export interface EvPlugin<TBundlerCfg = DefaultBundlerConfig> {
   /** Plugin name for debugging and logging. */
   name: string;
 
@@ -212,6 +246,33 @@ export interface Plugin<TBundlerCfg = DefaultBundlerConfig> {
   optionalDependencies?: string[];
 
   /**
+   * Modify the raw user config before defaults are resolved.
+   *
+   * Use this for framework-level config such as `server.basePath` that must
+   * be visible to dev proxy setup and build-time runtime defines.
+   */
+  config?: (
+    config: Config<TBundlerCfg>,
+    ctx: EvPluginConfigContext,
+  ) => ConfigHookResult<TBundlerCfg>;
+
+  /**
+   * Initialize the plugin and return lifecycle hooks.
+   *
+   * Receives the fully resolved config and build context. All returned
+   * hooks share state through closure.
+   */
+  setup?: (
+    ctx: EvPluginContext<TBundlerCfg>,
+  ) => EvPluginSetupResult<TBundlerCfg>;
+}
+
+/**
+ * An evjs 0.2 plugin. The 0.1 `EvPlugin` shape is still accepted.
+ */
+export interface Plugin<TBundlerCfg = DefaultBundlerConfig>
+  extends Omit<EvPlugin<TBundlerCfg>, "config" | "setup"> {
+  /**
    * Relative ordering tier for plugins without an explicit dependency edge.
    *
    * Dependencies still win over enforce ordering.
@@ -227,10 +288,7 @@ export interface Plugin<TBundlerCfg = DefaultBundlerConfig> {
   config?: (
     config: Config<TBundlerCfg>,
     ctx: PluginConfigContext,
-  ) =>
-    | Config<TBundlerCfg>
-    | undefined
-    | Promise<Config<TBundlerCfg> | undefined>;
+  ) => ConfigHookResult<TBundlerCfg>;
 
   /**
    * Initialize the plugin and return lifecycle hooks.
@@ -238,26 +296,28 @@ export interface Plugin<TBundlerCfg = DefaultBundlerConfig> {
    * Receives the fully resolved config and build context. All returned
    * hooks share state through closure.
    */
-  setup?: (
-    ctx: PluginContext<TBundlerCfg>,
-  ) =>
-    | PluginHooks<TBundlerCfg>
-    | undefined
-    | Promise<PluginHooks<TBundlerCfg> | undefined>;
+  setup?: (ctx: PluginContext<TBundlerCfg>) => PluginSetupResult<TBundlerCfg>;
+}
+
+/**
+ * Context passed to 0.1-compatible plugin setup().
+ */
+export interface EvPluginContext<TBundlerCfg = DefaultBundlerConfig> {
+  /** Current mode. */
+  mode: "development" | "production";
+  /** The current working directory. */
+  cwd: string;
+  /** The fully resolved framework config. */
+  config: ResolvedConfig<TBundlerCfg>;
 }
 
 /**
  * Context passed to plugin setup().
  */
-export interface PluginContext<TBundlerCfg = DefaultBundlerConfig> {
-  /** Current mode. */
-  mode: "development" | "production";
+export interface PluginContext<TBundlerCfg = DefaultBundlerConfig>
+  extends EvPluginContext<TBundlerCfg> {
   /** Current command. */
   command: "dev" | "build";
-  /** The current working directory. */
-  cwd: string;
-  /** The fully resolved framework config. */
-  config: ResolvedConfig<TBundlerCfg>;
   /** Logger plugins can use for framework-scoped messages. */
   logger: Logger;
   /** Adds an extra framework-level watch file in dev mode. */
@@ -274,11 +334,53 @@ export interface DisposeContext<TBundlerCfg = DefaultBundlerConfig>
   extends PluginContext<TBundlerCfg> {}
 
 /**
+ * Lifecycle hooks returned from 0.1-compatible plugin setup().
+ */
+export interface EvPluginHooks<TBundlerCfg = DefaultBundlerConfig> {
+  /** Called before compilation begins. */
+  buildStart?: () => void | Promise<void>;
+
+  /**
+   * Modify the underlying bundler configuration directly.
+   *
+   * The config type defaults to Utoopack's config shape because Utoopack is
+   * the default adapter. Projects that switch bundlers can pass a narrower
+   * generic or use the typed helper exported by that adapter.
+   */
+  bundlerConfig?: (
+    config: TBundlerCfg,
+    ctx: EvBundlerCtx<TBundlerCfg>,
+  ) => void | Promise<void>;
+
+  /** Called after compilation completes. Receives build result with manifests. */
+  buildEnd?: (result: EvBuildResult) => void | Promise<void>;
+
+  /**
+   * Transform the output HTML document after asset injection.
+   *
+   * Receives the parsed DOM document and the build result (with manifests).
+   * Mutate the document in place (e.g. `doc.head.insertAdjacentHTML(...)`).
+   * Runs after evjs injects `<script>` / `<link>` tags but before the
+   * document is serialized and emitted. Multiple plugins are applied in order.
+   */
+  transformHtml?: (
+    doc: HtmlDocument,
+    result: EvBuildResult,
+  ) => void | Promise<void>;
+}
+
+/**
  * Lifecycle hooks returned from plugin setup().
  */
-export interface PluginHooks<TBundlerCfg = DefaultBundlerConfig> {
+export interface PluginHooks<TBundlerCfg = DefaultBundlerConfig>
+  extends Omit<
+    EvPluginHooks<TBundlerCfg>,
+    "buildStart" | "bundlerConfig" | "buildEnd" | "transformHtml"
+  > {
   /** Called before compilation begins. */
-  buildStart?: (ctx: BuildStartContext<TBundlerCfg>) => void | Promise<void>;
+  buildStart?:
+    | EvPluginHooks<TBundlerCfg>["buildStart"]
+    | ((ctx: BuildStartContext<TBundlerCfg>) => void | Promise<void>);
 
   /**
    * Inspect or mutate the linked framework build output before it is emitted
@@ -295,10 +397,9 @@ export interface PluginHooks<TBundlerCfg = DefaultBundlerConfig> {
   /**
    * Modify the underlying bundler configuration directly.
    *
-   * The config type defaults to the framework-agnostic
-   * `DefaultBundlerConfig`. Use the typed helper exported by each bundler
-   * adapter for type safety (e.g., `utoopack()` from
-   * `@evjs/bundler-utoopack`).
+   * The config type defaults to Utoopack's config shape because Utoopack is
+   * the default adapter. Projects that switch bundlers can pass a narrower
+   * generic or use the typed helper exported by that adapter.
    */
   bundlerConfig?: (
     config: TBundlerCfg,
@@ -326,17 +427,23 @@ export interface PluginHooks<TBundlerCfg = DefaultBundlerConfig> {
 }
 
 /**
- * Build result passed to the buildEnd hook.
+ * 0.1-compatible build result passed to plugin hooks.
  */
-export interface BuildResult {
-  /** Single framework build output. */
-  output: BuildOutput;
+export interface EvBuildResult {
   /** Client-focused manifest view derived from `output`. */
   clientManifest: ClientManifest;
   /** Server-focused manifest view derived from `output`, when server output exists. */
   serverManifest?: ServerManifest;
   /** True if this is a rebuild triggered by file change (dev watch mode only). */
   isRebuild: boolean;
+}
+
+/**
+ * Build result passed to the buildEnd hook.
+ */
+export interface BuildResult extends EvBuildResult {
+  /** Single framework build output. */
+  output: BuildOutput;
 }
 
 export type HtmlDocumentInfo =
@@ -379,16 +486,7 @@ export type HtmlTransformContext<TBundlerCfg = DefaultBundlerConfig> =
 export type BuildOutputHookContext<TBundlerCfg = DefaultBundlerConfig> =
   BuildOutputContext<TBundlerCfg>;
 
-export type EvBuildResult = BuildResult;
-export type EvBundlerCtx<TBundlerCfg = DefaultBundlerConfig> =
-  BundlerCtx<TBundlerCfg>;
 export type EvDocument = HtmlDocument;
-export type EvPlugin<TBundlerCfg = DefaultBundlerConfig> = Plugin<TBundlerCfg>;
-export type EvPluginConfigContext = PluginConfigContext;
-export type EvPluginContext<TBundlerCfg = DefaultBundlerConfig> =
-  PluginContext<TBundlerCfg>;
-export type EvPluginHooks<TBundlerCfg = DefaultBundlerConfig> =
-  PluginHooks<TBundlerCfg>;
 
 const EMPTY_ASSETS: ManifestAssets = { js: [], css: [] };
 

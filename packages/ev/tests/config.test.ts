@@ -1357,6 +1357,23 @@ describe("resolveConfig", () => {
     expect(resolved.plugins).toEqual([plugin]);
   });
 
+  it("accepts 0.1-compatible plugin metadata", () => {
+    const resolved = resolveConfig({
+      plugins: [
+        {
+          name: "test-plugin",
+          description: "custom plugin metadata",
+        } as never,
+      ],
+    });
+
+    expect(resolved.plugins).toEqual([
+      {
+        name: "test-plugin",
+      },
+    ]);
+  });
+
   it("rejects invalid plugin declarations", () => {
     expect(() =>
       resolveConfig({
@@ -1382,20 +1399,6 @@ describe("resolveConfig", () => {
       }),
     ).toThrow(
       "[evjs] plugins[0].name must not contain leading or trailing whitespace.",
-    );
-
-    expect(() =>
-      resolveConfig({
-        plugins: [
-          {
-            name: "build-timer",
-            // @ts-expect-error runtime config loading can still produce unknown keys.
-            configure: () => {},
-          },
-        ],
-      }),
-    ).toThrow(
-      "[evjs] plugins[0].configure is not supported. Use name, dependencies, optionalDependencies, enforce, config, or setup.",
     );
 
     expect(() =>

@@ -28,9 +28,15 @@ export default defineConfig({
 ## Plugin Shape
 
 ```ts
-import type { Config, Plugin, PluginHooks, ResolvedConfig } from "@evjs/ev";
+import type {
+  Config,
+  DefaultBundlerConfig,
+  Plugin,
+  PluginHooks,
+  ResolvedConfig,
+} from "@evjs/ev";
 
-interface Plugin<TBundlerConfig = unknown> {
+interface Plugin<TBundlerConfig = DefaultBundlerConfig> {
   name: string;
   dependencies?: string[];
   optionalDependencies?: string[];
@@ -52,9 +58,8 @@ Plugin names must be unique. `config` and `setup` must be functions when
 provided. `dependencies` and `optionalDependencies` control ordering and are
 applied to both `config()` and `setup()` hooks. Dependency lists must contain
 unique, non-empty plugin names; the same plugin name cannot appear in both
-`dependencies` and `optionalDependencies`. Plugin objects accept only `name`,
-`dependencies`, `optionalDependencies`, `enforce`, `config`, and `setup`, so
-misspelled lifecycle entrypoints fail during config resolution.
+`dependencies` and `optionalDependencies`. Extra plugin object metadata is
+ignored by evjs so existing 0.1 plugins can keep package-local metadata fields.
 
 ## Config Hook
 
@@ -84,12 +89,13 @@ export default defineConfig({
 });
 ```
 
-Do not use `bundlerConfig()` for framework protocol paths. Server functions, PPR, and RSC endpoints are derived from `server.basePath`.
+Do not use `bundlerConfig()` for framework protocol paths. Server functions,
+PPR, and RSC endpoints are derived from `server.basePath`.
 
 ## Setup Context
 
 ```ts
-interface PluginContext<TBundlerConfig = unknown> {
+interface PluginContext<TBundlerConfig = DefaultBundlerConfig> {
   mode: "development" | "production";
   command: "dev" | "build";
   cwd: string;
@@ -101,8 +107,9 @@ interface PluginContext<TBundlerConfig = unknown> {
 
 Use `setup()` to allocate shared state and return lifecycle hooks. Return a
 hooks object or `undefined`; `null`, arrays, and non-function hook fields are
-rejected before lifecycle hooks run. Unknown hook names are rejected so typos
-such as `buildstart` fail before they can be silently ignored.
+rejected before lifecycle hooks run. Unknown hook keys are ignored for
+compatibility with 0.1 plugins that attach package-local metadata to the
+returned object.
 
 ## Lifecycle
 
@@ -124,10 +131,10 @@ flowchart LR
 
 | Hook | Purpose |
 |------|---------|
-| `buildStart(ctx)` | Build setup before framework analysis |
+| `buildStart(ctx)` | Build setup before framework analysis; 0.1-style `buildStart()` is still supported |
 | `bundlerConfig(config, ctx)` | Mutate selected bundler config |
 | `buildOutput(output, ctx)` | Add deployment/runtime metadata to the single framework output |
-| `transformHtml(doc, ctx)` | Mutate one HTML document at a time |
+| `transformHtml(doc, ctx)` | Mutate one HTML document at a time; 0.1-style `transformHtml(doc, result)` still receives manifest result fields |
 | `buildEnd({ output, isRebuild })` | Emit final artifacts after build |
 | `dispose(ctx)` | Cleanup |
 
@@ -192,7 +199,10 @@ fields plus document-specific fields such as `ctx.kind`, `ctx.fileName`, and
 
 ## Bundler Config
 
-Use adapter helpers for type-safe low-level changes. For Utoopack:
+`Plugin` defaults to the Utoopack config type, matching the default bundler.
+Use adapter helpers for type-safe low-level changes.
+
+For Utoopack:
 
 ```ts
 import { merge, utoopack } from "@evjs/bundler-utoopack";
@@ -215,6 +225,34 @@ export function yamlPlugin() {
     },
   };
 }
+```
+
+For webpack projects, switch the config generic and use the webpack adapter
+helper:
+
+```ts
+import { defineConfig } from "@evjs/ev";
+import { webpack, webpackAdapter, type WebpackConfig } from "@evjs/bundler-webpack";
+
+export default defineConfig<WebpackConfig>({
+  bundler: webpackAdapter,
+  plugins: [
+    {
+      name: "webpack-alias",
+      setup() {
+        return {
+          bundlerConfig: webpack((configs) => {
+            for (const cfg of configs) {
+              cfg.resolve ??= {};
+              cfg.resolve.alias ??= {};
+              cfg.resolve.alias["@app"] = "./src";
+            }
+          }),
+        };
+      },
+    },
+  ],
+});
 ```
 
 ## Recipes

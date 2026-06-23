@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import type { Config } from "@evjs/ev";
+import type { Config, DefaultBundlerConfig } from "@evjs/ev";
 import { loadConfigFile } from "@evjs/ev/build-tools";
 
 export const CONFIG_FILES = ["ev.config.ts", "ev.config.js", "ev.config.mjs"];
@@ -11,7 +11,7 @@ export const CONFIG_FILES = ["ev.config.ts", "ev.config.js", "ev.config.mjs"];
  * Looks for `ev.config.ts`, `.js`, or `.mjs` in the given directory.
  * Returns undefined if no config file is found.
  */
-export async function loadConfig<TBundlerCfg = unknown>(
+export async function loadConfig<TBundlerCfg = DefaultBundlerConfig>(
   cwd: string,
 ): Promise<Config<TBundlerCfg> | undefined> {
   const configPath = resolveConfigPath(cwd);

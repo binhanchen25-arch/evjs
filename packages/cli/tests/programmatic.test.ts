@@ -40,4 +40,29 @@ describe("programmatic API", () => {
 
     expect(events).toEqual([`build:${cwd}:main`]);
   });
+
+  it("supports explicit non-default bundler config types", async () => {
+    const cwd = await createProject();
+    type CustomBundlerConfig = { customFlag: boolean };
+    const events: string[] = [];
+    const bundler: BundlerAdapter<CustomBundlerConfig> = {
+      name: "custom",
+      async build({ config }) {
+        events.push(String(config.bundler?.name));
+        return {
+          clientEntryAssets: {
+            main: { js: ["main.js"], css: [] },
+          },
+          firstClientEntryAssets: { js: ["main.js"], css: [] },
+        };
+      },
+      async dev() {
+        events.push("dev");
+      },
+    };
+
+    await build<CustomBundlerConfig>({ server: false }, { cwd, bundler });
+
+    expect(events).toEqual(["custom"]);
+  });
 });

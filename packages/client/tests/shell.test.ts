@@ -6,8 +6,6 @@ import {
   createPageDriver,
   createShell,
   type HistoryDriverOptions,
-  loadSharedDependency,
-  registerSharedDependency,
   registerShellModule,
 } from "../src/internal";
 
@@ -78,7 +76,6 @@ const manifest: BuildOutput = {
 
 afterEach(() => {
   delete globalThis.__EVJS_SHELL_MODULES__;
-  delete globalThis.__EVJS_SHARED_SCOPE__;
   vi.unstubAllGlobals();
 });
 
@@ -306,105 +303,11 @@ describe("createShell", () => {
     ).toThrow(
       "[evjs] createShell() resolveMountPoint must be a function when provided.",
     );
-    expect(() => createShell({ manifest, shared: [] as never })).toThrow(
-      "[evjs] createShell() shared must be an object.",
-    );
-    expect(() =>
-      createShell({ manifest, shared: { "": {} } as never }),
-    ).toThrow("[evjs] createShell() shared must not contain empty keys.");
-    expect(() =>
-      createShell({ manifest, shared: { " react": {} } as never }),
-    ).toThrow(
-      '[evjs] createShell() shared key " react" must not contain leading or trailing whitespace.',
-    );
-    expect(() =>
-      createShell({ manifest, shared: { react: "react" } as never }),
-    ).toThrow(
-      "[evjs] createShell() shared.react must be a shared dependency object.",
-    );
-    expect(() =>
-      createShell({
-        manifest,
-        shared: { react: { version: "" } },
-      }),
-    ).toThrow(
-      "[evjs] createShell() shared.react.version must be a non-empty string when provided.",
-    );
-    expect(() =>
-      createShell({
-        manifest,
-        shared: { react: { singleton: "yes" } } as never,
-      }),
-    ).toThrow(
-      "[evjs] createShell() shared.react.singleton must be a boolean when provided.",
-    );
-    expect(() =>
-      createShell({
-        manifest,
-        shared: { react: { get: "load" } } as never,
-      }),
-    ).toThrow(
-      "[evjs] createShell() shared.react.get must be a function when provided.",
-    );
     expect(() => createShell({ manifest, onError: "handle" as never })).toThrow(
       "[evjs] createShell() onError must be a function when provided.",
     );
     expect(() => createShell({ manifest, onWarning: "warn" as never })).toThrow(
       "[evjs] createShell() onWarning must be a function when provided.",
-    );
-  });
-
-  it("rejects invalid global shared dependency registrations", async () => {
-    expect(() => registerSharedDependency("" as never, { value: {} })).toThrow(
-      "[evjs] registerSharedDependency() name must be a non-empty string.",
-    );
-    expect(() =>
-      registerSharedDependency(" react" as never, { value: {} }),
-    ).toThrow(
-      "[evjs] registerSharedDependency() name must not contain leading or trailing whitespace.",
-    );
-    expect(() => registerSharedDependency("react", "react" as never)).toThrow(
-      "[evjs] registerSharedDependency() entry must be a shared dependency object.",
-    );
-    expect(() => registerSharedDependency("react", { version: "" })).toThrow(
-      "[evjs] registerSharedDependency() entry.version must be a non-empty string when provided.",
-    );
-    expect(() =>
-      registerSharedDependency("react", { singleton: "yes" } as never),
-    ).toThrow(
-      "[evjs] registerSharedDependency() entry.singleton must be a boolean when provided.",
-    );
-    expect(() =>
-      registerSharedDependency("react", { get: "load" } as never),
-    ).toThrow(
-      "[evjs] registerSharedDependency() entry.get must be a function when provided.",
-    );
-
-    await expect(loadSharedDependency("" as never)).rejects.toThrow(
-      "[evjs] loadSharedDependency() name must be a non-empty string.",
-    );
-    await expect(loadSharedDependency(" react" as never)).rejects.toThrow(
-      "[evjs] loadSharedDependency() name must not contain leading or trailing whitespace.",
-    );
-  });
-
-  it("rejects malformed global shared scope before shell negotiation", async () => {
-    globalThis.__EVJS_SHARED_SCOPE__ = {
-      react: {
-        get: "load",
-      },
-    } as never;
-
-    expect(() =>
-      createShell({
-        manifest,
-        resolveMountPoint: () => ({}) as Element,
-      }),
-    ).toThrow(
-      "[evjs] global shared scope.react.get must be a function when provided.",
-    );
-    await expect(loadSharedDependency("react")).rejects.toThrow(
-      "[evjs] global shared scope.react.get must be a function when provided.",
     );
   });
 

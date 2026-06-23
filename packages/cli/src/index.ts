@@ -43,25 +43,33 @@ export type DefaultBundlerConfig =
 
 const defaultBundler: BundlerAdapter<DefaultBundlerConfig> = utoopackAdapter;
 
-export async function dev(
-  userConfig?: Config<DefaultBundlerConfig>,
-  options?: DevOptions<DefaultBundlerConfig>,
+export async function dev<TBundlerCfg = DefaultBundlerConfig>(
+  userConfig?: Config<TBundlerCfg>,
+  options?: DevOptions<TBundlerCfg>,
 ): Promise<void> {
   const { loadConfig } = await import("./load-config.js");
-  const defaultLoadConfig = loadConfig<DefaultBundlerConfig>;
-  await frameworkDev(userConfig, {
+  const defaultLoadConfig = loadConfig<TBundlerCfg>;
+  const bundler =
+    options?.bundler ??
+    userConfig?.bundler ??
+    (defaultBundler as unknown as BundlerAdapter<TBundlerCfg>);
+  await frameworkDev<TBundlerCfg>(userConfig, {
     ...options,
-    bundler: options?.bundler ?? userConfig?.bundler ?? defaultBundler,
+    bundler,
     loadConfig: options?.loadConfig ?? defaultLoadConfig,
   });
 }
 
-export async function build(
-  userConfig?: Config<DefaultBundlerConfig>,
-  options?: BuildOptions<DefaultBundlerConfig>,
+export async function build<TBundlerCfg = DefaultBundlerConfig>(
+  userConfig?: Config<TBundlerCfg>,
+  options?: BuildOptions<TBundlerCfg>,
 ): Promise<void> {
-  await frameworkBuild(userConfig, {
+  const bundler =
+    options?.bundler ??
+    userConfig?.bundler ??
+    (defaultBundler as unknown as BundlerAdapter<TBundlerCfg>);
+  await frameworkBuild<TBundlerCfg>(userConfig, {
     ...options,
-    bundler: options?.bundler ?? userConfig?.bundler ?? defaultBundler,
+    bundler,
   });
 }

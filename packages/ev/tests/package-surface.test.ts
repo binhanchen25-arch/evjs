@@ -124,6 +124,7 @@ const allowedDocumentationImportPackages = new Set([
   "@evjs/ev",
   "@evjs/server",
   "@evjs/bundler-utoopack",
+  "@evjs/bundler-webpack",
 ]);
 
 const allowedSampleBundlerDependencies = {
@@ -137,11 +138,8 @@ const allowedSampleBundlerDependencies = {
   ],
 } as const satisfies Record<string, readonly string[]>;
 
-const forbiddenCoreBundlerPackages = [
-  "@utoo/pack",
-  "webpack",
-  "webpack-dev-server",
-] as const;
+const defaultBundlerTypePackage = "@utoo/pack";
+const forbiddenCoreBundlerPackages = ["webpack", "webpack-dev-server"] as const;
 
 const generatedFrameworkArtifacts = [
   ".evjs",
@@ -340,10 +338,16 @@ describe("workspace package surface", () => {
     }
   });
 
-  it("keeps @evjs/ev independent from concrete bundler packages", async () => {
+  it("keeps @evjs/ev tied only to the default Utoopack type package", async () => {
     const evPackageJson = await readPackageJson("ev");
     const declaredDependencies = allDependencyNames(evPackageJson);
     const violations: string[] = [];
+
+    if (evPackageJson.dependencies?.[defaultBundlerTypePackage] === undefined) {
+      violations.push(
+        `packages/ev/package.json does not declare ${defaultBundlerTypePackage}`,
+      );
+    }
 
     for (const packageName of forbiddenCoreBundlerPackages) {
       if (declaredDependencies.has(packageName)) {

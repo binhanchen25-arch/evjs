@@ -7,14 +7,12 @@ import { assertFrameworkManifestShape } from "@evjs/shared/manifest";
 import { isRecord } from "../validation.js";
 import { defaultLoadModule } from "./assets.js";
 import { assertAppModule } from "./module-registration.js";
-import { assertSharedScope, createShellSharedScope } from "./shared.js";
 import { resolveTarget } from "./targets.js";
 import type {
   ActivationRequest,
   AppContext,
   AppModule,
   ResolvedShellTarget,
-  SharedScope,
   Shell,
   ShellErrorContext,
   ShellOptions,
@@ -41,7 +39,6 @@ export function createShell(options: ShellOptions): Shell {
   const moduleCache = new Map<string, Promise<AppModule>>();
   const moduleInitCache = new Map<string, Promise<void>>();
   const driverDisposers: Array<() => void> = [];
-  const sharedScope = createShellSharedScope(options.shared);
   let active: ActiveModule | undefined;
   let activationQueue: Promise<void> = Promise.resolve();
   let disposed = false;
@@ -163,14 +160,7 @@ export function createShell(options: ShellOptions): Shell {
       moduleCache.set(href, promise);
     }
     const module = await promise;
-    await initializeModule(
-      href,
-      module,
-      ctx,
-      moduleInitCache,
-      options.onError,
-      sharedScope,
-    );
+    await initializeModule(href, module, ctx, moduleInitCache, options.onError);
     return module;
   }
 
@@ -341,8 +331,6 @@ function assertShellOptions(options: unknown): asserts options is ShellOptions {
   assertOptionalFunction(options.resolveMountPoint, "resolveMountPoint");
   assertOptionalFunction(options.onError, "onError");
   assertOptionalFunction(options.onWarning, "onWarning");
-
-  assertSharedScope(options.shared, "[evjs] createShell() shared");
 }
 
 function assertActivationRequest(
@@ -532,7 +520,6 @@ async function initializeModule(
   ctx: AppContext,
   moduleInitCache: Map<string, Promise<void>>,
   onError: ShellOptions["onError"],
-  sharedScope: SharedScope,
 ): Promise<void> {
   if (!module.init) return;
 
@@ -542,7 +529,7 @@ async function initializeModule(
       "init",
       ctx,
       async () => {
-        await module.init?.(sharedScope, ctx);
+        await module.init?.(ctx);
       },
       onError,
     ).catch((error) => {

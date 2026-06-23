@@ -27,10 +27,10 @@ import type { Plugin } from "./plugin.js";
 /**
  * Default bundler config shape used by framework-core APIs.
  *
- * Adapter packages can provide a narrower generic or helper wrapper for their
- * concrete config type without making `@evjs/ev` depend on that bundler.
+ * Utoopack is the default bundler path. Projects that switch bundlers can pass
+ * a narrower generic or use the typed helper exported by that adapter.
  */
-export type DefaultBundlerConfig = Record<string, unknown>;
+export type DefaultBundlerConfig = import("@utoo/pack").ConfigComplete;
 
 export type {
   BuildResult,
@@ -437,14 +437,6 @@ const PUBLIC_DEV_PROXY_RULE_KEYS = new Set([
   "changeOrigin",
   "secure",
 ]);
-const PUBLIC_PLUGIN_CONFIG_KEYS = new Set([
-  "name",
-  "dependencies",
-  "optionalDependencies",
-  "enforce",
-  "config",
-  "setup",
-]);
 const PUBLIC_BUNDLER_CONFIG_KEYS = new Set(["name", "build", "dev"]);
 
 function toProxyContext(endpoint: string): string {
@@ -655,7 +647,6 @@ function resolvePluginConfig<TBundlerCfg = DefaultBundlerConfig>(
     config: rawConfig,
     setup: rawSetup,
   } = pluginConfig;
-  validatePluginConfigKeys(pluginConfig, path);
 
   if (rawConfig !== undefined) {
     assertFunction<NonNullable<Plugin<TBundlerCfg>["config"]>>(
@@ -741,18 +732,6 @@ function assertBundlerAdapter<TBundlerCfg = DefaultBundlerConfig>(
   assertFunction<BundlerAdapter<TBundlerCfg>["dev"]>(
     bundlerConfig.dev,
     `${path}.dev`,
-  );
-}
-
-function validatePluginConfigKeys(
-  plugin: Record<string, unknown>,
-  path: string,
-): void {
-  assertKnownConfigKeys(
-    plugin,
-    PUBLIC_PLUGIN_CONFIG_KEYS,
-    path,
-    "name, dependencies, optionalDependencies, enforce, config, or setup",
   );
 }
 

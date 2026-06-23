@@ -95,12 +95,6 @@ export {
   isReservedServerRouteParamName,
   serverRoutePathShapeFromPath,
 } from "./server-route-data.js";
-export type { SharedVersionRangeValidationError } from "./shared-version-range.js";
-export {
-  getSharedVersionRangeValidationError,
-  isSharedVersionRange,
-  SHARED_VERSION_RANGE_DESCRIPTION,
-} from "./shared-version-range.js";
 export type {
   AbsoluteHttpUrlValidationError,
   HttpUrlOrAbsolutePathnameValidationError,

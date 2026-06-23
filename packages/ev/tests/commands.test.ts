@@ -7,10 +7,11 @@ import { describe, expect, it } from "vitest";
 import { PAGE_ROUTE_CONVENTION_SUMMARY } from "../src/build-tools/page-route-conventions.js";
 import type { BundlerAdapter } from "../src/bundler.js";
 import {
-  type BuildResult,
   build,
   type Config,
   dev,
+  type EvBuildResult,
+  type EvPlugin,
   type HtmlDocument,
   type Plugin,
   prepareFrameworkBuild,
@@ -443,18 +444,18 @@ describe("build", () => {
     const cwd = await createProject();
     const events: string[] = [];
     const bundler = createMockBundler(events);
-    const plugin: Plugin<Record<string, never>> = {
+    const plugin: EvPlugin<Record<string, never>> = {
       name: "manifest-result",
       setup() {
         return {
           buildStart() {
             events.push("manifest:buildStart");
           },
-          transformHtml(doc: HtmlDocument, result: BuildResult) {
+          transformHtml(doc: HtmlDocument, result: EvBuildResult) {
             events.push(`manifest:html:${result.clientManifest.assets.js[0]}`);
             doc.head?.appendChild(doc.createComment(" manifest html "));
           },
-          buildEnd(result: BuildResult) {
+          buildEnd(result: EvBuildResult) {
             events.push(
               `manifest:buildEnd:${result.clientManifest.assets.js[0]}:${result.serverManifest?.entry ?? "none"}`,
             );
@@ -1350,7 +1351,7 @@ describe("build", () => {
     const events: string[] = [];
     const bundler = createMockBundler(events);
 
-    const plugin: Plugin<Record<string, never>> = {
+    const plugin: EvPlugin<Record<string, never>> = {
       name: "sets-server-base-path",
       config(config, ctx) {
         events.push(`config:${ctx.mode}`);
@@ -1502,7 +1503,7 @@ describe("build", () => {
     expect(events).toEqual(["setup"]);
   });
 
-  it("rejects unknown lifecycle hooks returned from plugin setup", async () => {
+  it("ignores unknown lifecycle hook keys for 0.1 plugin compatibility", async () => {
     const cwd = await createProject();
     const events: string[] = [];
     const bundler = createMockBundler(events);
@@ -1513,22 +1514,26 @@ describe("build", () => {
         events.push("setup");
         return {
           buildstart() {},
+          buildStart() {
+            events.push("buildStart");
+          },
         } as never;
       },
     };
 
-    await expect(
-      build(
-        { server: false, plugins: [plugin] },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      '[evjs] Plugin "typo-lifecycle-hook" setup hook returned unknown hook "buildstart". Supported hooks: buildStart, buildOutput, bundlerConfig, buildEnd, dispose, transformHtml.',
+    await build(
+      { server: false, plugins: [plugin] },
+      {
+        cwd,
+        bundler,
+      },
     );
-    expect(events).toEqual(["setup"]);
+    expect(events).toEqual([
+      "setup",
+      "buildStart",
+      "bundler.build",
+      "bundler.entries:main",
+    ]);
   });
 
   it("fails on missing app html templates before running the bundler", async () => {

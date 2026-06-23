@@ -4,16 +4,9 @@ import {
   assertShellModuleHref,
   assertShellModuleRegistration,
 } from "./module-registration.js";
-import {
-  assertSharedDependencyName,
-  assertSharedScope,
-  assertSharedScopeEntry,
-} from "./shared-scope.js";
 import type {
   AppContext,
   AppModule,
-  SharedScope,
-  SharedScopeEntry,
   ShellModuleRegistration,
 } from "./types.js";
 
@@ -21,7 +14,6 @@ declare global {
   var __EVJS_SHELL_MODULES__:
     | Record<string, ShellModuleRegistration>
     | undefined;
-  var __EVJS_SHARED_SCOPE__: SharedScope | undefined;
 }
 
 export function registerShellModule(
@@ -31,28 +23,6 @@ export function registerShellModule(
   assertShellModuleHref(href, "[evjs] registerShellModule() href");
   assertShellModuleRegistration(module, "[evjs] registerShellModule() module");
   getShellModuleRegistry()[href] = module;
-}
-
-export function registerSharedDependency(
-  name: string,
-  entry: SharedScopeEntry,
-): void {
-  assertSharedDependencyName(name, "[evjs] registerSharedDependency() name");
-  assertSharedScopeEntry(entry, "[evjs] registerSharedDependency() entry");
-  const scope = getSharedScope();
-  assertSharedScope(scope, "[evjs] global shared scope");
-  scope[name] = entry;
-}
-
-export async function loadSharedDependency(name: string): Promise<unknown> {
-  assertSharedDependencyName(name, "[evjs] loadSharedDependency() name");
-  const scope = getSharedScope();
-  assertSharedScope(scope, "[evjs] global shared scope");
-  const entry = scope[name];
-  if (!entry) {
-    throw new Error(`[evjs] Shared dependency "${name}" is not registered.`);
-  }
-  return entry.get ? entry.get() : entry.value;
 }
 
 export function getShellModuleRegistry(): Record<
@@ -65,15 +35,6 @@ export function getShellModuleRegistry(): Record<
     globalThis.__EVJS_SHELL_MODULES__ = registry;
   }
   return registry;
-}
-
-export function getSharedScope(): SharedScope {
-  let scope = globalThis.__EVJS_SHARED_SCOPE__;
-  if (!scope) {
-    scope = {};
-    globalThis.__EVJS_SHARED_SCOPE__ = scope;
-  }
-  return scope;
 }
 
 export async function readRegisteredModule(

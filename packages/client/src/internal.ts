@@ -34,8 +34,6 @@ export type {
   HistoryDriverOptions,
   PageDriver,
   PageDriverOptions,
-  SharedScope,
-  SharedScopeEntry,
   Shell,
   ShellDriver,
   ShellErrorContext,
@@ -48,8 +46,6 @@ export {
   createHistoryDriver,
   createPageDriver,
   createShell,
-  loadSharedDependency,
-  registerSharedDependency,
   registerShellModule,
 } from "./shell.js";
 export {

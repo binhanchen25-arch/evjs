@@ -28,7 +28,8 @@ export default defineConfig({
 | `server.basePath` | `/__evjs` |
 | server function endpoint | `${server.basePath}/fn` |
 
-The server function endpoint is derived from `server.basePath`; there is no separate public function-endpoint config.
+The server function endpoint is derived from `server.basePath`; there is no
+separate public function-endpoint config.
 
 The top-level config object accepts only `entry`, `html`, `output`, `dev`,
 `server`, `transport`, `app`, `routing`, `bundler`, `plugins`, and

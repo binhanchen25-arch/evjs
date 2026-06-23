@@ -1,7 +1,7 @@
 import type { AppOutput, BuildOutput, PageOutput } from "@evjs/shared/manifest";
 
 export interface AppModule {
-  init?: (sharedScope: SharedScope, ctx: AppContext) => void | Promise<void>;
+  init?: (ctx: AppContext) => void | Promise<void>;
   mount?: (mountPoint: Element, ctx: AppContext) => void | Promise<void>;
   hydrate?: (mountPoint: Element, ctx: AppContext) => void | Promise<void>;
   unmount?: (mountPoint: Element, ctx: AppContext) => void | Promise<void>;
@@ -33,7 +33,6 @@ export interface ShellOptions {
   drivers?: ShellDriver[];
   loadModule?: (href: string, ctx: AppContext) => Promise<AppModule>;
   resolveMountPoint?: (ctx: AppContext) => Element | null;
-  shared?: SharedScope;
   onError?: (error: unknown, ctx: ShellErrorContext) => void | Promise<void>;
   onWarning?: (warning: ShellWarningContext) => void | Promise<void>;
 }
@@ -44,18 +43,6 @@ export interface ShellErrorContext {
 }
 
 export type ShellWarningContext = never;
-
-export type SharedScope = Record<string, SharedScopeEntry>;
-
-export interface SharedScopeEntry {
-  version?: string;
-  singleton?: boolean;
-  eager?: boolean;
-  loaded?: boolean;
-  from?: string;
-  value?: unknown;
-  get?: () => unknown | Promise<unknown>;
-}
 
 export interface Shell {
   start(request?: ActivationRequest): Promise<void>;

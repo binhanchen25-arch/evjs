@@ -50,7 +50,7 @@ There is no longer a public `@evjs/build-tools` or `@evjs/manifest` workspace pa
 | `Link`, page hooks, page metadata exports | `@evjs/client` / page modules | Public page authoring API for params, search, loader data, navigation, and render metadata |
 | React page runtime | `@evjs/client/internal/react-page` | Framework-managed component page mount/hydration |
 | Server-function stubs | `@evjs/client/internal` | Generated client references and internal transport dispatch |
-| Shell runtime | `@evjs/client/internal` | Manifest-driven app/page activation and shared scope registration |
+| Shell runtime | `@evjs/client/internal` | Manifest-driven app/page activation and generated module registration |
 | RSC client runtime | `@evjs/client` | React Flight client integration |
 | `createApp({ routes, middlewares })` | `@evjs/server` | Server functions, REST routes, SSR/PPR/RSC framework requests |
 | `createReactFrameworkServer()` | `@evjs/server/react` | React SSR/RSC framework server integration |

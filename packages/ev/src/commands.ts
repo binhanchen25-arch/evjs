@@ -77,7 +77,6 @@ const PLUGIN_HOOK_NAMES = [
   "dispose",
   "transformHtml",
 ] as const satisfies readonly (keyof PluginHooks)[];
-const PLUGIN_HOOK_NAME_SET: ReadonlySet<string> = new Set(PLUGIN_HOOK_NAMES);
 const PAGE_ROUTE_CONVENTION_DOCS_HINT = `${PAGE_ROUTE_CONVENTION_SUMMARY}. See ${PAGE_ROUTE_CONVENTION_DOCS_URL} for the page route file convention.`;
 
 interface DevDistLock {
@@ -619,15 +618,6 @@ function resolvePluginSetupHooks<TBundlerCfg>(
   }
 
   const hookConfig = hooks as Record<string, unknown>;
-  const unknownHookName = Object.keys(hookConfig).find(
-    (hookName) => !PLUGIN_HOOK_NAME_SET.has(hookName),
-  );
-  if (unknownHookName) {
-    throw new Error(
-      `[evjs] Plugin "${pluginName}" setup hook returned unknown hook "${unknownHookName}". Supported hooks: ${PLUGIN_HOOK_NAMES.join(", ")}.`,
-    );
-  }
-
   for (const hookName of PLUGIN_HOOK_NAMES) {
     if (
       hookConfig[hookName] !== undefined &&

@@ -84,13 +84,6 @@ export type HiddenCreateShell = typeof Client.createShell;
 // @ts-expect-error registerShellModule is internal to generated shell bootstrap.
 export type HiddenRegisterShellModule = typeof Client.registerShellModule;
 
-export type HiddenRegisterSharedDependency =
-  // @ts-expect-error registerSharedDependency is internal to generated shell bootstrap.
-  typeof Client.registerSharedDependency;
-
-// @ts-expect-error loadSharedDependency is internal to generated shell bootstrap.
-export type HiddenLoadSharedDependency = typeof Client.loadSharedDependency;
-
 // @ts-expect-error createServerReference is internal to generated server-function stubs.
 export type HiddenCreateServerReference = typeof Client.createServerReference;
 
