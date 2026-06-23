@@ -8,6 +8,34 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.0] — 2026-06-23
+
+### ⚠️ Breaking Changes
+
+- **Graph-driven framework contracts** — Reworked framework build and development around the `AppGraph -> BuildPlan -> BuildOutput` pipeline, with framework semantics owned by `@evjs/ev` build tools and manifest contracts owned by `@evjs/shared/manifest`.
+- **Package surface cleanup** — Removed the legacy public `@evjs/build-tools` and `@evjs/manifest` packages, and kept `@evjs/ev` focused on config, build, plugin, and deployment APIs while runtime APIs live in `@evjs/client` and `@evjs/server`.
+- **Plugin and endpoint contracts** — Removed the old `commandStart` plugin hook and derived server function, PPR, and RSC paths from `server.basePath` instead of exposing a separate public server function endpoint config.
+- **Rendering contracts** — Standardized non-CSR page rendering around generated build manifests; PPR uses `render = "ssr"` plus `prerender = { partial: true }`, and PPR plus RSC on the same page remains unsupported.
+
+### ✨ Highlights
+
+- **Graph-driven build pipeline** — Added build graph analysis, build planning, linked framework output, dev-time plan updates, and `ev inspect` for preflight diagnostics.
+- **Framework page routes and render modes** — Added strict `src/pages` discovery, pathless route groups, layout source modules, generated route types, SSR, SSG, experimental PPR, and RSC integration.
+- **Deployment output** — Added `nodeDeploymentAdapter()` and deployment metadata for production Node servers that mount framework endpoints, SSR/PPR/RSC document routes, server functions, server routes, and static assets.
+- **Webpack validation adapter** — Added `@evjs/bundler-webpack` as the validation/fallback adapter for dynamic entries, server output, SSR, PPR, RSC, and framework build contracts that still need lower-level Utoopack parity.
+- **Cross-origin asset loading** — Added `output.crossOriginLoading` to apply `crossorigin` attributes to emitted HTML assets and dynamic chunk loading in Utoopack and webpack builds.
+- **PPR authoring model** — Aligned experimental PPR with React `Suspense`, switched PPR region IDs to opaque internal identifiers, and added diagnostics for unsupported Suspense boundaries until runtime postponed/resume support lands.
+
+### 🧪 Testing
+
+- **Architecture coverage** — Added broad graph, plan, manifest, page-route, server-rendering, RSC, shell runtime, deployment, and bundler adapter tests, plus render-mode and deployment-adapter E2E coverage.
+
+### 📝 Documentation
+
+- **0.2 architecture refresh** — Updated English and Chinese docs, examples, agent guidance, and contributor docs for the graph-driven architecture, page-route conventions, render modes, deployment model, plugin lifecycle, and package boundaries.
+
+---
+
 ## [0.1.11] — 2026-05-26
 
 ### ✨ Improvements
