@@ -700,7 +700,7 @@ describe("workspace package surface", () => {
           }
           if (
             importSpecifier.startsWith("@evjs/client/internal") &&
-            !relativeFile.endsWith("src/route-types.d.ts")
+            !relativeFile.endsWith("route-types.d.ts")
           ) {
             violations.push(
               `${relativeFile} imports generated-only ${importSpecifier}`,

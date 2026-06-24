@@ -24,19 +24,6 @@ command exits non-zero; warnings are printed without failing the command.
 
 ## Output
 
-Fullstack output:
-
-```txt
-dist/
-├── client/
-│   ├── index.html
-│   ├── main.[hash].js
-│   └── [chunk].[hash].js
-├── server/
-│   └── server.[hash].js
-└── manifest.json
-```
-
 CSR-only output (`server: false`) is flat:
 
 ```txt
@@ -47,12 +34,33 @@ dist/
 └── manifest.json
 ```
 
-`dist/manifest.json` is the framework contract consumed by runtime, server,
-shell, and deployment adapters. HTML may embed this manifest as
-`__EVJS_MANIFEST__`; when the browser runtime fetches it through `manifestUrl`,
-`data-evjs-manifest`, or `/manifest.json`, the response must be successful JSON
-with `Content-Type: application/json`, allowing optional content-type
-parameters.
+Server-enabled output uses separate manifests:
+
+```txt
+dist/
+├── client/
+│   ├── index.html
+│   ├── main.[hash].js
+│   └── manifest.json
+├── server/
+│   ├── main.[hash].js
+│   └── manifest.json
+└── build-output.json
+```
+
+`dist/build-output.json` is the complete private `BuildOutput` handoff artifact
+for tools that need the full framework model after build. `dist/client/manifest.json`
+and `dist/server/manifest.json` are deterministic views derived from it: the
+client manifest is browser-safe public metadata, while the server manifest
+contains server bundle metadata (`entry`, `assets`, `fns`, and `routes`).
+Deployment adapters can consume `BuildOutput` during the build and embed the
+equivalent runtime data into platform files, so a deployed server package does
+not have to read `dist/build-output.json` at startup. CSR-only output stays flat
+and writes the public manifest to `dist/manifest.json`. HTML may embed the
+public manifest as `__EVJS_MANIFEST__`; when the browser runtime fetches it
+through `manifestUrl`, `data-evjs-manifest`, or `/manifest.json`, the response
+must be successful JSON with
+`Content-Type: application/json`, allowing optional content-type parameters.
 
 ## Build Pipeline
 
@@ -62,7 +70,7 @@ parameters.
 4. `createBuildPlan()` produces concrete client/server entries and HTML documents.
 5. The selected bundler compiles `BuildPlan.entries`.
 6. `linkBuildOutput()` combines `AppGraph`, `BuildPlan`, and bundler facts.
-7. evjs emits `dist/manifest.json`.
+7. evjs emits framework manifests.
 8. evjs generates each planned HTML document and calls `transformHtml(doc, ctx)`.
 9. evjs calls `buildEnd({ output, isRebuild })`.
 
@@ -176,8 +184,12 @@ Internal PPR regions carry cache metadata in the manifest:
 
 ## Key Points
 
-- One framework manifest: `dist/manifest.json`.
-- `BuildOutput` is the framework manifest contract.
+- Server-enabled builds emit `dist/client/manifest.json`,
+  `dist/server/manifest.json`, and `dist/build-output.json`; CSR-only
+  builds emit `dist/manifest.json`.
+- `dist/build-output.json` is the complete private `BuildOutput` handoff for
+  post-build tools and debugging; runtime deployments may embed equivalent data
+  instead of reading that file at startup.
 - Manifest object keys that become runtime ids, including app ids, page ids,
   and opaque internal PPR region ids, must be build identifiers: letters,
   numbers, underscores, or hyphens.
@@ -188,13 +200,13 @@ Internal PPR regions carry cache metadata in the manifest:
   handler.
 - Build entry names are manifest asset keys. They must be build identifiers and
   must be globally unique across app, page, runtime, and server entries.
-- `manifest.server.renderers` keys are renderer build entry names and must use
+- `BuildOutput.server.renderers` keys are renderer build entry names and must use
   the same build-identifier rule.
-- In full server manifests, each SSR, SSG, or RSC document page with server
+- In full BuildOutput manifests, each SSR, SSG, or RSC document page with server
   HTML must have a `page-server` renderer owned by that page id, or by a route
-  id whose `manifest.routes` entry points to that page. PPR pages use their
+  id whose `BuildOutput.routes` entry points to that page. PPR pages use their
   `ppr-shell` and `ppr-region` renderer references instead.
-- `manifest.routes` ids must be unique non-empty strings without leading or
+- `BuildOutput.routes` ids must be unique non-empty strings without leading or
   trailing whitespace. Page route paths must keep one entry per normalized URL
   path and dynamic URL shape; `pageId` and `appId` must point to existing
   manifest pages or apps.
@@ -206,7 +218,7 @@ Internal PPR regions carry cache metadata in the manifest:
   reference metadata. It is required as soon as `BuildOutput.rsc.pages` contains
   Flight-rendered pages; manifest emission fails before writing an RSC page
   output that has no `runtime.server.rsc` endpoint.
-- In full server manifests, each `BuildOutput.rsc.pages[id].renderer` must point
+- In full BuildOutput manifests, each `BuildOutput.rsc.pages[id].renderer` must point
   to an `rsc-page` server renderer owned by the same page id. Public manifests
   may omit server renderer metadata because it is redacted.
 - `BuildOutput.server.routes` must keep one entry per URL path and dynamic URL

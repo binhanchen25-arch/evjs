@@ -368,24 +368,35 @@ export function createExampleTest(exampleName: string) {
         // Build with specified bundler (fullstack = server enabled)
         await buildExample(exampleDir, bundlerName, true);
 
-        // Read the public manifest for client routing and the internal build
-        // output for server bootstrap metadata. The public manifest is
-        // browser-safe and intentionally does not expose server entry files.
-        const manifestPath = path.join(exampleDir, "dist", "manifest.json");
+        // Read the public manifest for client routing, the server manifest for
+        // the bundle entry, and the full BuildOutput for framework bootstrap.
+        // The public manifest is browser-safe and intentionally does not
+        // expose server entry files.
+        const manifestPath = path.join(
+          exampleDir,
+          "dist",
+          "client",
+          "manifest.json",
+        );
         const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-        const buildOutputPath = path.join(
+        const serverManifestPath = path.join(
           exampleDir,
           "dist",
           "server",
-          "build-output.json",
+          "manifest.json",
         );
-        const buildOutput = JSON.parse(
-          fs.readFileSync(buildOutputPath, "utf-8"),
+        const serverManifest = JSON.parse(
+          fs.readFileSync(serverManifestPath, "utf-8"),
         );
-        const serverEntry = buildOutput.server?.entry;
+        const serverEntry = serverManifest.entry;
         if (!serverEntry) {
           throw new Error("Built example did not emit a server entry.");
         }
+        const buildOutputPath = path.join(
+          exampleDir,
+          "dist",
+          "build-output.json",
+        );
         const serverEntryPath = path.join(
           exampleDir,
           "dist",

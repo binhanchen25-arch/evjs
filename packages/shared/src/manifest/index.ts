@@ -3,7 +3,11 @@
  *
  * Shared manifest schemas for the ev framework build system.
  *
- * Bundler adapters emit one framework manifest to `dist/manifest.json`.
+ * Bundler adapters emit framework manifests under the configured dist
+ * directory. Server-enabled builds write the public client manifest to
+ * `dist/client/manifest.json`, the derived server bundle manifest to
+ * `dist/server/manifest.json`, and the full private BuildOutput handoff to
+ * `dist/build-output.json`; CSR-only builds write `dist/manifest.json`.
  */
 
 import {
@@ -145,7 +149,7 @@ export type PrerenderConfig =
 export type HydrationMode = "none" | "load" | "visible" | "idle";
 export type BuildEnvironment = "client" | "server";
 export type ServerRuntime = "node" | "edge";
-export type PublicPathOutput = string | { mode: "runtime" };
+export type PublicPathOutput = string;
 
 /**
  * Internal build-unit arrangement derived from ResolvedConfig + AppGraph.
@@ -763,19 +767,7 @@ function assertManifestBuildId(value: unknown, source: string): void {
 }
 
 function assertPublicPathOutput(value: unknown, source: string): void {
-  if (typeof value === "string") {
-    assertManifestString(value, source);
-    return;
-  }
-
-  if (!isRecord(value)) {
-    throw new Error(
-      `[evjs] ${source} must be a non-empty string or { mode: "runtime" }.`,
-    );
-  }
-  if (value.mode !== "runtime") {
-    throw new Error(`[evjs] ${source}.mode must be "runtime".`);
-  }
+  assertManifestString(value, source);
 }
 
 function assertBuildOutputPaths(value: unknown, source: string): void {
@@ -1893,7 +1885,11 @@ export {
   type BuildOutputLinkInput,
   type BuildOutputServerModule,
   createPublicManifest,
+  createServerManifest,
   linkBuildOutput,
+  type ServerManifestFnOutput,
+  type ServerManifestOutput,
+  type ServerManifestRouteOutput,
 } from "./linker.js";
 export {
   type ClientRouteMatch,

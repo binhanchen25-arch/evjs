@@ -35,7 +35,7 @@ describe("createDeploymentArtifact", () => {
       version: 1,
       buildId: "build-1",
       distDir: "dist",
-      publicPath: { mode: "runtime" },
+      publicPath: "auto",
       runtime: {
         server: {
           basePath: "/framework",
@@ -147,7 +147,7 @@ describe("createDeploymentArtifact", () => {
         publicDir: "dist/client",
         serverDir: "dist/server",
       },
-      publicPath: { mode: "runtime" },
+      publicPath: "auto",
       runtime: output.runtime,
       apps: {
         default: {
@@ -273,11 +273,11 @@ describe("createDeploymentArtifact", () => {
       'import { fileURLToPath, pathToFileURL } from "node:url";',
     );
     expect(files.serverModule).toContain(
-      'await readJsonIfExists(path.join(serverDir, "build-output.json"))',
-    );
-    expect(files.serverModule).toContain(
       "globalThis.__EVJS_MANIFEST__ = manifest",
     );
+    expect(files.serverModule).toContain('"buildId": "build-1"');
+    expect(files.serverModule).toContain('"renderers": {}');
+    expect(files.serverModule).not.toContain("readJsonIfExists");
     expect(files.serverModule).toContain(
       "globalThis.__EVJS_SERVER_MODULE_LOADER__",
     );

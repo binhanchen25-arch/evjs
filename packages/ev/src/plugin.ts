@@ -3,6 +3,7 @@ import type {
   BuildEnvironment,
   BuildOutput,
 } from "@evjs/shared/manifest";
+import { createServerManifest } from "@evjs/shared/manifest";
 import type { Logger } from "@logtape/logtape";
 import type { Config, DefaultBundlerConfig, ResolvedConfig } from "./config.js";
 
@@ -155,9 +156,7 @@ export interface ServerManifest {
   routes?: ServerRouteEntry[];
 }
 
-/**
- * Context passed to 0.1-compatible plugin bundler hooks.
- */
+/** Base context passed to plugin bundler hooks. */
 export interface EvBundlerCtx<TBundlerCfg = DefaultBundlerConfig> {
   /** The current mode. */
   mode: "development" | "production";
@@ -184,9 +183,7 @@ export interface BundlerCtx<TBundlerCfg = DefaultBundlerConfig>
   addWatchFile(file: string): void;
 }
 
-/**
- * Context passed to 0.1-compatible plugin config hooks.
- */
+/** Base context passed to plugin config hooks. */
 export interface EvPluginConfigContext {
   /** The current mode. */
   mode: "development" | "production";
@@ -267,9 +264,7 @@ export interface EvPlugin<TBundlerCfg = DefaultBundlerConfig> {
   ) => EvPluginSetupResult<TBundlerCfg>;
 }
 
-/**
- * An evjs 0.2 plugin. The 0.1 `EvPlugin` shape is still accepted.
- */
+/** An evjs plugin. The `EvPlugin` alias shape is accepted. */
 export interface Plugin<TBundlerCfg = DefaultBundlerConfig>
   extends Omit<EvPlugin<TBundlerCfg>, "config" | "setup"> {
   /**
@@ -299,9 +294,7 @@ export interface Plugin<TBundlerCfg = DefaultBundlerConfig>
   setup?: (ctx: PluginContext<TBundlerCfg>) => PluginSetupResult<TBundlerCfg>;
 }
 
-/**
- * Context passed to 0.1-compatible plugin setup().
- */
+/** Base context passed to plugin setup(). */
 export interface EvPluginContext<TBundlerCfg = DefaultBundlerConfig> {
   /** Current mode. */
   mode: "development" | "production";
@@ -333,9 +326,7 @@ export interface BuildOutputContext<TBundlerCfg = DefaultBundlerConfig>
 export interface DisposeContext<TBundlerCfg = DefaultBundlerConfig>
   extends PluginContext<TBundlerCfg> {}
 
-/**
- * Lifecycle hooks returned from 0.1-compatible plugin setup().
- */
+/** Lifecycle hooks returned from plugin setup(). */
 export interface EvPluginHooks<TBundlerCfg = DefaultBundlerConfig> {
   /** Called before compilation begins. */
   buildStart?: () => void | Promise<void>;
@@ -384,10 +375,11 @@ export interface PluginHooks<TBundlerCfg = DefaultBundlerConfig>
 
   /**
    * Inspect or mutate the linked framework build output before it is emitted
-   * as `dist/manifest.json` and before HTML documents are transformed.
+   * as the framework manifest and before HTML documents are transformed.
    *
    * Deployment adapters should use this hook to add deployment metadata to the
-   * single framework output emitted as `dist/manifest.json`.
+   * BuildOutput emitted as `dist/build-output.json` for server-enabled
+   * builds or `dist/manifest.json` for CSR-only builds.
    */
   buildOutput?: (
     output: BuildOutput,
@@ -426,9 +418,7 @@ export interface PluginHooks<TBundlerCfg = DefaultBundlerConfig>
   ) => void | Promise<void>;
 }
 
-/**
- * 0.1-compatible build result passed to plugin hooks.
- */
+/** Build result passed to plugin hooks. */
 export interface EvBuildResult {
   /** Client-focused manifest view derived from `output`. */
   clientManifest: ClientManifest;
@@ -532,29 +522,6 @@ function createClientManifest(output: BuildOutput): ClientManifest {
       : cloneAssets(getAppAssets(output)),
     ...(routes.length > 0 ? { routes } : {}),
     ...(pages ? { pages } : {}),
-  };
-}
-
-function createServerManifest(output: BuildOutput): ServerManifest | undefined {
-  if (!output.server) return undefined;
-
-  const routes = output.server.routes.map((route) => ({
-    path: route.path,
-    methods: [...route.methods],
-    assets: cloneAssets(route.assets),
-  }));
-
-  return {
-    version: 1,
-    ...(output.server.entry ? { entry: output.server.entry } : {}),
-    assets: cloneAssets(output.server.assets),
-    fns: Object.fromEntries(
-      Object.entries(output.server.functions).map(([id, fn]) => [
-        id,
-        { assets: cloneAssets(fn.assets) },
-      ]),
-    ),
-    ...(routes.length > 0 ? { routes } : {}),
   };
 }
 

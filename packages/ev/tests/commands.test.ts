@@ -1237,7 +1237,7 @@ describe("build", () => {
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
   });
 
-  it("emits a public-safe manifest and keeps internal build output server-side", async () => {
+  it("emits split public and server manifests for server-enabled builds", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
     await fs.promises.writeFile(
@@ -1296,19 +1296,60 @@ describe("build", () => {
     );
 
     const publicManifest = fs.readFileSync(
-      path.join(cwd, "dist/manifest.json"),
+      path.join(cwd, "dist/client/manifest.json"),
       "utf-8",
     );
-    const internalOutput = fs.readFileSync(
-      path.join(cwd, "dist/server/build-output.json"),
+    const serverManifest = fs.readFileSync(
+      path.join(cwd, "dist/server/manifest.json"),
       "utf-8",
     );
+    const buildOutput = fs.readFileSync(
+      path.join(cwd, "dist/build-output.json"),
+      "utf-8",
+    );
+    const serverManifestJson = JSON.parse(serverManifest);
+    const buildOutputJson = JSON.parse(buildOutput);
 
     expect(rawOutputComponents).toEqual(["./src/pages/Dashboard.tsx"]);
     expect(publicManifest).not.toContain(".tsx");
     expect(publicManifest).not.toContain("server.js");
-    expect(internalOutput).toContain("./src/pages/Dashboard.tsx");
-    expect(internalOutput).toContain("server.js");
+    expect(serverManifestJson).toEqual({
+      version: 1,
+      entry: "server.js",
+      assets: { js: ["server.js"], css: [] },
+      fns: {},
+    });
+    expect(serverManifestJson.server).toBeUndefined();
+    expect(serverManifest).not.toContain("./src/pages/Dashboard.tsx");
+    expect(buildOutputJson.server?.entry).toBe("server.js");
+    expect(buildOutputJson.server?.renderers).toHaveProperty(
+      "dashboard-server",
+    );
+    expect(buildOutput).toContain("./src/pages/Dashboard.tsx");
+    expect(buildOutput).toContain("server.js");
+    expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, "dist/build-output.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, "dist/server/build-output.json"))).toBe(
+      false,
+    );
+  });
+
+  it("removes stale split client manifests when rebuilding as CSR-only", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    await build({}, { cwd, bundler });
+    expect(fs.existsSync(path.join(cwd, "dist/client/manifest.json"))).toBe(
+      true,
+    );
+
+    await build({ server: false }, { cwd, bundler });
+
+    expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, "dist/client/manifest.json"))).toBe(
+      false,
+    );
   });
 
   it("runs plugin config hooks before resolving config", async () => {
@@ -1468,7 +1509,7 @@ describe("build", () => {
     expect(events).toEqual(["setup"]);
   });
 
-  it("ignores unknown lifecycle hook keys for 0.1 plugin compatibility", async () => {
+  it("ignores unknown lifecycle hook keys", async () => {
     const cwd = await createProject();
     const events: string[] = [];
     const bundler = createMockBundler(events);
