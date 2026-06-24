@@ -8,6 +8,29 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.2] — 2026-06-24
+
+### ✨ Improvements
+
+- **Build output manifests** — Aligned framework output around the root `BuildOutput` manifest while keeping client and server runtime manifests in their respective output directories.
+- **Runtime public path** — Defaulted build plans to `publicPath: "auto"` and passed that through Utoopack and webpack so dynamically loaded chunks can resolve relative to the current script.
+
+### 🐛 Bug Fixes
+
+- **Release dependency versions** — Added release-time internal dependency syncing so published `@evjs/*` workspace packages depend on the concrete release version instead of source-only `"*"` ranges.
+- **Stale manifest cleanup** — Removed stale split manifest files before builds so switching output layouts does not leave obsolete manifest artifacts behind.
+- **Utoopack CSS filenames** — Fixed content-hash CSS output naming for Utoopack builds.
+
+### 🧹 Code Quality
+
+- **Build cache inputs** — Tightened Turbo task inputs so generated artifacts and runtime outputs are excluded from cache keys.
+
+### 📝 Documentation
+
+- **Generated artifact guidance** — Refreshed architecture, build, deploy, config, plugin, and project-structure docs in English and Chinese for the current manifest and generated route type outputs.
+
+---
+
 ## [0.2.1] — 2026-06-23
 
 ### 🐛 Bug Fixes
