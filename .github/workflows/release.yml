@@ -20,7 +20,10 @@ jobs:
         with:
           node-version: 22
           registry-url: "https://registry.npmjs.org"
-          cache: npm
+          package-manager-cache: false
+
+      - name: Setup npm
+        run: npm install -g npm@11.6.2
 
       - name: Install Dependencies
         run: npm install
@@ -36,6 +39,3 @@ jobs:
 
       - name: Publish to npm
         run: npm publish --workspaces --access public
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
