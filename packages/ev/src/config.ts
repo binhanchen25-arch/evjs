@@ -18,6 +18,8 @@ import type {
   PprConfig,
   PrerenderConfig,
   RenderMode,
+  ServerMiddlewareNode,
+  ServerRouteNode,
 } from "@evjs/shared/manifest";
 import { validatePageRenderingContract } from "./build-tools/page-rendering-contract.js";
 import { routePathShapeFromPath } from "./build-tools/page-route-conventions.js";
@@ -96,8 +98,6 @@ export interface ResolvedServerDevConfig {
 
 /** Resolved server configuration (all defaults applied). */
 export interface ResolvedServerConfig {
-  /** Explicit server entry file. Omitted when auto-generated. */
-  entry?: string;
   /** Framework server runtime base path. */
   basePath: string;
   /** Derived framework server runtime paths. */
@@ -106,6 +106,10 @@ export interface ResolvedServerConfig {
   functionRuntime: ResolvedFunctionRuntimeConfig;
   /** RSC Flight endpoint configuration when enabled. */
   rsc?: ResolvedServerRscConfig;
+  /** Framework-managed server file routing declaration, when enabled. */
+  routing?: ResolvedServerRoutingConfig;
+  /** Framework-managed server conventions, when enabled. */
+  conventions?: ResolvedServerConventionsConfig;
   /** Server dev options. */
   dev: ResolvedServerDevConfig;
 }
@@ -142,8 +146,6 @@ export interface ResolvedConfig<TBundlerCfg = DefaultBundlerConfig> {
   apps?: Record<string, ResolvedAppConfig>;
   /** Client dev server options. */
   dev: ResolvedDevConfig;
-  /** Whether the server is enabled (true unless `server: false`). */
-  serverEnabled: boolean;
   /** Server configuration. */
   server: ResolvedServerConfig;
   /** Browser-to-server transport configuration. */
@@ -169,14 +171,8 @@ export interface Config<TBundlerCfg = DefaultBundlerConfig> {
   /** Client dev server options. */
   dev?: DevConfig;
 
-  /**
-   * Server configuration.
-   *
-   * Set to `false` to disable the server entirely (CSR-only mode).
-   * When `false`, build output goes to flat `dist/` instead of `dist/client/` + `dist/server/`,
-   * and any `"use server"` module will cause a build error.
-   */
-  server?: false | ServerConfig;
+  /** Server configuration. */
+  server?: ServerConfig;
 
   /**
    * Browser-to-server transport options.
@@ -256,8 +252,18 @@ export interface DevConfig {
 
 /** Server configuration. */
 export interface ServerConfig {
-  /** Explicit server entry file. If provided, overrides auto-generated entry. */
-  entry?: string;
+  /**
+   * Framework-managed server file routing.
+   *
+   * When enabled, evjs discovers Request/Response route modules from `src/apis`.
+   */
+  routing?: boolean | ServerRoutingConfig;
+  /**
+   * Framework-managed server conventions.
+   *
+   * Defaults to enabled when server file routing is enabled.
+   */
+  conventions?: boolean | ServerConventionsConfig;
   /**
    * Framework server runtime base path. Defaults to "/__evjs".
    *
@@ -281,6 +287,27 @@ export interface ResolvedServerRscConfig {
   endpoint: string;
 }
 
+export interface ServerRoutingConfig {
+  /** Directory containing server route modules. Default: "./src/apis". */
+  dir?: string;
+}
+
+export interface ResolvedServerRoutingConfig {
+  dir: string;
+  routes: ServerRouteNode[];
+}
+
+export interface ServerConventionsConfig {
+  /** Discover filesystem-scoped server middleware files. Default: true. */
+  middleware?: boolean;
+}
+
+export interface ResolvedServerConventionsConfig {
+  middleware: boolean;
+  globalMiddlewares: ServerMiddlewareNode[];
+  routeMiddlewares: ServerMiddlewareNode[];
+}
+
 export interface TransportConfig {
   /** Absolute or relative server origin used by the browser runtime. */
   baseUrl?: string;
@@ -294,6 +321,14 @@ export type CrossOriginLoadingPolicy = false | "anonymous" | "use-credentials";
 
 export interface OutputConfig {
   /**
+   * Directory for browser/public build artifacts. Default: "dist/client".
+   */
+  client?: string;
+  /**
+   * Directory for framework server build artifacts. Default: "dist/server".
+   */
+  server?: string;
+  /**
    * Adds a `crossorigin` attribute to JavaScript and CSS asset tags in emitted
    * HTML documents and configures the browser chunk loader to use the same
    * policy for dynamically loaded chunks. Default: "anonymous".
@@ -302,6 +337,8 @@ export interface OutputConfig {
 }
 
 export interface ResolvedOutputConfig {
+  client: string;
+  server: string;
   crossOriginLoading: CrossOriginLoadingPolicy;
 }
 
@@ -340,27 +377,41 @@ export interface PageRoutingConfig {
   /** Mount selector for generated page routes. Default: "#app". */
   mount?: string;
   /**
-   * SPA root layout module.
+   * Framework-managed page routing conventions.
    *
-   * Defaults to the `layout/index.tsx` convention beside the page route
-   * directory in SPA mode. Set to `false` to disable the framework root layout.
-   * MPA mode does not use framework layouts.
+   * Defaults to enabled for SPA routing. `false` disables all page conventions.
    */
-  layout?: PageRoutingLayoutConfig;
+  conventions?: boolean | PageRoutingConventionsConfig;
 }
 
 export type PageRoutingMode = "spa" | "mpa";
-export type PageRoutingLayoutConfig = string | false;
+export type PageRoutingLayoutConvention = boolean | string;
+
+export interface PageRoutingConventionsConfig {
+  /**
+   * SPA root layout convention.
+   *
+   * `true` auto-discovers one `layout.*` or `layout/index.*` source module
+   * beside the route directory, `false` disables root layout discovery, and a
+   * string points at an explicit root layout module. MPA mode does not use
+   * framework layouts.
+   */
+  layout?: PageRoutingLayoutConvention;
+}
 
 export type RoutingConfig = PageRoutingConfig;
 export type RoutingMode = PageRoutingMode;
+
+export interface ResolvedPageRoutingConventionsConfig {
+  layout: PageRoutingLayoutConvention;
+}
 
 export interface ResolvedPageRoutingConfig {
   mode: PageRoutingMode;
   dir: string;
   html: string;
   mount: string;
-  layout?: PageRoutingLayoutConfig;
+  conventions?: ResolvedPageRoutingConventionsConfig;
   entry?: string;
   routes: PageRouteNode[];
   rootModule?: string;
@@ -386,12 +437,16 @@ export const CONFIG_DEFAULTS = {
   clientProxy: "@evjs/client/internal",
   serverRegister: "@evjs/server/register",
   crossOriginLoading: "anonymous",
+  outputClientDir: "dist/client",
+  outputServerDir: "dist/server",
   routingDir: "./src/pages",
   routingMode: "spa",
+  serverRoutingDir: "./src/apis",
+  serverMiddlewareFile: "./src/middleware.ts",
   mount: "#app",
 } as const;
 const MPA_LAYOUT_UNSUPPORTED_MESSAGE =
-  "[evjs] routing.layout is only supported in SPA mode. MPA pages should import shared shell components directly or use shared HTML templates.";
+  "[evjs] routing.conventions.layout is only supported in SPA mode. MPA pages should import shared shell components directly or use shared HTML templates.";
 const PUBLIC_ROOT_CONFIG_KEYS = new Set([
   "entry",
   "html",
@@ -410,8 +465,9 @@ const PUBLIC_PAGE_ROUTING_CONFIG_KEYS = new Set([
   "dir",
   "html",
   "mount",
-  "layout",
+  "conventions",
 ]);
+const PUBLIC_PAGE_ROUTING_CONVENTIONS_CONFIG_KEYS = new Set(["layout"]);
 const PUBLIC_APP_CONFIG_KEYS = new Set(["source", "entry", "html", "mount"]);
 const PUBLIC_PAGE_CONFIG_KEYS = new Set([
   "path",
@@ -426,11 +482,23 @@ const PUBLIC_PAGE_CONFIG_KEYS = new Set([
   "rsc",
 ]);
 const PUBLIC_DEV_CONFIG_KEYS = new Set(["port", "https", "proxy"]);
-const PUBLIC_SERVER_CONFIG_KEYS = new Set(["entry", "basePath", "rsc", "dev"]);
+const PUBLIC_SERVER_CONFIG_KEYS = new Set([
+  "routing",
+  "conventions",
+  "basePath",
+  "rsc",
+  "dev",
+]);
+const PUBLIC_SERVER_ROUTING_CONFIG_KEYS = new Set(["dir"]);
+const PUBLIC_SERVER_CONVENTIONS_CONFIG_KEYS = new Set(["middleware"]);
 const PUBLIC_SERVER_DEV_CONFIG_KEYS = new Set(["port", "https"]);
 const PUBLIC_SERVER_RSC_CONFIG_KEYS = new Set(["endpoint"]);
 const PUBLIC_TRANSPORT_CONFIG_KEYS = new Set(["baseUrl"]);
-const PUBLIC_OUTPUT_CONFIG_KEYS = new Set(["crossOriginLoading"]);
+const PUBLIC_OUTPUT_CONFIG_KEYS = new Set([
+  "client",
+  "server",
+  "crossOriginLoading",
+]);
 const PUBLIC_HTTPS_CONFIG_KEYS = new Set(["key", "cert"]);
 const PUBLIC_DEV_PROXY_RULE_KEYS = new Set([
   "context",
@@ -474,13 +542,12 @@ export function resolveConfig<TBundlerCfg = DefaultBundlerConfig>(
   userConfig?: Config<TBundlerCfg>,
 ): ResolvedConfig<TBundlerCfg> {
   const config = resolveRootConfig(userConfig);
-  const serverEnabled = config.server !== false;
   const devConfig = resolveOptionalObjectConfig<DevConfig>(config.dev, "dev");
   validateDevConfigKeys(devConfig);
-  const serverConfig =
-    config.server === false
-      ? {}
-      : resolveOptionalObjectConfig<ServerConfig>(config.server, "server");
+  const serverConfig = resolveOptionalObjectConfig<ServerConfig>(
+    config.server,
+    "server",
+  );
   validateServerConfigKeys(serverConfig);
   const serverRscConfig = resolveServerRscConfig(serverConfig.rsc);
   const serverDevConfig = resolveOptionalObjectConfig<ServerDevConfig>(
@@ -520,10 +587,13 @@ export function resolveConfig<TBundlerCfg = DefaultBundlerConfig>(
   );
   const resolvedApps = resolvedApp ? { default: resolvedApp } : undefined;
 
-  const serverEntry =
-    serverConfig.entry === undefined
-      ? undefined
-      : assertNonEmptyString(serverConfig.entry, "server.entry");
+  const resolvedServerRouting = resolveServerRoutingConfig(
+    serverConfig.routing,
+  );
+  const resolvedServerConventions = resolveServerConventionsConfig(
+    serverConfig.conventions,
+    resolvedServerRouting !== undefined,
+  );
   const clientPort =
     devConfig.port === undefined
       ? CONFIG_DEFAULTS.port
@@ -539,11 +609,7 @@ export function resolveConfig<TBundlerCfg = DefaultBundlerConfig>(
   );
   const serverEndpoint = joinPath(serverBasePath, "fn");
   const pprEndpoint = joinPath(serverBasePath, "ppr");
-  const rscEndpoint = resolveRscEndpoint(
-    serverRscConfig,
-    serverEnabled,
-    serverBasePath,
-  );
+  const rscEndpoint = resolveRscEndpoint(serverRscConfig, true, serverBasePath);
   const devHttps = resolveDevHttpsConfig(devConfig.https);
   const serverHttps = resolveServerDevHttpsConfig(serverDevConfig.https);
   const serverTarget = new URL(
@@ -564,26 +630,20 @@ export function resolveConfig<TBundlerCfg = DefaultBundlerConfig>(
       proxy: [
         // User-defined proxies take precedence
         ...resolveDevProxyRules(devConfig.proxy),
-        // Framework runtime paths proxy to the API dev server only when it exists.
-        ...(serverEnabled
-          ? [
-              {
-                context: [
-                  toProxyContext(serverEndpoint),
-                  toProxyContext(pprEndpoint),
-                  ...(rscEndpoint ? [toProxyContext(rscEndpoint)] : []),
-                ],
-                target: serverTarget.origin,
-                changeOrigin: true,
-                secure: false,
-              },
-            ]
-          : []),
+        // Framework runtime paths proxy to the API dev server.
+        {
+          context: [
+            toProxyContext(serverEndpoint),
+            toProxyContext(pprEndpoint),
+            ...(rscEndpoint ? [toProxyContext(rscEndpoint)] : []),
+          ],
+          target: serverTarget.origin,
+          changeOrigin: true,
+          secure: false,
+        },
       ],
     },
-    serverEnabled,
     server: {
-      entry: serverEntry,
       basePath: serverBasePath,
       runtime: {
         basePath: serverBasePath,
@@ -592,6 +652,8 @@ export function resolveConfig<TBundlerCfg = DefaultBundlerConfig>(
         ...(rscEndpoint ? { rsc: rscEndpoint } : {}),
       },
       rsc: rscEndpoint ? { endpoint: rscEndpoint } : undefined,
+      routing: resolvedServerRouting,
+      conventions: resolvedServerConventions,
       functionRuntime: {
         endpoint: serverEndpoint,
         clientProxy: CONFIG_DEFAULTS.clientProxy,
@@ -609,6 +671,7 @@ export function resolveConfig<TBundlerCfg = DefaultBundlerConfig>(
           : assertHttpUrl(transportConfig.baseUrl, "transport.baseUrl"),
     },
     output: {
+      ...resolveOutputDirectories(outputConfig),
       crossOriginLoading:
         outputConfig.crossOriginLoading === undefined
           ? CONFIG_DEFAULTS.crossOriginLoading
@@ -815,8 +878,11 @@ function validateServerConfigKeys(server: ServerConfig): void {
     server,
     PUBLIC_SERVER_CONFIG_KEYS,
     "server",
-    "entry, basePath, rsc, or dev",
+    "routing, conventions, basePath, rsc, or dev",
     (key) => {
+      if (key === "entry") {
+        return "[evjs] server.entry is not supported. Use server.routing file conventions under src/apis instead.";
+      }
       if (key === "functions") {
         return "[evjs] server.functions is not a public config field. Server function, PPR, and RSC endpoints are derived from server.basePath.";
       }
@@ -824,6 +890,94 @@ function validateServerConfigKeys(server: ServerConfig): void {
         return `[evjs] server.${key} is resolved framework metadata and cannot be configured. Use server.basePath to change framework endpoint paths.`;
       }
     },
+  );
+}
+
+function resolveServerConventionsConfig(
+  conventions: ServerConfig["conventions"],
+  defaultsEnabled: boolean,
+): ResolvedServerConventionsConfig | undefined {
+  if (conventions === undefined) {
+    return defaultsEnabled
+      ? { middleware: true, globalMiddlewares: [], routeMiddlewares: [] }
+      : undefined;
+  }
+  if (conventions === false) return undefined;
+
+  let options: ServerConventionsConfig;
+  if (conventions === true) {
+    options = {};
+  } else if (
+    conventions &&
+    typeof conventions === "object" &&
+    !Array.isArray(conventions)
+  ) {
+    options = conventions as ServerConventionsConfig;
+  } else {
+    throw new Error(
+      "[evjs] server.conventions must be true, false, or a server conventions object.",
+    );
+  }
+  validateServerConventionsConfigKeys(options);
+
+  const middleware = options.middleware ?? true;
+  if (typeof middleware !== "boolean") {
+    throw new Error("[evjs] server.conventions.middleware must be a boolean.");
+  }
+  if (!middleware) return undefined;
+
+  return {
+    middleware,
+    globalMiddlewares: [],
+    routeMiddlewares: [],
+  };
+}
+
+function resolveServerRoutingConfig(
+  routing: ServerConfig["routing"],
+): ResolvedServerRoutingConfig | undefined {
+  if (routing === undefined || routing === false) return undefined;
+  let options: ServerRoutingConfig;
+  if (routing === true) {
+    options = {};
+  } else if (
+    routing &&
+    typeof routing === "object" &&
+    !Array.isArray(routing)
+  ) {
+    options = routing as ServerRoutingConfig;
+  } else {
+    throw new Error(
+      "[evjs] server.routing must be true, false, or a server routing object.",
+    );
+  }
+  validateServerRoutingConfigKeys(options);
+  return {
+    dir:
+      options.dir === undefined
+        ? CONFIG_DEFAULTS.serverRoutingDir
+        : assertNonEmptyString(options.dir, "server.routing.dir"),
+    routes: [],
+  };
+}
+
+function validateServerRoutingConfigKeys(routing: ServerRoutingConfig): void {
+  assertKnownConfigKeys(
+    routing,
+    PUBLIC_SERVER_ROUTING_CONFIG_KEYS,
+    "server.routing",
+    "dir",
+  );
+}
+
+function validateServerConventionsConfigKeys(
+  conventions: ServerConventionsConfig,
+): void {
+  assertKnownConfigKeys(
+    conventions,
+    PUBLIC_SERVER_CONVENTIONS_CONFIG_KEYS,
+    "server.conventions",
+    "middleware",
   );
 }
 
@@ -868,7 +1022,7 @@ function validateOutputConfigKeys(output: OutputConfig): void {
     output,
     PUBLIC_OUTPUT_CONFIG_KEYS,
     "output",
-    "crossOriginLoading",
+    "client, server, or crossOriginLoading",
   );
 }
 
@@ -891,10 +1045,10 @@ function resolvePageRoutingConfig(
   }
   validatePageRoutingConfigKeys(options);
   const mode = resolvePageRoutingMode(options.mode);
-  if (mode === "mpa" && options.layout !== undefined) {
-    throw new Error(MPA_LAYOUT_UNSUPPORTED_MESSAGE);
-  }
-  const layout = resolvePageRoutingLayout(options.layout);
+  const conventions = resolvePageRoutingConventionsConfig(
+    options.conventions,
+    mode,
+  );
   return {
     mode,
     dir:
@@ -909,7 +1063,7 @@ function resolvePageRoutingConfig(
       options.mount === undefined
         ? CONFIG_DEFAULTS.mount
         : assertNonEmptyString(options.mount, "routing.mount"),
-    ...(layout !== undefined ? { layout } : {}),
+    ...(conventions ? { conventions } : {}),
     routes: [],
   };
 }
@@ -919,7 +1073,7 @@ function validatePageRoutingConfigKeys(routing: PageRoutingConfig): void {
     routing,
     PUBLIC_PAGE_ROUTING_CONFIG_KEYS,
     "routing",
-    "mode, dir, html, mount, or layout",
+    "mode, dir, html, mount, or conventions",
     (key) => {
       if (key === "entry") {
         return "[evjs] routing.entry is not a public config field. Use top-level entry or app entries for SPA applications; MPA routing creates one page entry per route file.";
@@ -939,14 +1093,61 @@ function resolvePageRoutingMode(
   throw new Error('[evjs] routing.mode must be "spa" or "mpa".');
 }
 
-function resolvePageRoutingLayout(
-  layout: PageRoutingLayoutConfig | undefined,
-): PageRoutingLayoutConfig | undefined {
-  if (layout === undefined || layout === false) return layout;
-  if (typeof layout === "string") {
-    return assertNonEmptyString(layout, "routing.layout");
+function resolvePageRoutingConventionsConfig(
+  conventions: PageRoutingConfig["conventions"],
+  mode: PageRoutingMode,
+): ResolvedPageRoutingConventionsConfig | undefined {
+  if (conventions === false) return undefined;
+
+  let options: PageRoutingConventionsConfig;
+  if (conventions === undefined || conventions === true) {
+    options = {};
+  } else if (
+    conventions &&
+    typeof conventions === "object" &&
+    !Array.isArray(conventions)
+  ) {
+    options = conventions as PageRoutingConventionsConfig;
+  } else {
+    throw new Error(
+      "[evjs] routing.conventions must be true, false, or a routing conventions object.",
+    );
   }
-  throw new Error("[evjs] routing.layout must be false or a non-empty string.");
+  validatePageRoutingConventionsConfigKeys(options);
+
+  if (mode === "mpa") {
+    if (options.layout !== undefined && options.layout !== false) {
+      throw new Error(MPA_LAYOUT_UNSUPPORTED_MESSAGE);
+    }
+    return undefined;
+  }
+
+  return {
+    layout: resolvePageRoutingLayoutConvention(
+      options.layout ?? true,
+      "routing.conventions.layout",
+    ),
+  };
+}
+
+function validatePageRoutingConventionsConfigKeys(
+  conventions: PageRoutingConventionsConfig,
+): void {
+  assertKnownConfigKeys(
+    conventions,
+    PUBLIC_PAGE_ROUTING_CONVENTIONS_CONFIG_KEYS,
+    "routing.conventions",
+    "layout",
+  );
+}
+
+function resolvePageRoutingLayoutConvention(
+  layout: PageRoutingLayoutConvention,
+  path: string,
+): PageRoutingLayoutConvention {
+  if (layout === true || layout === false) return layout;
+  if (typeof layout === "string") return assertNonEmptyString(layout, path);
+  throw new Error(`[evjs] ${path} must be a boolean or a non-empty string.`);
 }
 
 function resolveAppConfig(
@@ -1173,6 +1374,35 @@ function assertCrossOriginPolicy(
   throw new Error(
     `[evjs] ${path} must be false, "anonymous", or "use-credentials".`,
   );
+}
+
+function resolveOutputDirectories(
+  outputConfig: OutputConfig,
+): Pick<ResolvedOutputConfig, "client" | "server"> {
+  const client =
+    outputConfig.client === undefined
+      ? CONFIG_DEFAULTS.outputClientDir
+      : assertOutputDirectory(outputConfig.client, "output.client");
+  const server =
+    outputConfig.server === undefined
+      ? CONFIG_DEFAULTS.outputServerDir
+      : assertOutputDirectory(outputConfig.server, "output.server");
+
+  if (normalizeOutputDirectory(client) === normalizeOutputDirectory(server)) {
+    throw new Error(
+      "[evjs] output.client and output.server must point to different directories.",
+    );
+  }
+
+  return { client, server };
+}
+
+function assertOutputDirectory(value: unknown, path: string): string {
+  return assertNonEmptyString(value, path);
+}
+
+function normalizeOutputDirectory(value: string): string {
+  return value.replace(/\\/g, "/").replace(/\/+$/, "") || ".";
 }
 
 function resolvePagePrerenderConfig(

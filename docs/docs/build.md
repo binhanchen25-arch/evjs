@@ -24,17 +24,7 @@ command exits non-zero; warnings are printed without failing the command.
 
 ## Output
 
-CSR-only output (`server: false`) is flat:
-
-```txt
-dist/
-├── index.html
-├── main.[hash].js
-├── [chunk].[hash].js
-└── manifest.json
-```
-
-Server-enabled output uses separate manifests:
+By default, evjs emits split public and server output:
 
 ```txt
 dist/
@@ -48,6 +38,31 @@ dist/
 └── build-output.json
 ```
 
+Set `output.client: "dist"` and `output.server: "dist-server"` when
+public/client assets should be written directly under `dist` while server
+artifacts stay outside that public directory:
+
+```ts
+export default defineConfig({
+  output: {
+    client: "dist",
+    server: "dist-server",
+  },
+});
+```
+
+```txt
+dist/
+├── index.html
+├── main.[hash].js
+├── [chunk].[hash].js
+├── manifest.json
+└── build-output.json
+dist-server/
+├── main.[hash].js
+└── manifest.json
+```
+
 `dist/build-output.json` is the complete private `BuildOutput` handoff artifact
 for tools that need the full framework model after build. `dist/client/manifest.json`
 and `dist/server/manifest.json` are deterministic views derived from it: the
@@ -55,18 +70,16 @@ client manifest is browser-safe public metadata, while the server manifest
 contains server bundle metadata (`entry`, `assets`, `fns`, and `routes`).
 Deployment adapters can consume `BuildOutput` during the build and embed the
 equivalent runtime data into platform files, so a deployed server package does
-not have to read `dist/build-output.json` at startup. CSR-only output stays flat
-and writes the public manifest to `dist/manifest.json`. HTML may embed the
-public manifest as `__EVJS_MANIFEST__`; when the browser runtime fetches it
-through `manifestUrl`, `data-evjs-manifest`, or `/manifest.json`, the response
-must be successful JSON with
+not have to read `dist/build-output.json` at startup. HTML may embed the public
+manifest as `__EVJS_MANIFEST__`; when the browser runtime fetches it through
+`manifestUrl`, `data-evjs-manifest`, or `/manifest.json`, the response must be successful JSON with
 `Content-Type: application/json`, allowing optional content-type parameters.
 
 ## Build Pipeline
 
 1. Load and resolve `ev.config.ts`.
 2. Run config/setup plugin hooks.
-3. `createAppGraph()` analyzes the file-based page route files, lower-level app/page outputs, server entry,.
+3. `createAppGraph()` analyzes file-based page routes, lower-level app/page outputs, server file routes, and server conventions.
 4. `createBuildPlan()` produces concrete client/server entries and HTML documents.
 5. The selected bundler compiles `BuildPlan.entries`.
 6. `linkBuildOutput()` combines `AppGraph`, `BuildPlan`, and bundler facts.
@@ -184,9 +197,11 @@ Internal PPR regions carry cache metadata in the manifest:
 
 ## Key Points
 
-- Server-enabled builds emit `dist/client/manifest.json`,
-  `dist/server/manifest.json`, and `dist/build-output.json`; CSR-only
-  builds emit `dist/manifest.json`.
+- The default output directories emit `dist/client/manifest.json`,
+  `dist/server/manifest.json`, and `dist/build-output.json`.
+- `output.client: "dist"` with `output.server: "dist-server"` emits public
+  assets and `dist/manifest.json` directly under `dist`, while server assets
+  remain outside the public output directory.
 - `dist/build-output.json` is the complete private `BuildOutput` handoff for
   post-build tools and debugging; runtime deployments may embed equivalent data
   instead of reading that file at startup.
@@ -195,11 +210,11 @@ Internal PPR regions carry cache metadata in the manifest:
   numbers, underscores, or hyphens.
 - App and page runtime modules must link to a JavaScript asset; manifest
   emission fails if a client entry only produced CSS or no assets.
-- Server-enabled builds must link the server runtime entry to a JavaScript
-  asset; deployment adapters rely on `server.entry` to import the framework
-  handler.
+- Builds must link the server runtime entry to a JavaScript asset; deployment
+  adapters rely on `BuildOutput.server.entry` to import the framework handler.
 - Build entry names are manifest asset keys. They must be build identifiers and
-  must be globally unique across app, page, runtime, and server entries.
+  must be globally unique across app, page, runtime, and generated server
+  entries.
 - `BuildOutput.server.renderers` keys are renderer build entry names and must use
   the same build-identifier rule.
 - In full BuildOutput manifests, each SSR, SSG, or RSC document page with server

@@ -364,6 +364,7 @@ describe("createAppGraph and createBuildPlan", () => {
     const cwd = await createFixture({
       "src/pages/index.tsx": "export default function Home() { return null; }",
       "src/pages/about.tsx": "export default function About() { return null; }",
+      "src/pages/about.html": '<div id="app"></div>',
       "index.html": '<div id="app"></div>',
     });
     const config = createConfig({
@@ -382,6 +383,7 @@ describe("createAppGraph and createBuildPlan", () => {
             id: "about",
             path: "/about",
             module: "./src/pages/about.tsx",
+            html: "./src/pages/about.html",
           },
         ],
       },
@@ -405,7 +407,7 @@ describe("createAppGraph and createBuildPlan", () => {
         id: "about",
         path: "/about",
         component: "./src/pages/about.tsx",
-        html: "./index.html",
+        html: "./src/pages/about.html",
         render: "csr",
         mount: "#app",
       },
@@ -448,7 +450,7 @@ describe("createAppGraph and createBuildPlan", () => {
       },
       {
         id: "about",
-        template: "./index.html",
+        template: "./src/pages/about.html",
         fileName: "about.html",
         owner: { pageId: "about" },
       },
@@ -1103,7 +1105,6 @@ describe("createAppGraph and createBuildPlan", () => {
     });
     const config = createConfig({
       entry: "./src/missing-main.tsx",
-      serverEnabled: false,
     });
 
     const analysis = await createAppGraph(config, cwd);
@@ -1151,13 +1152,12 @@ describe("createAppGraph and createBuildPlan", () => {
     );
   });
 
-  it("adds the server runtime entry when server is enabled", async () => {
+  it("adds the server runtime entry", async () => {
     const cwd = await createFixture({
       "src/main.tsx": "console.log('app');",
     });
     const config = createConfig({
       server: {
-        entry: "./src/server.ts",
         basePath: "/__evjs",
         functionRuntime: {
           endpoint: "/__evjs/fn",
@@ -1172,8 +1172,7 @@ describe("createAppGraph and createBuildPlan", () => {
     });
 
     expect(plan.server).toEqual({
-      enabled: true,
-      entry: "./src/server.ts",
+      entry: "@evjs/server/fetch",
       functionRuntime: {
         endpoint: "/__evjs/fn",
         clientProxy: "client-proxy",
@@ -1182,7 +1181,7 @@ describe("createAppGraph and createBuildPlan", () => {
     });
     expect(plan.entries).toContainEqual({
       name: "server",
-      import: "./src/server.ts",
+      import: "@evjs/server/fetch",
       environment: "server",
       runtime: "node",
       kind: "server-runtime",
@@ -1195,7 +1194,6 @@ describe("createAppGraph and createBuildPlan", () => {
     });
     const config = createConfig({
       server: {
-        entry: undefined,
         basePath: "/__evjs",
         runtime: {
           rsc: "/__evjs/rsc",
@@ -1223,7 +1221,6 @@ describe("createAppGraph and createBuildPlan", () => {
       "index.html": '<div id="app"></div>',
     });
     const config = createConfig({
-      serverEnabled: false,
       pages: {
         home: {
           component: "./src/pages/home.tsx",
@@ -2724,35 +2721,6 @@ describe("createAppGraph and createBuildPlan", () => {
     });
   });
 
-  it("rejects PPR pages when server output is disabled", async () => {
-    const cwd = await createFixture({
-      "src/campaign/Page.tsx": `
-        export const render = "ssr";
-        export const prerender = { partial: true } as const;
-        export default function Page() { return null; }
-      `,
-    });
-    const config = createConfig({
-      serverEnabled: false,
-      pages: {
-        campaign: {
-          component: "./src/campaign/Page.tsx",
-          html: "./index.html",
-        },
-      },
-    });
-    const analysis = await createAppGraph(config, cwd);
-
-    expect(analysis.diagnostics).toEqual([
-      {
-        level: "error",
-        file: "src/campaign/Page.tsx",
-        message:
-          'Page "campaign" uses partial prerendering but server is disabled.',
-      },
-    ]);
-  });
-
   it("rejects PPR pages without a component page module", async () => {
     const cwd = await createFixture({
       "src/campaign/main.tsx": "console.log('campaign');",
@@ -2891,34 +2859,6 @@ describe("createAppGraph and createBuildPlan", () => {
         file: "src/pages/home.tsx",
         message:
           'Page "home" uses full prerendering and must declare render: "ssg" or "ssr".',
-      },
-    ]);
-  });
-
-  it("rejects RSC pages when server output is disabled", async () => {
-    const cwd = await createFixture({
-      "src/pages/rsc.tsx": `
-        export const render = "ssr";
-        export const rsc = true;
-        export default function RscPage() { return null; }
-      `,
-    });
-    const config = createConfig({
-      serverEnabled: false,
-      pages: {
-        rsc: {
-          component: "./src/pages/rsc.tsx",
-          html: "./index.html",
-        },
-      },
-    });
-    const analysis = await createAppGraph(config, cwd);
-
-    expect(analysis.diagnostics).toEqual([
-      {
-        level: "error",
-        file: "src/pages/rsc.tsx",
-        message: 'Page "rsc" uses RSC but server is disabled.',
       },
     ]);
   });
@@ -3474,7 +3414,6 @@ describe("createAppGraph and createBuildPlan", () => {
       "index.html": '<div id="app"></div>',
     });
     const previousConfig = createConfig({
-      serverEnabled: false,
       pages: {
         home: {
           entry: "./src/pages/home/main.tsx",
@@ -3483,7 +3422,6 @@ describe("createAppGraph and createBuildPlan", () => {
       },
     });
     const nextConfig = createConfig({
-      serverEnabled: false,
       pages: {
         home: {
           entry: "./src/pages/home/main.tsx",
@@ -3529,326 +3467,169 @@ describe("createAppGraph and createBuildPlan", () => {
     expect(update.serverChanged).toBe(false);
   });
 
-  it("extracts server route and server function metadata", async () => {
+  it("publishes configured server file routes through a generated server entry", async () => {
     const cwd = await createFixture({
       "src/main.tsx": `
         export const clientEntry = true;
       `,
-      "src/server.ts": `
-        import "./api";
-        import "./actions";
-      `,
-      "src/api.ts": `
-        import { createRoute } from "@evjs/server";
-        export const health = createRoute("/api/health", {
-          GET: async () => Response.json({ ok: true }),
-        });
-      `,
-      "src/actions.ts": `
+      "src/apis/health.ts": `
         "use server";
-        export async function saveOrder() {
-          return { ok: true };
+
+        export async function GET() {
+          return Response.json({ ok: true });
         }
       `,
-    });
-    const config = createConfig({
-      server: {
-        entry: "./src/server.ts",
-        basePath: "/__evjs",
-        functionRuntime: {
-          endpoint: "/__evjs/fn",
-          clientProxy: "@evjs/client/internal",
-          serverRegister: "@evjs/server/register",
-        },
-      },
-    });
-    const analysis = await createAppGraph(config, cwd);
-
-    expect(analysis.graph.routes).toEqual([]);
-    expect(analysis.graph.serverRoutes).toEqual([
-      {
-        id: "src/api.ts:/api/health:GET",
-        module: "src/api.ts",
-        path: "/api/health",
-        methods: ["GET"],
-      },
-    ]);
-    expect(analysis.graph.serverFunctions).toEqual([
-      {
-        id: expect.any(String),
-        module: "src/actions.ts",
-        exportName: "saveOrder",
-      },
-    ]);
-    expect(relativeFileDependencies(cwd, analysis.fileDependencies)).toEqual([
-      "src/actions.ts",
-      "src/api.ts",
-      "src/server.ts",
-    ]);
-  });
-
-  it("reports missing explicit server entries during graph analysis", async () => {
-    const cwd = await createFixture({
-      "src/main.tsx": `
-        export const clientEntry = true;
+      "src/middleware.ts": `
+        export default async function middleware(_ctx, next) {
+          await next();
+        }
+      `,
+      "src/apis/users/middleware.ts": `
+        export default async function middleware(_ctx, next) {
+          await next();
+        }
+      `,
+      "src/apis/users/$userId.ts": `
+        export const POST = async () => Response.json({ ok: true });
       `,
     });
+    const globalMiddleware = {
+      id: "src/middleware.ts:global-middleware",
+      module: "src/middleware.ts",
+      scope: "global" as const,
+      scopeSegments: [],
+    };
+    const userMiddleware = {
+      id: "src/apis/users/middleware.ts:route-middleware",
+      module: "src/apis/users/middleware.ts",
+      scope: "route" as const,
+      scopeSegments: ["users"],
+    };
     const config = createConfig({
       server: {
-        entry: "./src/missing-server.ts",
         basePath: "/__evjs",
         functionRuntime: {
           endpoint: "/__evjs/fn",
           clientProxy: "@evjs/client/internal",
           serverRegister: "@evjs/server/register",
         },
+        routing: {
+          dir: "./src/apis",
+          routes: [
+            {
+              id: "src/apis/health.ts:/health:GET",
+              module: "src/apis/health.ts",
+              path: "/health",
+              methods: ["GET"],
+            },
+            {
+              id: "src/apis/users/$userId.ts:/users/:userId:POST",
+              module: "src/apis/users/$userId.ts",
+              path: "/users/:userId",
+              methods: ["POST"],
+              moduleSegments: ["users"],
+              middlewares: [userMiddleware],
+            },
+          ],
+        },
+        conventions: {
+          globalMiddlewares: [globalMiddleware],
+          routeMiddlewares: [userMiddleware],
+        },
       },
     });
     const analysis = await createAppGraph(config, cwd);
+    const plan = createBuildPlan(config, analysis.graph, {
+      mode: "development",
+    });
 
-    expect(analysis.graph.serverRoutes).toEqual([]);
+    expect(analysis.diagnostics).toEqual([]);
+    expect(analysis.graph.serverRoutes).toEqual([
+      {
+        id: "src/apis/health.ts:/health:GET",
+        module: "src/apis/health.ts",
+        path: "/health",
+        methods: ["GET"],
+      },
+      {
+        id: "src/apis/users/$userId.ts:/users/:userId:POST",
+        module: "src/apis/users/$userId.ts",
+        path: "/users/:userId",
+        methods: ["POST"],
+      },
+    ]);
     expect(analysis.graph.serverFunctions).toEqual([]);
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/missing-server.ts",
-      message: "Server entry source file not found.",
+    expect(relativeFileDependencies(cwd, analysis.fileDependencies)).toEqual([
+      "src/apis",
+      "src/apis/health.ts",
+      "src/apis/users",
+      "src/apis/users/$userId.ts",
+      "src/apis/users/middleware.ts",
+      "src/middleware.ts",
+    ]);
+    expect(plan.entries).toContainEqual({
+      name: "server",
+      import: "evjs:server-routes",
+      environment: "server",
+      runtime: "node",
+      kind: "server-runtime",
+      metadata: {
+        type: "server-app",
+        middlewares: [globalMiddleware],
+        routes: [
+          {
+            id: "src/apis/health.ts:/health:GET",
+            module: "src/apis/health.ts",
+            path: "/health",
+            methods: ["GET"],
+          },
+          {
+            id: "src/apis/users/$userId.ts:/users/:userId:POST",
+            module: "src/apis/users/$userId.ts",
+            path: "/users/:userId",
+            methods: ["POST"],
+            moduleSegments: ["users"],
+            middlewares: [userMiddleware],
+          },
+        ],
+      },
     });
+    expect(plan.server.entry).toBe("evjs:server-routes");
   });
 
-  it("reports malformed server route modules", async () => {
+  it("does not publish programmatic routes from the application graph", async () => {
     const cwd = await createFixture({
       "src/main.tsx": `
-        export const clientEntry = true;
-      `,
-      "src/server.ts": `
         import "./api";
       `,
       "src/api.ts": `
         import { createRoute } from "@evjs/server";
-        export const users = createRoute("/api/users", {
-          GET: async () => Response.json([])
-      `,
-    });
-    const config = createConfig({
-      server: {
-        entry: "./src/server.ts",
-        basePath: "/__evjs",
-        functionRuntime: {
-          endpoint: "/__evjs/fn",
-          clientProxy: "@evjs/client/internal",
-          serverRegister: "@evjs/server/register",
-        },
-      },
-    });
-    const analysis = await createAppGraph(config, cwd);
-
-    expect(analysis.graph.serverRoutes).toEqual([]);
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message: expect.stringContaining(
-        "Server route module could not be parsed:",
-      ),
-    });
-  });
-
-  it("reports unsupported exported server route declarations", async () => {
-    const cwd = await createFixture({
-      "src/main.tsx": `
-        export const clientEntry = true;
-      `,
-      "src/server.ts": `
-        import "./api";
-      `,
-      "src/api.ts": `
-        "use client";
-        import { createRoute } from "@evjs/server";
-        export function ClientWidget() {
-          return null;
-        }
-        export const valid = createRoute("/api/valid", {
-          GET: async () => Response.json({ ok: true }),
-        });
-        const routePath = "/api/dynamic";
-        export const dynamic = createRoute(routePath, {
-          GET: async () => Response.json({ ok: true }),
-        });
-        export const relative = createRoute("api/relative", {
-          GET: async () => Response.json({ ok: true }),
-        });
-        export const whitespacePath = createRoute("/api/space ", {
-          GET: async () => Response.json({ ok: true }),
-        });
-        export const queryPath = createRoute("/api/query?filter=all", {
-          GET: async () => Response.json({ ok: true }),
-        });
-        export const emptyParam = createRoute("/api/empty-param/:", {
-          GET: async () => Response.json({ ok: true }),
-        });
-        export const reservedParam = createRoute("/api/reserved-param/:constructor", {
-          GET: async () => Response.json({ ok: true }),
-        });
-        export const duplicateParam = createRoute("/api/users/:userId/posts/:userId", {
-          GET: async () => Response.json({ ok: true }),
-        });
-        export const empty = createRoute("/api/empty", {
-          middlewares: [],
-        });
-        export const lowerCaseMethod = createRoute("/api/lowercase", {
-          get: async () => Response.json({ ok: true }),
-        });
-        export const legacyMiddleware = createRoute("/api/legacy-middleware", {
-          middleware: [],
-          GET: async () => Response.json({ ok: true }),
-        });
-        export const literalMethod = createRoute("/api/literal-method", {
-          GET: "not a function",
-        });
-        export const invalidMiddlewares = createRoute("/api/invalid-middlewares", {
-          middlewares: [null],
-          GET: async () => Response.json({ ok: true }),
-        });
-        let missingHandler;
-        export const uninitializedHandler = createRoute("/api/uninitialized-handler", {
-          GET: missingHandler,
-        });
-        let missingMiddlewares;
-        export const uninitializedMiddlewares = createRoute("/api/uninitialized-middlewares", {
-          middlewares: missingMiddlewares,
-          GET: async () => Response.json({ ok: true }),
-        });
-      `,
-    });
-    const config = createConfig({
-      server: {
-        entry: "./src/server.ts",
-        basePath: "/__evjs",
-        functionRuntime: {
-          endpoint: "/__evjs/fn",
-          clientProxy: "@evjs/client/internal",
-          serverRegister: "@evjs/server/register",
-        },
-      },
-    });
-    const analysis = await createAppGraph(config, cwd);
-
-    expect(analysis.graph.clientReferences).toEqual([]);
-    expect(analysis.graph.serverRoutes).toEqual([]);
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "dynamic" must use a string-literal createRoute() path.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "relative" must use a createRoute() path that starts with "/".',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "whitespacePath" must use a createRoute() path without whitespace.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "queryPath" must use a createRoute() path without query strings or hashes.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "emptyParam" path contains dynamic segment ":" without a param name.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "reservedParam" path uses reserved dynamic param name "constructor" in segment ":constructor". Use a safe application-specific name.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "duplicateParam" path uses duplicate dynamic param name "userId" in segment ":userId". Use unique param names within one route path.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "empty" must declare at least one HTTP method handler.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "lowerCaseMethod" definition key "get" is not supported. Use GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS or "middlewares".',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "legacyMiddleware" uses "middleware"; use "middlewares" for per-route middleware.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message: 'Server route "literalMethod" GET handler must be a function.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "invalidMiddlewares" middlewares must be an array of functions.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "uninitializedHandler" GET handler must be a function.',
-    });
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api.ts",
-      message:
-        'Server route "uninitializedMiddlewares" middlewares must be an array of functions.',
-    });
-  });
-
-  it("reports duplicate exported server route paths", async () => {
-    const cwd = await createFixture({
-      "src/main.tsx": `
-        export const clientEntry = true;
-      `,
-      "src/server.ts": `
-        import "./api/a-customers";
-        import "./api/b-customers";
-      `,
-      "src/api/a-customers.ts": `
-        import { createRoute } from "@evjs/server";
-        export const customersGet = createRoute("/api/customers", {
-          GET: async () => Response.json([]),
-        });
-      `,
-      "src/api/b-customers.ts": `
-        import { createRoute } from "@evjs/server";
-        export const customersPost = createRoute("/api/customers", {
+        export const health = createRoute("/health", {
           POST: async () => Response.json({ ok: true }),
         });
       `,
+      "src/apis/health.ts": `
+        export const GET = async () => Response.json({ ok: true });
+      `,
     });
     const config = createConfig({
       server: {
-        entry: "./src/server.ts",
         basePath: "/__evjs",
         functionRuntime: {
           endpoint: "/__evjs/fn",
           clientProxy: "@evjs/client/internal",
           serverRegister: "@evjs/server/register",
+        },
+        routing: {
+          dir: "./src/apis",
+          routes: [
+            {
+              id: "src/apis/health.ts:/health:GET",
+              module: "src/apis/health.ts",
+              path: "/health",
+              methods: ["GET"],
+            },
+          ],
         },
       },
     });
@@ -3856,75 +3637,18 @@ describe("createAppGraph and createBuildPlan", () => {
 
     expect(analysis.graph.serverRoutes).toEqual([
       {
-        id: "src/api/a-customers.ts:/api/customers:GET",
-        module: "src/api/a-customers.ts",
-        path: "/api/customers",
+        id: "src/apis/health.ts:/health:GET",
+        module: "src/apis/health.ts",
+        path: "/health",
         methods: ["GET"],
       },
     ]);
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api/b-customers.ts",
-      message:
-        'Server route path "/api/customers" is already declared by src/api/a-customers.ts. Declare all HTTP methods for a path in one createRoute() call.',
-    });
-  });
-
-  it("reports duplicate exported server route shapes", async () => {
-    const cwd = await createFixture({
-      "src/main.tsx": `
-        export const clientEntry = true;
-      `,
-      "src/server.ts": `
-        import "./api/a-customer";
-        import "./api/b-customer";
-      `,
-      "src/api/a-customer.ts": `
-        import { createRoute } from "@evjs/server";
-        export const customerGet = createRoute("/api/customers/:id", {
-          GET: async () => Response.json({ ok: true }),
-        });
-      `,
-      "src/api/b-customer.ts": `
-        import { createRoute } from "@evjs/server";
-        export const customerPost = createRoute("/api/customers/:customerId", {
-          POST: async () => Response.json({ ok: true }),
-        });
-      `,
-    });
-    const config = createConfig({
-      server: {
-        entry: "./src/server.ts",
-        basePath: "/__evjs",
-        functionRuntime: {
-          endpoint: "/__evjs/fn",
-          clientProxy: "@evjs/client/internal",
-          serverRegister: "@evjs/server/register",
-        },
-      },
-    });
-    const analysis = await createAppGraph(config, cwd);
-
-    expect(analysis.graph.serverRoutes).toEqual([
-      {
-        id: "src/api/a-customer.ts:/api/customers/:id:GET",
-        module: "src/api/a-customer.ts",
-        path: "/api/customers/:id",
-        methods: ["GET"],
-      },
-    ]);
-    expect(analysis.diagnostics).toContainEqual({
-      level: "error",
-      file: "src/api/b-customer.ts",
-      message:
-        'Server route path "/api/customers/:customerId" has the same route shape as src/api/a-customer.ts (/api/customers/:id). Use one route handler per URL shape.',
-    });
+    expect(analysis.diagnostics).toEqual([]);
   });
 
   it("extracts callable named server function exports only", async () => {
     const cwd = await createFixture({
-      "src/main.tsx": "console.log('app');",
-      "src/server.ts": `
+      "src/main.tsx": `
         import "./actions";
       `,
       "src/actions.ts": `
@@ -3956,7 +3680,6 @@ describe("createAppGraph and createBuildPlan", () => {
     });
     const config = createConfig({
       server: {
-        entry: "./src/server.ts",
         basePath: "/__evjs",
         functionRuntime: {
           endpoint: "/__evjs/fn",
@@ -3966,6 +3689,9 @@ describe("createAppGraph and createBuildPlan", () => {
       },
     });
     const analysis = await createAppGraph(config, cwd);
+    const plan = createBuildPlan(config, analysis.graph, {
+      mode: "production",
+    });
 
     expect(analysis.diagnostics).toEqual([]);
     expect(
@@ -3981,8 +3707,40 @@ describe("createAppGraph and createBuildPlan", () => {
     ]);
     expect(relativeFileDependencies(cwd, analysis.fileDependencies)).toEqual([
       "src/actions.ts",
-      "src/server.ts",
     ]);
+    expect(plan.entries).toContainEqual({
+      name: "server",
+      import: "evjs:server-routes",
+      environment: "server",
+      runtime: "node",
+      kind: "server-runtime",
+      metadata: {
+        type: "server-app",
+        routes: [],
+        serverFunctions: [
+          {
+            id: expect.any(String),
+            module: "src/actions.ts",
+            exportName: "saveOrder",
+          },
+          {
+            id: expect.any(String),
+            module: "src/actions.ts",
+            exportName: "createOrder",
+          },
+          {
+            id: expect.any(String),
+            module: "src/actions.ts",
+            exportName: "removeOrder",
+          },
+          {
+            id: expect.any(String),
+            module: "src/actions.ts",
+            exportName: "cancel-order",
+          },
+        ],
+      },
+    });
   });
 
   it("reports unsupported use-server exports during graph analysis", async () => {
@@ -4139,38 +3897,6 @@ describe("createAppGraph and createBuildPlan", () => {
     expect(relativeFileDependencies(cwd, analysis.fileDependencies)).toEqual(
       [],
     );
-  });
-
-  it("reports reachable use-server modules when server output is disabled", async () => {
-    const cwd = await createFixture({
-      "src/main.tsx": `
-        import { saveOrder } from "./actions";
-        void saveOrder;
-      `,
-      "src/actions.ts": `
-        "use server";
-        export async function saveOrder() {
-          return { ok: true };
-        }
-      `,
-    });
-    const config = createConfig({
-      serverEnabled: false,
-    });
-    const analysis = await createAppGraph(config, cwd);
-
-    expect(analysis.graph.serverFunctions).toEqual([]);
-    expect(analysis.diagnostics).toEqual([
-      {
-        level: "error",
-        file: "src/actions.ts",
-        message:
-          'This "use server" module is reachable from the app graph, but server is disabled. Remove the import or enable server in ev.config.ts.',
-      },
-    ]);
-    expect(relativeFileDependencies(cwd, analysis.fileDependencies)).toEqual([
-      "src/actions.ts",
-    ]);
   });
 
   it("collects page route declarations", async () => {
@@ -4880,9 +4606,11 @@ function createConfig(overrides: Partial<TestConfig> = {}): TestConfig {
     entry: "./src/main.tsx",
     html: "./index.html",
     pages: undefined,
-    serverEnabled: true,
+    output: {
+      client: "dist/client",
+      server: "dist/server",
+    },
     server: {
-      entry: undefined,
       basePath: "/__evjs",
       functionRuntime: {
         endpoint: "/__evjs/fn",

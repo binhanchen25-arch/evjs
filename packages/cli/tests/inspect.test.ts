@@ -39,23 +39,15 @@ describe("inspect", () => {
           return [];
         }
       `,
-      "src/api/health.routes.ts": `
-        import { createRoute } from "@evjs/server";
-        export const healthRoute = createRoute("/api/health", {
-          GET: () => Response.json({ ok: true }),
-        });
-      `,
-      "src/server.ts": `
-        import { createApp } from "@evjs/server";
-        import { healthRoute } from "./api/health.routes";
-        export default createApp({ routes: [healthRoute] });
+      "src/apis/api/health.ts": `
+        export const GET = () => Response.json({ ok: true });
       `,
     });
 
     const result = await inspectFrameworkBuild(
       {
         routing: { mode: "spa" },
-        server: { entry: "./src/server.ts" },
+        server: { routing: true },
       },
       { cwd },
     );
@@ -99,7 +91,7 @@ describe("inspect", () => {
     ]);
     expect(result.serverRoutes).toEqual([
       expect.objectContaining({
-        module: "src/api/health.routes.ts",
+        module: "src/apis/api/health.ts",
         path: "/api/health",
         methods: ["GET"],
       }),
@@ -120,17 +112,19 @@ describe("inspect", () => {
       "src/pages/index.tsx": "export default function Home() { return null; }",
     });
     const result = await inspectFrameworkBuild(
-      { routing: true, server: false },
+      { routing: true, output: { client: "dist" } },
       { cwd },
     );
 
     const text = formatInspectText(result);
     expect(text).toContain("ev inspect");
     expect(text).toContain("Routing");
+    expect(text).toContain("conventions.layout: auto");
     expect(text).toContain("/ -> index");
 
     const json = JSON.parse(formatInspectJson(result));
     expect(json.routing.mode).toBe("spa");
+    expect(json.routing.conventions.layout).toBe(true);
     expect(json.pageRoutes[0].path).toBe("/");
   });
 
@@ -143,7 +137,7 @@ describe("inspect", () => {
     });
 
     const result = await inspectFrameworkBuild(
-      { routing: true, server: false },
+      { routing: true, output: { client: "dist" } },
       { cwd },
     );
 
@@ -176,7 +170,7 @@ describe("inspect", () => {
     const cwd = await createFixture({
       "ev.config.ts": `
         import { defineConfig } from "@evjs/ev";
-        export default defineConfig({ routing: true, server: false });
+        export default defineConfig({ routing: true, output: { client: "dist" } });
       `,
       "index.html": '<div id="app"></div>',
       "src/pages/index.tsx": "export default function Home() { return null; }",

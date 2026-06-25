@@ -12,7 +12,6 @@ import type {
   AppNode,
   ComponentModel,
   ExtractedRoute,
-  ExtractedServerRoute,
   HydrationMode,
   PageNode,
   PageRouteNode,
@@ -21,8 +20,10 @@ import type {
   RenderMode,
   RouteNode,
   ServerFunctionNode,
+  ServerMiddlewareNode,
   ServerRouteNode,
 } from "@evjs/shared/manifest";
+import { resolveRoutes } from "@evjs/shared/manifest";
 import { parseSync } from "@swc/core";
 import type { ModuleItem } from "@swc/types";
 import {
@@ -37,7 +38,6 @@ import {
   extractPprRegionModuleConfig,
   extractPprRegions,
 } from "../ppr-regions.js";
-import { analyzeRoutes, resolveRoutes } from "../routes/index.js";
 import {
   extractRscReferences,
   hasBlockingReferenceParseDiagnostic,
@@ -46,6 +46,7 @@ import {
   analyzeServerFunctionExports,
   type ServerFunctionExportAnalysis,
 } from "../server-fns.js";
+import type { DiscoveredServerRouteNode } from "../server-routes.js";
 import {
   deriveRouteIdFromPath,
   detectUseServer,
@@ -103,12 +104,21 @@ export interface GraphConfig {
     entry?: string;
     html: string;
     mount: string;
+    conventions?: {
+      layout: boolean | string;
+    };
     routes: PageRouteNode[];
     rootModule?: string;
   };
-  serverEnabled: boolean;
   server: {
-    entry?: string;
+    routing?: {
+      dir: string;
+      routes: DiscoveredServerRouteNode[];
+    };
+    conventions?: {
+      globalMiddlewares: ServerMiddlewareNode[];
+      routeMiddlewares: ServerMiddlewareNode[];
+    };
   };
 }
 
@@ -174,10 +184,33 @@ export async function createAppGraph(
       fileDependencies.add(dir);
     }
   }
+  if (config.server.routing) {
+    const routingDir = path.resolve(cwd, config.server.routing.dir);
+    for (const dir of await collectRouteDirectories(routingDir)) {
+      fileDependencies.add(dir);
+    }
+  }
+  for (const middleware of [
+    ...(config.server.conventions?.globalMiddlewares ?? []),
+    ...(config.server.conventions?.routeMiddlewares ?? []),
+  ]) {
+    fileDependencies.add(path.resolve(cwd, middleware.module));
+  }
   const clientRoutes: ExtractedRoute[] = [];
   const serverRoutes = new Map<string, ServerRouteNode>();
   const serverRoutePathOwners = new Map<string, ServerRouteNode>();
   const serverRouteShapeOwners = new Map<string, ServerRouteNode>();
+  const serverFileRouteModules = new Set(
+    (config.server.routing?.routes ?? []).map((route) =>
+      path.resolve(cwd, route.module),
+    ),
+  );
+  const serverConventionModules = new Set(
+    [
+      ...(config.server.conventions?.globalMiddlewares ?? []),
+      ...(config.server.conventions?.routeMiddlewares ?? []),
+    ].map((middleware) => path.resolve(cwd, middleware.module)),
+  );
   const serverFunctions: ServerFunctionNode[] = [];
   const clientReferences = new Map<
     string,
@@ -187,6 +220,18 @@ export async function createAppGraph(
     string,
     NonNullable<AppGraph["serverReferences"]>[number]
   >();
+  const configuredServerRoutePublication = validateServerRouteNodePublication(
+    config.server.routing?.routes ?? [],
+    serverRoutePathOwners,
+    serverRouteShapeOwners,
+  );
+  diagnostics.push(...configuredServerRoutePublication.diagnostics);
+  for (const node of configuredServerRoutePublication.nodes) {
+    serverRoutePathOwners.set(node.path, node);
+    serverRouteShapeOwners.set(serverRoutePathShapeFromPath(node.path), node);
+    serverRoutes.set(node.id, node);
+  }
+
   for (const file of sourceFiles.analysisFiles) {
     const source = sourceCache.get(file) ?? (await fs.readFile(file, "utf-8"));
     if (
@@ -207,26 +252,7 @@ export async function createAppGraph(
       })),
     );
 
-    const routeAnalysis = analyzeRoutes(source);
-    const hasRouteDiagnostics = routeAnalysis.diagnostics.some(
-      (diagnostic) => diagnostic.level === "error",
-    );
-    diagnostics.push(
-      ...routeAnalysis.diagnostics.map((diagnostic) => ({
-        ...diagnostic,
-        file: sourceRel,
-      })),
-    );
-
-    if (!config.serverEnabled) {
-      if (usesServerDirective) {
-        diagnostics.push({
-          level: "error",
-          file: sourceRel,
-          message:
-            'This "use server" module is reachable from the app graph, but server is disabled. Remove the import or enable server in ev.config.ts.',
-        });
-      }
+    if (serverFileRouteModules.has(file) || serverConventionModules.has(file)) {
       continue;
     }
 
@@ -250,32 +276,12 @@ export async function createAppGraph(
       })),
     );
 
-    if (
-      hasRscReferenceDiagnostics ||
-      hasRouteDiagnostics ||
-      hasServerFunctionDiagnostics
-    ) {
-      continue;
-    }
-
-    const routePublication = validateServerRoutePublication(
-      sourceRel,
-      routeAnalysis.serverRoutes,
-      serverRoutePathOwners,
-      serverRouteShapeOwners,
-    );
-    diagnostics.push(...routePublication.diagnostics);
-    if (routePublication.diagnostics.length > 0) {
+    if (hasRscReferenceDiagnostics || hasServerFunctionDiagnostics) {
       continue;
     }
 
     for (const reference of rscReferenceAnalysis.clientReferences) {
       clientReferences.set(reference.id, reference);
-    }
-    for (const node of routePublication.nodes) {
-      serverRoutePathOwners.set(node.path, node);
-      serverRouteShapeOwners.set(serverRoutePathShapeFromPath(node.path), node);
-      serverRoutes.set(node.id, node);
     }
     for (const reference of rscReferenceAnalysis.serverReferences) {
       serverReferences.set(reference.id, reference);
@@ -341,7 +347,7 @@ export async function createAppGraph(
     diagnostics,
     fileDependencies,
   );
-  validateGraphPageContracts(config, graph, diagnostics);
+  validateGraphPageContracts(graph, diagnostics);
   graph.serverRoutes = [...serverRoutes.values()];
   graph.serverFunctions = serverFunctions;
   graph.clientReferences = [...clientReferences.values()];
@@ -354,9 +360,8 @@ export async function createAppGraph(
   };
 }
 
-function validateServerRoutePublication(
-  sourceRel: string,
-  routes: ExtractedServerRoute[],
+function validateServerRouteNodePublication(
+  routes: ServerRouteNode[],
   serverRoutePathOwners: Map<string, ServerRouteNode>,
   serverRouteShapeOwners: Map<string, ServerRouteNode>,
 ): { nodes: ServerRouteNode[]; diagnostics: Diagnostic[] } {
@@ -366,21 +371,14 @@ function validateServerRoutePublication(
   const pendingShapeOwners = new Map(serverRouteShapeOwners);
 
   for (const route of routes) {
-    const id = `${sourceRel}:${route.path}:${route.methods.join(",")}`;
-    const node: ServerRouteNode = {
-      id,
-      module: sourceRel,
-      path: route.path,
-      methods: route.methods,
-    };
     const existing = pendingPathOwners.get(route.path);
     if (existing) {
       diagnostics.push({
         level: "error",
-        file: sourceRel,
+        file: route.module,
         message:
           `Server route path "${route.path}" is already declared by ${existing.module}. ` +
-          "Declare all HTTP methods for a path in one createRoute() call.",
+          "Declare all HTTP methods for a path in one server file route module.",
       });
       continue;
     }
@@ -389,16 +387,21 @@ function validateServerRoutePublication(
     if (existingShapeOwner) {
       diagnostics.push({
         level: "error",
-        file: sourceRel,
+        file: route.module,
         message:
           `Server route path "${route.path}" has the same route shape as ${existingShapeOwner.module} (${existingShapeOwner.path}). ` +
           "Use one route handler per URL shape.",
       });
       continue;
     }
-    pendingPathOwners.set(route.path, node);
-    pendingShapeOwners.set(routeShape, node);
-    nodes.push(node);
+    pendingPathOwners.set(route.path, route);
+    pendingShapeOwners.set(routeShape, route);
+    nodes.push({
+      id: route.id,
+      module: route.module,
+      path: route.path,
+      methods: route.methods,
+    });
   }
 
   return { nodes, diagnostics };
@@ -827,7 +830,6 @@ function hasRouteGraphSource(config: GraphConfig): boolean {
 }
 
 function validateGraphPageContracts(
-  config: GraphConfig,
   graph: AppGraph,
   diagnostics: Diagnostic[],
 ): void {
@@ -838,7 +840,6 @@ function validateGraphPageContracts(
     const renderingError = getPageBuildContractViolation(
       `Page "${page.id}"`,
       page,
-      { serverEnabled: config.serverEnabled },
     );
     if (renderingError) {
       diagnostics.push({
@@ -967,7 +968,7 @@ function createPageNodes(
         id: route.id,
         path: route.path,
         component: route.module,
-        html: config.routing.html,
+        html: route.html ?? config.routing.html,
         render: "csr",
         mount: config.routing.mount,
       };
@@ -1349,6 +1350,29 @@ async function collectFrameworkSourceFiles(
       explicitDependencyRoots,
     );
   }
+  for (const route of config.server.routing?.routes ?? []) {
+    await addConfiguredSource(
+      roots,
+      cwd,
+      route.module,
+      `Server route "${route.path}" module`,
+      diagnostics,
+      explicitDependencyRoots,
+    );
+  }
+  for (const middleware of [
+    ...(config.server.conventions?.globalMiddlewares ?? []),
+    ...(config.server.conventions?.routeMiddlewares ?? []),
+  ]) {
+    await addConfiguredSource(
+      roots,
+      cwd,
+      middleware.module,
+      `Server middleware "${middleware.module}" module`,
+      diagnostics,
+      explicitDependencyRoots,
+    );
+  }
   await addConfiguredSource(
     roots,
     cwd,
@@ -1381,17 +1405,6 @@ async function collectFrameworkSourceFiles(
       diagnostics,
     );
   }
-  if (config.server.entry) {
-    await addConfiguredSource(
-      roots,
-      cwd,
-      config.server.entry,
-      "Server entry",
-      diagnostics,
-      explicitDependencyRoots,
-    );
-  }
-
   for (const root of roots) {
     await collectStaticImportClosure(files, cwd, root, sourceCache);
   }
@@ -1568,10 +1581,7 @@ function extractStaticImportSpecifiersWithRegex(source: string): string[] {
 }
 
 function isFrameworkDependencySource(source: string): boolean {
-  return (
-    /^\s*["']use (client|server)["']/m.test(source.slice(0, 200)) ||
-    (source.includes("@evjs/server") && source.includes("createRoute"))
-  );
+  return /^\s*["']use (client|server)["']/m.test(source.slice(0, 200));
 }
 
 async function resolveSourceImport(

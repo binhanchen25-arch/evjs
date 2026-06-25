@@ -21,7 +21,11 @@ export function formatInspectText(result: InspectFrameworkBuildResult): string {
     lines.push(`  dir: ${result.routing.dir}`);
     lines.push(`  html: ${result.routing.html}`);
     lines.push(`  mount: ${result.routing.mount}`);
-    lines.push(`  layout: ${formatValue(result.routing.layout ?? "auto")}`);
+    lines.push(
+      `  conventions.layout: ${formatLayoutConvention(
+        result.routing.conventions?.layout,
+      )}`,
+    );
     if (result.routing.rootModule) {
       lines.push(`  rootModule: ${result.routing.rootModule}`);
     }
@@ -68,14 +72,13 @@ export function formatInspectText(result: InspectFrameworkBuildResult): string {
   });
 
   lines.push("Runtime");
-  lines.push(`  serverEnabled: ${String(result.runtime.serverEnabled)}`);
-  if (result.runtime.server) {
-    lines.push(`  server.basePath: ${result.runtime.server.basePath}`);
-    lines.push(`  server.fn: ${result.runtime.server.fn}`);
-    lines.push(`  server.ppr: ${result.runtime.server.ppr}`);
-    if (result.runtime.server.rsc) {
-      lines.push(`  server.rsc: ${result.runtime.server.rsc}`);
-    }
+  lines.push(`  output.client: ${result.output.client}`);
+  lines.push(`  output.server: ${result.output.server}`);
+  lines.push(`  server.basePath: ${result.runtime.server.basePath}`);
+  lines.push(`  server.fn: ${result.runtime.server.fn}`);
+  lines.push(`  server.ppr: ${result.runtime.server.ppr}`);
+  if (result.runtime.server.rsc) {
+    lines.push(`  server.rsc: ${result.runtime.server.rsc}`);
   }
   if (result.runtime.transport?.baseUrl) {
     lines.push(`  transport.baseUrl: ${result.runtime.transport.baseUrl}`);
@@ -134,4 +137,10 @@ function formatDiagnostic(diagnostic: InspectDiagnostic): string {
 
 function formatValue(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function formatLayoutConvention(value: boolean | string | undefined): string {
+  if (value === true) return "auto";
+  if (value === false || value === undefined) return "disabled";
+  return formatValue(value);
 }

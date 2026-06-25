@@ -43,6 +43,12 @@ const pagesEntryLoader = fileURLToPath(
 const pagesEntryAnchor = fileURLToPath(
   new URL("./pages-entry-anchor.js", import.meta.url),
 );
+const serverRoutesEntryLoader = fileURLToPath(
+  new URL("./server-routes-entry-loader.cjs", import.meta.url),
+);
+const serverRoutesEntryAnchor = fileURLToPath(
+  new URL("./server-routes-entry-anchor.js", import.meta.url),
+);
 const ReactFlightWebpackPlugin = require("react-server-dom-webpack/plugin");
 const clientRscEntry = "@evjs/client/internal/rsc-runtime";
 const clientRscPageContextEntry = "@evjs/client/internal/rsc-page-context";
@@ -65,7 +71,7 @@ export async function createWebpackConfigs(
   hooks: PluginHooks<WebpackConfig>[],
   options: { clean?: boolean } = {},
 ): Promise<Configuration[]> {
-  const outputPaths = getOutputPaths(cwd, config.serverEnabled, plan.distDir);
+  const outputPaths = getOutputPaths(cwd, config.output, plan.distDir);
   const configs: Configuration[] = [];
   const clientEntries = plan.entries.filter(
     (entry) => entry.environment === "client",
@@ -105,7 +111,7 @@ export async function createWebpackConfigs(
     );
   }
 
-  if (config.serverEnabled && regularServerEntries.length > 0) {
+  if (regularServerEntries.length > 0) {
     configs.push(
       createWebpackConfig({
         cwd,
@@ -125,7 +131,7 @@ export async function createWebpackConfigs(
     );
   }
 
-  if (config.serverEnabled && rscServerEntries.length > 0) {
+  if (rscServerEntries.length > 0) {
     configs.push(
       createWebpackConfig({
         cwd,
@@ -292,6 +298,7 @@ function createWebpackConfig(options: {
           ],
         },
         ...createPagesEntryRules(options.entries),
+        ...createServerRoutesEntryRules(options.entries),
         ...createFrameworkEntryRules(options.cwd, options.entries),
         {
           test: /\.css$/,
@@ -365,6 +372,30 @@ function createPagesEntryPathPattern(): RegExp {
   return new RegExp(`${escapeRegExp(normalizeRulePath(pagesEntryAnchor))}$`);
 }
 
+function createServerRoutesEntryRules(entries: BuildEntry[]) {
+  const entry = getServerRoutesEntry(entries);
+  if (!entry) return [];
+
+  return [
+    {
+      test: createServerRoutesEntryPathPattern(),
+      resourceQuery: /^$/,
+      use: [
+        {
+          loader: serverRoutesEntryLoader,
+          options: entry.metadata,
+        },
+      ],
+    },
+  ];
+}
+
+function createServerRoutesEntryPathPattern(): RegExp {
+  return new RegExp(
+    `${escapeRegExp(normalizeRulePath(serverRoutesEntryAnchor))}$`,
+  );
+}
+
 function createFrameworkEntryRules(cwd: string, entries: BuildEntry[]) {
   return entries.flatMap((entry) => {
     const options = createFrameworkEntryLoaderOptions(cwd, entry);
@@ -422,6 +453,26 @@ function getPagesAppEntry(entries: BuildEntry[]):
   );
 }
 
+function getServerRoutesEntry(entries: BuildEntry[]):
+  | (BuildEntry & {
+      metadata: Extract<
+        NonNullable<BuildEntry["metadata"]>,
+        { type: "server-app" }
+      >;
+    })
+  | undefined {
+  return entries.find(
+    (
+      entry,
+    ): entry is BuildEntry & {
+      metadata: Extract<
+        NonNullable<BuildEntry["metadata"]>,
+        { type: "server-app" }
+      >;
+    } => entry.metadata?.type === "server-app",
+  );
+}
+
 function createEntryObject(cwd: string, entries: BuildEntry[]): EntryObject {
   return Object.fromEntries(
     entries.map((entry) => [
@@ -440,6 +491,10 @@ function createEntryImport(cwd: string, entry: BuildEntry): string {
 
   if (entry.metadata?.type === "pages-app") {
     return pagesEntryAnchor;
+  }
+
+  if (entry.metadata?.type === "server-app") {
+    return serverRoutesEntryAnchor;
   }
 
   if (createFrameworkEntryLoaderOptions(cwd, entry)) {

@@ -13,8 +13,8 @@ my-evjs-app/
 ├── public/                      # 原样复制的静态文件
 ├── tsconfig.json
 └── src/
-    ├── server.ts                # framework/server entry
     ├── styles.css               # 全局 CSS / Tailwind 入口
+    ├── middleware.ts            # 全局 server middleware
     ├── layout/
     │   └── index.tsx            # 可选 SPA 根布局
     ├── pages/                   # 页面路由
@@ -27,8 +27,11 @@ my-evjs-app/
     │   ├── insights.tsx         # /insights
     │   └── users/$userId.tsx    # /users/$userId
     ├── api/
-    │   ├── operators.server.ts  # "use server" functions
-    │   └── health.routes.ts     # Request/Response route handlers
+    │   └── operators.server.ts  # "use server" functions
+    ├── apis/                    # server file routes
+    │   ├── middleware.ts        # route-scoped server route middleware
+    │   └── api/
+    │       └── health.ts        # /api/health server file route
     ├── components/              # 可复用 UI
     ├── features/                # 业务领域模块
     │   └── operations/
@@ -47,10 +50,10 @@ my-evjs-app/
 - SPA 模式可以有一个可选的外部根布局源码模块。默认 `src/pages` 会在旁边查找
   `src/layout.tsx`、`src/layout.ts`、`src/layout.jsx`、`src/layout.js`，
   或对应的 `src/layout/index.*` 源码模块；自定义 `routing.dir` 时使用该路由目录的父级。
-  自动发现的根布局候选只能保留一个，或者通过 `routing.layout` 指向自定义位置。
+  自动发现的根布局候选只能保留一个，或者通过 `routing.conventions.layout` 指向自定义位置。
   显式布局模块必须使用 `.ts`、`.tsx`、`.js` 或 `.jsx`；声明文件、测试/spec、
   Storybook、client-only 和 server-only 文件都不被接受。设置
-  `routing.layout: false` 可以关闭外部根布局发现。
+  `routing.conventions.layout: false` 可以关闭外部根布局发现。
 - `pages/**/layout.*` 和 `pages/**/layout/index.*` 是 SPA route layout。
   它们会在发现到的路由树中创建 pathless layout route，因此
   `src/pages/layout.tsx` 会包裹根级页面路由，`src/pages/posts/layout.tsx`
@@ -70,6 +73,7 @@ my-evjs-app/
 ## 约定矩阵
 
 创建文件时优先看这张表。只有少数路径是框架约定，其余只是普通项目组织方式。
+完整文件名和作用域规则见 [文件约定](./file-conventions.md)。
 
 快速规则：
 
@@ -85,7 +89,7 @@ my-evjs-app/
   `*.server.*` 文件都会被路由目录忽略，因此就近放置的支撑文件不会变成路由。
 - SPA 根布局自动发现接受路由目录旁边唯一的 `layout.*` 或 `layout/index.*`
   源码模块。SPA route layout 使用路由目录内的 `layout.*` 或 `layout/index.*`
-  模块。自定义外部根布局模块使用 `routing.layout`。MPA 路由不消费框架 layout。
+  模块。自定义外部根布局模块使用 `routing.conventions.layout`。MPA 路由不消费框架 layout。
 - 输出无法遵循目录形状时，使用显式 `pages` 配置，而不是手写 `routing.routes`。
 
 迁移规则保持显式，不通过新增文件名方言来兼容：
@@ -100,6 +104,7 @@ my-evjs-app/
 | 文件或目录 | 框架含义 | 用于 | 不用于 |
 | --- | --- | --- | --- |
 | `src/pages/**/*.{tsx,jsx,ts,js}` | SPA/MPA 页面路由发现 | 轻量页面组件和可选的字面量渲染元信息 | 共享 helper、测试、bracket route、catch-all route 或手写 SPA router/bootstrap 代码 |
+| 页面路由旁同 basename 的 `src/pages/**/*.html` | MPA 页面 HTML 模板 | 页面专属 document 模板，例如 `about.tsx` 旁的 `about.html`，或 `users/index.tsx` 旁的 `users/index.html` | SPA layout、路由模块，或其他路由的模板 |
 | `src/pages` 下的 route paths、dynamic URL shapes 和生成的 route ID | graph/build plan 生成前的路由冲突检查 | 每个 URL path 只保留一个页面模块，每个 dynamic URL shape 只保留一种参数命名，并且生成的 route ID 必须唯一 | 并存的 `users.tsx`/`users/index.tsx`、`users/$id.tsx`/`users/$userId.tsx` 或 `admin/panel.tsx`/`admin_panel.tsx` 路由 |
 | `src/pages/(group)/**` | Pathless route group | 不增加 URL segment 的页面和 layout 组织目录 | 应出现在浏览器 URL 中的路径段 |
 | `src/pages/_*` 和 `src/pages/**/_*` | 忽略的私有路由模块 | 就近放置 helper component、utility、fixture 和页面局部实现细节 | URL 路由、SPA 根布局或生成文件 |
@@ -108,9 +113,11 @@ my-evjs-app/
 | `<routing-dir-parent>/layout.{tsx,ts,jsx,js}` 或 `<routing-dir-parent>/layout/index.{tsx,ts,jsx,js}` | 可选外部 SPA 根布局 | 包裹已发现 SPA 路由树的一层应用 shell | MPA 公共外框、route-specific 嵌套布局或多个根布局候选 |
 | `src/pages/**/layout.{tsx,ts,jsx,js}` 或 `src/pages/**/layout/index.{tsx,ts,jsx,js}` | SPA route layout | 在同一 URL 前缀下包裹子路由的 pathless layout route | MPA 公共外框，或命名为 `layout` 的非 layout helper 目录 |
 | `<routing-dir-parent>/route-types.d.ts` | SPA 导航类型生成物 | 编辑器和类型检查支持 | 手工修改、从应用代码导入、放入模板或脚手架源码，或用于 MPA 模式 |
-| `src/api/*.server.ts` | 推荐的 server function 边界 | 以 `"use server";` 开头并导出命名 callable server functions 的文件 | 需要在 `server: false` 下运行的客户端导入、默认导出或 runtime re-export |
-| `src/api/*.routes.ts` | 推荐的 server route 边界 | 使用 Web `Request`/`Response` 的 `createRoute()` handlers | Server functions，或把同一个 URL shape 拆到多个文件 |
-| `src/server.ts` | Framework server entry | `createApp({ routes, middlewares, framework })` 和部署运行时 glue | 浏览器代码或按页面拆分的 client bootstrap |
+| `src/api/*.server.ts` | 推荐的 server function 边界 | 以 `"use server";` 开头并导出命名 callable server functions 的文件 | 浏览器专用 helper、默认导出或 runtime re-export |
+| `src/apis/**/*.{ts,tsx,js,jsx}` | 启用 `server.routing` 时的服务端文件路由发现 | 导出大写 HTTP method 的 Request/Response route 模块 | `route.ts` 哨兵、`foo.get.ts` method suffix 文件、bracket/catch-all/optional routes、`middleware`/`middlewares`、默认导出，或从 route candidate 导出 helper |
+| `src/middleware.{ts,tsx,js,jsx}` | 启用 server conventions 时的全局服务端中间件约定 | 在 server file routes、server functions、SSR、PPR 和 RSC 之前运行的 Hono-compatible middleware | Matcher 配置、route handlers 或 helper exports |
+| `src/apis/**/middleware.{ts,tsx,js,jsx}` | route-scoped server file-route middleware | 作用于该目录树下 descendant server file routes 的 Hono-compatible middleware | `api.ts` 这类 flat sibling routes、全局 server functions/SSR middleware，或 matcher 配置 |
+| `src/apis` 下的 server route paths 和 dynamic URL shapes | graph/build plan 生成前的 server route 冲突检查 | 每个 URL path 只保留一个 server route module，每个 dynamic URL shape 只保留一种参数命名 | 并存的 `users.ts`/`users/index.ts`、`users/$id.ts`/`users/$userId.ts`，或把同一路径的方法拆到多个文件 |
 | `src/features`、`src/components`、`src/lib`、`src/hooks` | 没有直接框架约定 | 业务代码、可复用 UI、浏览器安全 helper 和 React hooks | 依赖文件名被路由发现的文件 |
 
 除非确实需要更底层 API，否则不要在一个应用中混用多套路由所有权模型：
@@ -134,15 +141,17 @@ export default defineConfig({
   },
 
   server: {
-    entry: "./src/server.ts",
+    routing: true,
     rsc: true,
   },
 });
 ```
 
 当每个路由都应该输出独立 HTML 文档且不需要客户端路由器配置时，使用
-`routing: { mode: "mpa" }`；这种模式不使用框架 layout。只有页面输出无法自然映射到
-`src/pages` 时，才使用更底层的 `pages` 配置。
+`routing: { mode: "mpa" }`；这种模式不使用框架 layout。MPA 路由可以用同
+basename 的 colocated 模板替代全局 `index.html` 模板，例如
+`src/pages/product/index.tsx` 对应 `src/pages/product/index.html`。只有页面输出无法
+自然映射到 `src/pages` 时，才使用更底层的 `pages` 配置。
 
 ## 页面模块
 
@@ -235,7 +244,8 @@ export default function Campaign() {
 
 ## 服务端边界
 
-默认把服务端专用代码放在 `src/api/` 下。
+默认把 callable server functions 放在 `src/api/` 下，把服务端文件路由放在
+`src/apis` 下。
 
 ```ts
 // src/api/operators.server.ts
@@ -247,37 +257,60 @@ export async function listOperators() {
 ```
 
 ```ts
-// src/api/health.routes.ts
-import { createRoute } from "@evjs/server";
-
-export const healthRoute = createRoute("/api/health", {
-  GET: async () => Response.json({ ok: true }),
-});
+// src/apis/api/health.ts
+export const GET = async () => Response.json({ ok: true });
 ```
 
-在 `src/server.ts` 中挂载 routes 和 framework rendering：
+`src/apis` 下的文件路径就是 URL path，因此上面的例子映射到
+`/api/health`。根路由使用 `src/apis/index.ts`；动态段使用
+`$param` 文件名，并映射为 Hono params，例如 `:userId`。
+
+服务端 middleware 使用 Hono 的 middleware 签名，并放在专门的 `middleware.ts`
+约定文件中：
 
 ```ts
-import { createApp, requestLogger } from "@evjs/server";
-import { createReactFrameworkServer } from "@evjs/server/react";
-import { healthRoute } from "./api/health.routes";
+// src/middleware.ts
+import type { MiddlewareHandler } from "@evjs/server";
 
-const framework = createReactFrameworkServer();
+const middleware: MiddlewareHandler = async (ctx, next) => {
+  await next();
+  ctx.header("x-server", "evjs");
+};
 
-const app = createApp({
-  middlewares: [requestLogger()],
-  routes: [healthRoute],
-  framework,
-});
+export default middleware;
+```
 
-export default { fetch: app.fetch };
+```ts
+// src/apis/api/middleware.ts
+import type { MiddlewareHandler } from "@evjs/server";
+
+const middleware: MiddlewareHandler = async (ctx, next) => {
+  if (!ctx.req.header("authorization")) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  await next();
+};
+
+export default middleware;
+```
+
+```ts
+// src/apis/users/$userId.ts
+export const GET = async (_req, ctx) => {
+  const userId = ctx.req.param("userId");
+  return Response.json({ id: userId });
+};
 ```
 
 ## 命名建议
 
 - `pages/` 是文件路由目录，也可以包含 SSR/PPR/RSC components。
-- `api/` 是服务端边界。
+- `api/` 放 callable server functions 和自定义 route helpers。
+- `apis/` 是启用 `server.routing` 时的服务端文件路由目录。
+- `middleware.ts` 是全局服务端 middleware；嵌套的
+  `apis/**/middleware.ts` 会把 middleware 作用域限制到 descendant file
+  routes。
 - `features/` 放业务领域模块。
 - `components/` 放通用 UI。
 - `lib/` 放浏览器安全的共享工具。
-- 服务端密钥和 Node-only API 应留在 `api/`，或只被 server-only code 引用的模块中。
+- 服务端密钥和 Node-only API 应留在 `api/`、`apis/`，或只被 server-only code 引用的模块中。

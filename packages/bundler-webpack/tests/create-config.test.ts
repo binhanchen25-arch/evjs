@@ -10,6 +10,7 @@ import {
 const require = createRequire(import.meta.url);
 const frameworkEntryLoader = require("../src/adapter/framework-entry-loader.cjs");
 const pagesEntryLoader = require("../src/adapter/pages-entry-loader.cjs");
+const serverRoutesEntryLoader = require("../src/adapter/server-routes-entry-loader.cjs");
 
 describe("createWebpackConfigs", () => {
   it("installs the pages entry loader for framework-managed pages", async () => {
@@ -65,6 +66,8 @@ describe("createWebpackConfigs", () => {
     const config: ResolvedConfig<WebpackConfig> = {
       ...createResolvedConfig(),
       output: {
+        client: "dist/client",
+        server: "dist/server",
         crossOriginLoading: "use-credentials",
       },
     };
@@ -91,6 +94,63 @@ describe("createWebpackConfigs", () => {
     expect(miniCssPlugin?.options?.attributes).toEqual({
       crossorigin: "use-credentials",
     });
+  });
+
+  it("installs the server routes entry loader for framework-managed server routes", async () => {
+    const base = createResolvedConfig();
+    const config: ResolvedConfig<WebpackConfig> = {
+      ...base,
+      server: {
+        ...base.server,
+        routing: {
+          dir: "./src/apis",
+          routes: [
+            {
+              id: "src/apis/health.ts:/health:GET",
+              module: "src/apis/health.ts",
+              path: "/health",
+              methods: ["GET"],
+            },
+          ],
+        },
+      },
+    };
+    const graph = createGraph(config);
+    const plan = createBuildPlan(config, graph, { mode: "development" });
+
+    const configs = await createWebpackConfigs(
+      config,
+      plan,
+      graph,
+      process.cwd(),
+      [],
+    );
+
+    const serverConfig = configs.find((item) => item.name === "server");
+    const entry = serverConfig?.entry as Record<string, { import: string }>;
+    expect(entry.server?.import).toContain("server-routes-entry-anchor.js");
+    expect(serverConfig?.module?.rules).toContainEqual(
+      expect.objectContaining({
+        test: expect.any(RegExp),
+        resourceQuery: /^$/,
+        use: [
+          {
+            loader: expect.stringContaining("server-routes-entry-loader.cjs"),
+            options: {
+              type: "server-app",
+              routes: [
+                {
+                  id: "src/apis/health.ts:/health:GET",
+                  module: "src/apis/health.ts",
+                  path: "/health",
+                  methods: ["GET"],
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
   });
 
   it("uses component page bootstrap instead of the SPA router loader for MPA page routes", async () => {
@@ -143,10 +203,11 @@ describe("createWebpackConfigs", () => {
     };
     const plan = createBuildPlan(config, graph, { mode: "development" });
 
-    expect(plan.entries.map((entry) => entry.metadata?.type)).toEqual([
-      "react-component-page",
-      "react-component-page",
-    ]);
+    expect(
+      plan.entries
+        .filter((entry) => entry.environment === "client")
+        .map((entry) => entry.metadata?.type),
+    ).toEqual(["react-component-page", "react-component-page"]);
     const configs = await createWebpackConfigs(
       config,
       plan,
@@ -214,10 +275,75 @@ describe("createWebpackConfigs", () => {
     expect(source).not.toContain("evjs-page-route");
   });
 
+  it("generates server routes entries from method exports", () => {
+    const source = serverRoutesEntryLoader.call({
+      cacheable() {},
+      getOptions() {
+        return {
+          routes: [
+            {
+              path: "/health",
+              module: "src/apis/health.ts",
+              methods: ["GET"],
+            },
+            {
+              path: "/secure",
+              module: "src/apis/secure.ts",
+              methods: ["POST"],
+              middlewares: [
+                {
+                  module: "src/apis/middleware.ts",
+                },
+              ],
+            },
+          ],
+          middlewares: [
+            {
+              module: "src/middleware.ts",
+            },
+          ],
+          serverFunctions: [
+            {
+              id: "save",
+              module: "src/api/actions.server.ts",
+              exportName: "saveOrder",
+            },
+            {
+              id: "load",
+              module: "src/api/actions.server.ts",
+              exportName: "loadOrders",
+            },
+          ],
+        };
+      },
+      resourcePath:
+        "/workspace/node_modules/@evjs/bundler-webpack/esm/adapter/server-routes-entry-anchor.js",
+      rootContext: "/workspace",
+    });
+
+    expect(source).toContain('@evjs/server"');
+    expect(source).toContain("@evjs/server/react");
+    expect(source).toContain('createRoute("/health", routeDefinition0)');
+    expect(source).toContain('createRoute("/secure", routeDefinition1)');
+    expect(source).toContain("import middleware0 from");
+    expect(source).toContain("src/middleware.ts");
+    expect(source).toContain("import middleware1 from");
+    expect(source).toContain("src/apis/middleware.ts");
+    expect(source).toContain(
+      'import "file:///workspace/src/api/actions.server.ts";',
+    );
+    expect(source.match(/actions\.server\.ts/g)).toHaveLength(1);
+    expect(source).toContain("routeDefinition0.GET = routeModule0.GET");
+    expect(source).not.toContain("routeDefinition0.middlewares");
+    expect(source).toContain("routeDefinition1.middlewares = [middleware1]");
+    expect(source).toContain("routeDefinition1.POST = routeModule1.POST");
+    expect(source).toContain("const middlewares = [middleware0]");
+    expect(source).toContain("createApp({ middlewares, routes");
+  });
+
   it("keeps React and ReactDOM external in regular Node server bundles", async () => {
     const config: ResolvedConfig<WebpackConfig> = {
       ...createResolvedConfig(),
-      serverEnabled: true,
     };
     const graph: AppGraph = {
       ...createGraph(config),
@@ -295,9 +421,10 @@ function createResolvedConfig(): ResolvedConfig<WebpackConfig> {
       proxy: [],
     },
     output: {
+      client: "dist/client",
+      server: "dist/server",
       crossOriginLoading: "anonymous",
     },
-    serverEnabled: false,
     server: {
       basePath: "/__evjs",
       runtime: {
@@ -338,6 +465,6 @@ function createGraph(config: ResolvedConfig<WebpackConfig>): AppGraph {
         appId: "default",
       })) ?? [],
     serverFunctions: [],
-    serverRoutes: [],
+    serverRoutes: config.server.routing?.routes ?? [],
   };
 }

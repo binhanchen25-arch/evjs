@@ -15,8 +15,8 @@ my-evjs-app/
 ├── public/                      # copied static files
 ├── tsconfig.json
 └── src/
-    ├── server.ts                # framework/server entry
     ├── styles.css               # global CSS / Tailwind entry
+    ├── middleware.ts            # global server middleware
     ├── layout/
     │   └── index.tsx            # optional SPA root layout
     ├── pages/                   # page routes
@@ -29,8 +29,11 @@ my-evjs-app/
     │   ├── insights.tsx         # /insights
     │   └── users/$userId.tsx    # /users/$userId
     ├── api/
-    │   ├── operators.server.ts  # "use server" functions
-    │   └── health.routes.ts     # Request/Response route handlers
+    │   └── operators.server.ts  # "use server" functions
+    ├── apis/                    # server file routes
+    │   ├── middleware.ts        # route-scoped server route middleware
+    │   └── api/
+    │       └── health.ts        # /api/health server file route
     ├── components/              # reusable UI
     ├── features/                # domain modules
     │   └── operations/
@@ -53,10 +56,11 @@ This shape covers the complete framework surface:
   `src/layout.ts`, `src/layout.jsx`, `src/layout.js`, or the matching
   `src/layout/index.*` source modules. Custom `routing.dir` values use the
   parent of that route directory. Keep exactly one auto-discovered root layout
-  module, or use `routing.layout` for a custom location. Explicit layout
-  modules must use `.ts`, `.tsx`, `.js`, or `.jsx`; declaration, test, spec,
-  story, client-only, and server-only files are not accepted. Set
-  `routing.layout: false` to disable external root layout discovery.
+  module, or use `routing.conventions.layout` for a custom location. Explicit
+  layout modules must use `.ts`, `.tsx`, `.js`, or `.jsx`; declaration, test,
+  spec, story, client-only, and server-only files are not accepted. Set
+  `routing.conventions.layout: false` to disable external root layout
+  discovery.
 - `pages/**/layout.*` and `pages/**/layout/index.*` are SPA route layouts. They
   create pathless layout routes inside the discovered route tree, so
   `src/pages/layout.tsx` wraps the root page routes and
@@ -81,6 +85,8 @@ This shape covers the complete framework surface:
 
 Use this table as the source of truth when creating files. Only a few paths are
 framework conventions; the rest are ordinary project organization.
+For a dedicated filename and scope reference, see
+[File Conventions](./file-conventions.md).
 
 Quick rules:
 
@@ -98,9 +104,9 @@ Quick rules:
   colocated support files do not become routes.
 - SPA root layout auto-discovery accepts one `layout.*` or `layout/index.*`
   source module beside the route directory. SPA route layouts use `layout.*` or
-  `layout/index.*` modules inside the route directory. Use `routing.layout` for
-  a custom external root layout module. MPA routes do not consume framework
-  layouts.
+  `layout/index.*` modules inside the route directory. Use
+  `routing.conventions.layout` for a custom external root layout module. MPA
+  routes do not consume framework layouts.
 - If an output cannot follow the directory shape, use explicit `pages` config
   instead of hand-writing `routing.routes`.
 
@@ -119,6 +125,7 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 | File or folder | Framework meaning | Use it for | Do not use it for |
 | --- | --- | --- | --- |
 | `src/pages/**/*.{tsx,jsx,ts,js}` | SPA/MPA page route discovery | Thin page components with optional literal rendering metadata | Shared helpers, tests, bracket routes, catch-all routes, or hand-written SPA router/bootstrap code |
+| Same-basename `src/pages/**/*.html` beside a page route | MPA page HTML template | Page-specific document templates such as `about.html` beside `about.tsx` or `users/index.html` beside `users/index.tsx` | SPA layouts, route modules, or templates for unrelated routes |
 | Route paths, dynamic URL shapes, and generated route IDs under `src/pages` | Route collision checks before graph/build-plan generation | One page module per URL path, one parameter naming choice per dynamic URL shape, and unique generated route IDs | Parallel `users.tsx`/`users/index.tsx`, `users/$id.tsx`/`users/$userId.tsx`, or `admin/panel.tsx`/`admin_panel.tsx` routes |
 | `src/pages/(group)/**` | Pathless route group | Organizing page and layout modules without adding a URL segment | URL segments that should be visible in the browser path |
 | `src/pages/_*` and `src/pages/**/_*` | Ignored private route modules | Colocated helper components, utilities, fixtures, and page-local implementation details | URL routes, SPA root layouts, or generated files |
@@ -127,9 +134,11 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 | `<routing-dir-parent>/layout.{tsx,ts,jsx,js}` or `<routing-dir-parent>/layout/index.{tsx,ts,jsx,js}` | Optional external SPA root layout | One app shell around the discovered SPA route tree | MPA shared chrome, route-specific nested layouts, or multiple root layout candidates |
 | `src/pages/**/layout.{tsx,ts,jsx,js}` or `src/pages/**/layout/index.{tsx,ts,jsx,js}` | SPA route layout | Pathless layout routes that wrap child routes at the same URL prefix | MPA shared chrome or non-layout helper folders named `layout` |
 | `<routing-dir-parent>/route-types.d.ts` | Generated SPA navigation types | Editor and type-checker support | Manual edits, imports from app code, template/scaffold source, or MPA mode |
-| `src/api/*.server.ts` | Recommended server-function boundary | Files that start with `"use server";` and export named callable server functions | Client imports that should run with `server: false`, default exports, or runtime re-exports |
-| `src/api/*.routes.ts` | Recommended server-route boundary | `createRoute()` handlers using Web `Request`/`Response` | Server functions or multiple files for the same URL shape |
-| `src/server.ts` | Framework server entry | `createApp({ routes, middlewares, framework })` and deployment runtime glue | Browser code or per-page client bootstrap |
+| `src/api/*.server.ts` | Recommended server-function boundary | Files that start with `"use server";` and export named callable server functions | Browser-only helpers, default exports, or runtime re-exports |
+| `src/apis/**/*.{ts,tsx,js,jsx}` | Server file route discovery when `server.routing` is enabled | Request/Response route modules exporting uppercase HTTP methods | `route.ts` sentinels, `foo.get.ts` method suffix files, bracket/catch-all/optional routes, `middleware`/`middlewares`, default exports, or helper exports from route candidates |
+| `src/middleware.{ts,tsx,js,jsx}` | Global server middleware convention when server conventions are enabled | Hono-compatible middleware that runs before server file routes, server functions, SSR, PPR, and RSC | Matcher config, route handlers, or helper exports |
+| `src/apis/**/middleware.{ts,tsx,js,jsx}` | Route-scoped server file-route middleware | Hono-compatible middleware for descendant server file routes in that directory tree | Flat sibling routes such as `api.ts`, global server functions/SSR middleware, or matcher config |
+| Server route paths and dynamic URL shapes under `src/apis` | Server route collision checks before graph/build-plan generation | One server route module per URL path and one parameter naming choice per dynamic URL shape | Parallel `users.ts`/`users/index.ts`, `users/$id.ts`/`users/$userId.ts`, or splitting methods for one path across files |
 | `src/features`, `src/components`, `src/lib`, `src/hooks` | No direct framework convention | Domain code, reusable UI, browser-safe helpers, and React hooks | Files that depend on route discovery by filename |
 
 Do not mix ownership models in one app unless you need the lower-level API:
@@ -155,15 +164,18 @@ export default defineConfig({
   },
 
   server: {
-    entry: "./src/server.ts",
+    routing: true,
     rsc: true,
   },
 });
 ```
 
 Use `routing: { mode: "mpa" }` when every route should be emitted as its own
-HTML document without SPA router setup or framework layouts. Use the lower-level
-`pages` config only for page outputs that do not map cleanly to `src/pages`.
+HTML document without SPA router setup or framework layouts. MPA routes can
+use a same-basename colocated template, such as
+`src/pages/product/index.html` for `src/pages/product/index.tsx`, instead of
+the global `index.html` template. Use the lower-level `pages` config only for
+page outputs that do not map cleanly to `src/pages`.
 
 ## Page Modules
 
@@ -269,7 +281,8 @@ region metadata is read.
 
 ## Server Boundary
 
-Put server-only code under `src/api/` by default.
+Put callable server functions under `src/api/` and file-based server routes
+under `src/apis` by default.
 
 ```ts
 // src/api/operators.server.ts
@@ -281,38 +294,62 @@ export async function listOperators() {
 ```
 
 ```ts
-// src/api/health.routes.ts
-import { createRoute } from "@evjs/server";
-
-export const healthRoute = createRoute("/api/health", {
-  GET: async () => Response.json({ ok: true }),
-});
+// src/apis/api/health.ts
+export const GET = async () => Response.json({ ok: true });
 ```
 
-Mount routes and framework rendering in `src/server.ts`:
+The file path under `src/apis` is the URL path, so the example above
+maps to `/api/health`. A root route uses `src/apis/index.ts`; dynamic
+segments use `$param` filenames and map to Hono params such as `:userId`.
+
+Server middleware uses Hono's middleware signature and lives in dedicated
+`middleware.ts` convention files:
 
 ```ts
-import { createApp, requestLogger } from "@evjs/server";
-import { createReactFrameworkServer } from "@evjs/server/react";
-import { healthRoute } from "./api/health.routes";
+// src/middleware.ts
+import type { MiddlewareHandler } from "@evjs/server";
 
-const framework = createReactFrameworkServer();
+const middleware: MiddlewareHandler = async (ctx, next) => {
+  await next();
+  ctx.header("x-server", "evjs");
+};
 
-const app = createApp({
-  middlewares: [requestLogger()],
-  routes: [healthRoute],
-  framework,
-});
+export default middleware;
+```
 
-export default { fetch: app.fetch };
+```ts
+// src/apis/api/middleware.ts
+import type { MiddlewareHandler } from "@evjs/server";
+
+const middleware: MiddlewareHandler = async (ctx, next) => {
+  if (!ctx.req.header("authorization")) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  await next();
+};
+
+export default middleware;
+```
+
+```ts
+// src/apis/users/$userId.ts
+export const GET = async (_req, ctx) => {
+  const userId = ctx.req.param("userId");
+  return Response.json({ id: userId });
+};
 ```
 
 ## Naming Guidance
 
 - `pages/` is the page route source folder and can include SSR/PPR/RSC components.
-- `api/` is the server boundary.
+- `api/` contains callable server functions and custom route helpers.
+- `apis/` is the server file route source folder when `server.routing`
+  is enabled.
+- `middleware.ts` is global server middleware; nested
+  `apis/**/middleware.ts` files scope middleware to descendant file
+  routes.
 - `features/` owns business domains.
 - `components/` owns generic UI.
 - `lib/` contains browser-safe shared helpers.
-- Keep server secrets and Node-only APIs in `api/` or modules imported only by
-  server-only code.
+- Keep server secrets and Node-only APIs in `api/`, `apis/`, or modules
+  imported only by server-only code.

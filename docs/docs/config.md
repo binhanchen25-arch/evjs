@@ -23,6 +23,10 @@ export default defineConfig({
 | `html` | `./index.html` |
 | `output.crossOriginLoading` | `"anonymous"` |
 | `routing.mode` | `spa` |
+| `routing.dir` | `./src/pages` when `routing` is enabled |
+| `routing.conventions.layout` | `true` in SPA mode; auto-discovers a root layout beside `routing.dir` when present |
+| `server.routing.dir` | `./src/apis` when `server.routing` is enabled |
+| `server.conventions.middleware` | `true` when server conventions are enabled |
 | `dev.port` | `3000` |
 | `server.dev.port` | `3001` |
 | `server.basePath` | `/__evjs` |
@@ -36,6 +40,21 @@ The top-level config object accepts only `entry`, `html`, `output`, `dev`,
 `pages`. Framework metadata such as generated app declarations, page-route
 runtime wiring, and server-function endpoints is derived by evjs instead of
 being configured directly.
+
+## Convention Config
+
+Client and server conventions use the same owner model even though the object
+names differ:
+
+| Surface | Route discovery | Convention controls | Default files |
+|---------|-----------------|---------------------|---------------|
+| Client pages | `routing` | `routing.conventions.layout` for the SPA root layout; page-route file rules live under `routing.dir` | `./src/pages`, plus `layout.*` or `layout/index.*` beside that directory when present |
+| Server requests | `server.routing` | `server.conventions.middleware` for filesystem-scoped middleware | `./src/apis`, `./src/middleware.ts`, and `./src/apis/**/middleware.ts` |
+
+Top-level `routing` remains the client/page owner, and client convention
+toggles live under `routing.conventions`. Server conventions live under
+`server.conventions` because server functions, RSC, PPR, and runtime endpoints
+are separate server framework surfaces.
 
 ## Output HTML Assets
 
@@ -59,8 +78,11 @@ HTML documents or individual initial assets need different attributes.
 
 ## Routing
 
-`src/pages` is the primary client-routing model. SPA mode builds one
-framework-owned app from those page files:
+`src/pages` is the primary client-routing model. Treat top-level `routing` as
+the client convention object: it owns the route directory, output mode, SPA
+root layout convention, HTML template, and mount selector. Server file routes
+use the parallel `server.routing` and `server.conventions` surface. SPA mode
+builds one framework-owned app from those page files:
 
 ```ts
 export default defineConfig({
@@ -83,6 +105,13 @@ export default defineConfig({
 });
 ```
 
+MPA file routes can use a colocated HTML template instead of the global
+`index.html` template. For example, `src/pages/about.html` is used by
+`src/pages/about.tsx`, and `src/pages/product/index.html` is used by
+`src/pages/product/index.tsx`. Routes without a colocated template use the
+top-level `html` template, whose default is `./index.html`, unless the
+template is overridden with `routing: { html: "..." }`.
+
 When `src/pages` exists and the project does not declare explicit `app`,
 `pages` config, SPA routing is enabled automatically.
 Set `routing: false` to disable file-route discovery explicitly.
@@ -92,29 +121,33 @@ must be an object; arrays and `null` are rejected.
 SPA mode can use a root layout module. By default evjs looks for a single
 `layout.*` or `layout/index.*` source module beside the route directory, such
 as `src/layout.tsx` or `src/layout/index.tsx` for `src/pages`. If more than one
-candidate exists, keep one file or configure `routing.layout` explicitly. Set
-`routing.layout` to a module path when a migrated app has its shell in another
-location. Explicit layout modules must be source modules, not declaration,
-test, spec, story, client-only, or server-only files. Set it to `false` to
-disable external root layout discovery:
+candidate exists, keep one file or configure `routing.conventions.layout`
+explicitly. Set `routing.conventions.layout` to a module path when a migrated
+app has its shell in another location. Explicit layout modules must be source
+modules, not declaration, test, spec, story, client-only, or server-only files.
+Set it to `false` to disable external root layout discovery:
 
 ```ts
 export default defineConfig({
   routing: {
     mode: "spa",
-    layout: "./src/shell/AppLayout.tsx",
+    conventions: {
+      layout: "./src/shell/AppLayout.tsx",
+    },
   },
 });
 ```
 
-`routing.layout` is not supported in MPA mode. Route-directory layout modules
-are SPA route conventions. MPA pages should compose shared shells as normal
-React components, or use page-specific/shared HTML templates when the document
-wrapper needs to differ.
+Layout conventions are not supported in MPA mode. Route-directory layout
+modules are SPA route conventions. MPA pages should compose shared shells as
+normal React components, or use page-specific/shared HTML templates when the
+document wrapper needs to differ.
 
 `routing.mode` must be either `spa` or `mpa`. When provided, `routing.dir`,
-`routing.html`, and `routing.mount` must be non-empty strings. `routing.layout`
-must be either `false` or a non-empty module path.
+`routing: { html }`, and `routing.mount` must be non-empty strings.
+`routing.conventions` must be `true`, `false`, or an object; object form
+currently supports `layout`. `routing.conventions.layout` must be a boolean or
+a non-empty module path.
 
 Use top-level `entry` / `html` only for a manually bootstrapped single app.
 Applications that use `src/pages` should not create a separate client router or
@@ -146,11 +179,11 @@ export default defineConfig({
 Object-form `app` must specify exactly one of `source` or `entry`. `source`,
 `entry`, `html`, and `mount` must be non-empty strings when provided.
 Object-form `app` accepts only `source`, `entry`, `html`, and `mount`.
-Configured HTML templates from top-level `html`, `app.html`, `routing.html`,
-and `pages.*.html` must point to files and are validated before the bundler
-runs. When a config object declares `mount`, that selector must match an
-element in the corresponding HTML template. Shared templates are allowed; each
-declared mount selector is checked independently.
+Configured HTML templates from top-level `html`, `app.html`,
+`routing: { html }`, and `pages.*.html` must point to files and are validated
+before the bundler runs. When a config object declares `mount`, that selector
+must match an element in the corresponding HTML template. Shared templates are
+allowed; each declared mount selector is checked independently.
 
 ## Pages
 
@@ -289,18 +322,17 @@ before bundling so deployment adapters can trust the manifest:
 
 | Capability | Required page contract | SPA document output | MPA document output | Server/runtime requirement | Unsupported combination |
 | --- | --- | --- | --- | --- | --- |
-| CSR | Omit `render`, or export `render = "csr"` | App HTML fallback | One HTML document per page | No server required | None |
-| SSR | `render = "ssr"` | Route-owned server document | Route-owned server document, no static HTML file | Framework server document route | `server: false` |
-| SSG | `render = "ssg"` | App HTML fallback plus static metadata for the route page | Standalone static HTML document | Server build required for generation/manifest linking | `server: false` |
-| PPR | `render = "ssr"` + `prerender = { partial: true }` on a component page | Route-owned server document with server-composed regions | Route-owned server document with server-composed regions | Framework server document route plus optional `runtime.server.ppr` direct/debug endpoint | RSC on the same page, full-page hydration entry, `server: false` |
-| RSC | `render = "ssr"` + `rsc = true` on a component page | Route-owned server document plus RSC Flight endpoint | Route-owned server document plus RSC Flight endpoint | Framework server document route plus `runtime.server.rsc` | PPR on the same page, `hydrate` other than `"none"`, `server: false` |
+| CSR | Omit `render`, or export `render = "csr"` | App HTML fallback | One HTML document per page | Framework server still emitted for conventions and functions | None |
+| SSR | `render = "ssr"` | Route-owned server document | Route-owned server document, no static HTML file | Framework server document route | None |
+| SSG | `render = "ssg"` | App HTML fallback plus static metadata for the route page | Standalone static HTML document | Server build for generation/manifest linking | None |
+| PPR | `render = "ssr"` + `prerender = { partial: true }` on a component page | Route-owned server document with server-composed regions | Route-owned server document with server-composed regions | Framework server document route plus optional `runtime.server.ppr` direct/debug endpoint | RSC on the same page, full-page hydration entry |
+| RSC | `render = "ssr"` + `rsc = true` on a component page | Route-owned server document plus RSC Flight endpoint | Route-owned server document plus RSC Flight endpoint | Framework server document route plus `runtime.server.rsc` | PPR on the same page, `hydrate` other than `"none"` |
 If a page needs both RSC data flow and partial prerendered regions, keep those
 capabilities on separate page routes for now. A single component page must choose
 either `rsc = true` or `prerender = { partial: true }`.
 
-`server: false` is only valid for CSR pages, MPA client entries
-builds, and static assets. SSR, SSG, PPR, RSC, server functions, and server
-routes require the framework server to be enabled during build.
+The framework server is always part of the build. Use `output.client` and
+`output.server` to choose artifact directories instead of disabling the server.
 
 PPR pages should express deferred content with ordinary React `Suspense`:
 
@@ -438,19 +470,26 @@ missing required fields as startup errors. Custom runtimes that call
 `startReactRscPageRuntime({ document })` use that document for both bootstrap
 lookup and mount selector resolution.
 
-## Server
-
-Set `server: false` for CSR-only output:
+## Output
 
 ```ts
-export default defineConfig({ server: false });
+export default defineConfig({
+  output: {
+    client: "dist",
+    server: "dist-server",
+  },
+});
 ```
 
-When `server: false`:
+`output.client` and `output.server` control emitted artifact directories:
 
-- build output is flat `dist/`;
-- `"use server"` modules are build errors;
-- no framework server proxy is configured in dev.
+- `output.client` defaults to `dist/client`.
+- `output.server` defaults to `dist/server`.
+- Set `output.client: "dist"` with `output.server: "dist-server"` when the
+  public manifest and browser assets should be written directly under `dist`
+  while server artifacts stay outside the public output directory.
+
+## Server
 
 The framework server boundary defaults to `/__evjs`. Configure
 `server.basePath` only when a deployment platform requires a different path:
@@ -458,7 +497,6 @@ The framework server boundary defaults to `/__evjs`. Configure
 ```ts
 export default defineConfig({
   server: {
-    entry: "./src/server.ts",
     dev: {
       port: 3001,
       https: false,
@@ -467,11 +505,47 @@ export default defineConfig({
 });
 ```
 
+Server conventions use the same owner model under `server`: `server.routing`
+owns server file-route discovery, and `server.conventions` owns server behavior
+modules discovered from the server tree.
+
+Enable server file routes with `server.routing`. `true` scans
+`./src/apis`; object form currently supports only `dir`. There is no
+`prefix` option: put files under a folder such as `src/apis/api` when
+the URL should start with `/api`.
+
+```ts
+export default defineConfig({
+  server: {
+    routing: true,
+  },
+});
+```
+
+Server conventions are enabled by default when `server.routing` is enabled.
+The current convention discovers `src/middleware.ts` for global
+middleware and `src/apis/**/middleware.ts` for route-scoped file-route
+middleware. Missing middleware files are ignored.
+
+```ts
+export default defineConfig({
+  server: {
+    routing: true,
+    conventions: {
+      middleware: false,
+    },
+  },
+});
+```
+
+Use `server.conventions: false` to disable all server conventions.
+
 `output`, `dev`, `server`, `server.dev`, and `transport` must be objects when
-provided; use `server: false` to disable the framework server. `server.entry`
-must be a non-empty module path when provided, and evjs validates configured
-source paths such as `server.entry` during app graph analysis before the
-bundler runs.
+provided. `output.client` and `output.server` must be non-empty strings that
+point to different directories.
+`server.routing` must be `true`, `false`, or an object with an optional
+non-empty `dir` string. `server.conventions` must be `true`, `false`, or an
+object; object form currently supports `middleware`.
 `server.basePath` must be a non-empty URL
 pathname that starts with `/`, without whitespace, a query string, or a hash;
 trailing slashes are normalized away. If `server.rsc` is configured as an

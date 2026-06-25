@@ -15,7 +15,7 @@ cd my-app && npm install
 |------|------|
 | `basic` | 路由 + 服务端函数 |
 | `mpa` | 多页面应用模板 |
-| `api-routes` | 通过 `createRoute()` 构建程序化 REST API |
+| `api-routes` | 通过 `server.routing` 文件路由构建 REST API |
 | `complex-routing` | 参数、搜索、根布局、加载器、嵌套路径 |
 | `with-tailwind` | 通过 PostCSS 使用 Tailwind CSS |
 | `with-trpc` | tRPC 互操作示例 |
@@ -29,8 +29,8 @@ cd my-app && npm install
 ev dev
 ```
 
-开发服务器运行在 `http://localhost:3000`，支持热模块替换。app、page 和
-server entry import graph 中可达的 `"use server"` 模块会被自动发现。
+开发服务器运行在 `http://localhost:3000`，支持热模块替换。app、page、server
+file-route 和 server middleware convention import graph 中可达的 `"use server"` 模块会被自动发现。
 
 ## 生产构建
 
@@ -51,9 +51,12 @@ my-app/
 │   ├── pages/              # 文件路由
 │   │   ├── index.tsx       # /
 │   │   └── users/$id.tsx   # /users/$id
-│   └── api/                # 服务端模块
-│       ├── users.server.ts # "use server" 函数
-│       └── health.routes.ts
+│   ├── api/                # 服务端函数模块
+│   │   └── users.server.ts # "use server" 函数
+│   ├── apis/               # 服务端文件路由
+│   │   └── api/
+│   │       └── health.ts   # /api/health
+│   └── middleware.ts       # 全局 server middleware
 ├── package.json
 └── tsconfig.json
 ```
@@ -79,9 +82,9 @@ export default function UserPage() {
 
 SPA 根布局发现是可选的。可以在路由目录旁边保留唯一的 `layout.*` 或
 `layout/index.*` 源码模块，例如 `src/layout.tsx` 或 `src/layout/index.tsx`；
-也可以通过 `routing.layout` 指向其他模块；如果应用不需要框架根布局，设置
-`routing.layout: false`。SPA route layout 也可以放在路由目录内，命名为
-`layout.*` 或 `layout/index.*`。
+也可以通过 `routing.conventions.layout` 指向其他模块；如果应用不需要框架根布局，
+设置 `routing.conventions.layout: false`。SPA route layout 也可以放在路由目录内，
+命名为 `layout.*` 或 `layout/index.*`。
 
 ## MPA 模式
 
@@ -100,7 +103,7 @@ export default defineConfig({
 
 每个页面都会生成独立 HTML 文档和客户端 entry，不引入客户端路由器配置。
 框架 layout 约定只用于 SPA；MPA 页面需要公共外框时，应像普通 React 代码一样组合共享组件，
-且不支持 `routing.layout`。
+且不支持 `routing.conventions.layout`。
 
 ## 包列表
 

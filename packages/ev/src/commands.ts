@@ -17,11 +17,14 @@ import { getLogger } from "@logtape/logtape";
 import { execa } from "execa";
 import { validateHtmlTemplate } from "./build-tools/html.js";
 import {
+  applyRouteScopedMiddlewares,
   type CreateBuildPlanOptions,
   createAppGraph,
   createBuildPlan,
   diffBuildPlan,
   discoverPageRoutes,
+  discoverServerConventions,
+  discoverServerRoutes,
   generateHtml,
   type HtmlAsset,
 } from "./build-tools/index.js";
@@ -137,7 +140,14 @@ export interface InspectFrameworkBuildOptions<
 
 export interface InspectDiagnostic {
   level: "warning" | "error";
-  source: "config" | "html" | "page-routes" | "graph" | "plan";
+  source:
+    | "config"
+    | "html"
+    | "page-routes"
+    | "server-routes"
+    | "server-conventions"
+    | "graph"
+    | "plan";
   message: string;
   file?: string;
   line?: number;
@@ -207,7 +217,9 @@ export interface InspectFrameworkBuildResult {
     dir: string;
     html: string;
     mount: string;
-    layout?: string | false;
+    conventions?: {
+      layout: boolean | string;
+    };
     rootModule?: string;
     routeTypes?: string;
   };
@@ -217,9 +229,12 @@ export interface InspectFrameworkBuildResult {
   serverFunctions: InspectServerFunction[];
   serverRoutes: InspectServerRoute[];
   runtime: {
-    serverEnabled: boolean;
-    server?: ResolvedConfig["server"]["runtime"];
+    server: ResolvedConfig["server"]["runtime"];
     transport?: ResolvedConfig["transport"];
+  };
+  output: {
+    client: ResolvedConfig["output"]["client"];
+    server: ResolvedConfig["output"]["server"];
   };
   buildPlan?: {
     entries: InspectBuildEntry[];
@@ -251,6 +266,22 @@ interface PageRoutingDefaultsOptions {
   onDiscovery?: (
     base: NonNullable<ResolvedConfig["routing"]>,
     discovery: Awaited<ReturnType<typeof discoverPageRoutes>>,
+  ) => void;
+}
+
+interface ServerRoutingDefaultsOptions {
+  reportDiagnostics?: boolean;
+  allowEmptyRoutes?: boolean;
+  onDiscovery?: (
+    base: NonNullable<ResolvedConfig["server"]["routing"]>,
+    discovery: Awaited<ReturnType<typeof discoverServerRoutes>>,
+  ) => void;
+}
+
+interface ServerConventionDefaultsOptions {
+  reportDiagnostics?: boolean;
+  onDiscovery?: (
+    discovery: Awaited<ReturnType<typeof discoverServerConventions>>,
   ) => void;
 }
 
@@ -317,11 +348,16 @@ async function withPageRoutingDefaults<TBundlerCfg>(
     dir: CONFIG_DEFAULTS.routingDir,
     html: config.html,
     mount: CONFIG_DEFAULTS.mount,
+    conventions: {
+      layout: true,
+    },
     routes: [],
   };
   const discovery = await discoverPageRoutes(cwd, {
     dir: base.dir,
-    rootLayout: base.mode === "spa" ? (base.layout ?? true) : false,
+    mode: base.mode,
+    rootLayout:
+      base.mode === "spa" ? (base.conventions?.layout ?? false) : false,
     required: requested,
   });
   options.onDiscovery?.(base, discovery);
@@ -373,11 +409,138 @@ async function withPageRoutingDefaults<TBundlerCfg>(
   };
 }
 
+async function withServerRoutingDefaults<TBundlerCfg>(
+  config: ResolvedConfig<TBundlerCfg>,
+  userConfig: Config<TBundlerCfg> | undefined,
+  cwd: string,
+  options: ServerRoutingDefaultsOptions = {},
+): Promise<ResolvedConfig<TBundlerCfg>> {
+  const routingOption = readServerRoutingConfig(userConfig);
+  if (routingOption === false) {
+    return {
+      ...config,
+      server: {
+        ...config.server,
+        routing: undefined,
+      },
+    };
+  }
+
+  if (!config.server.routing) return config;
+
+  const requested = routingOption !== undefined;
+  const base = config.server.routing;
+  const discovery = await discoverServerRoutes(cwd, {
+    dir: base.dir,
+    required: requested,
+  });
+  options.onDiscovery?.(base, discovery);
+  if (options.reportDiagnostics !== false) {
+    reportServerRouteDiagnostics(discovery.diagnostics);
+  }
+
+  if (discovery.routes.length === 0) {
+    if (!requested) {
+      return {
+        ...config,
+        server: {
+          ...config.server,
+          routing: undefined,
+        },
+      };
+    }
+    if (options.allowEmptyRoutes) {
+      return {
+        ...config,
+        server: {
+          ...config.server,
+          routing: {
+            ...base,
+            routes: [],
+          },
+        },
+      };
+    }
+    throw new Error(createNoServerRoutesFoundMessage(base.dir));
+  }
+
+  return {
+    ...config,
+    server: {
+      ...config.server,
+      routing: {
+        ...base,
+        routes: discovery.routes,
+      },
+    },
+  };
+}
+
+async function withServerConventionDefaults<TBundlerCfg>(
+  config: ResolvedConfig<TBundlerCfg>,
+  cwd: string,
+  options: ServerConventionDefaultsOptions = {},
+): Promise<ResolvedConfig<TBundlerCfg>> {
+  const conventions = config.server.conventions;
+  if (conventions?.middleware !== true) {
+    return {
+      ...config,
+      server: {
+        ...config.server,
+        conventions: undefined,
+      },
+    };
+  }
+
+  const discovery = await discoverServerConventions(cwd, {
+    globalFile: CONFIG_DEFAULTS.serverMiddlewareFile,
+    routingDir: config.server.routing?.dir,
+    middleware: conventions.middleware,
+  });
+  options.onDiscovery?.(discovery);
+  if (options.reportDiagnostics !== false) {
+    reportServerConventionDiagnostics(discovery.diagnostics);
+  }
+
+  const nextRouting = config.server.routing
+    ? {
+        ...config.server.routing,
+        routes: applyRouteScopedMiddlewares(
+          config.server.routing.routes,
+          discovery.routeMiddlewares,
+        ),
+      }
+    : undefined;
+
+  return {
+    ...config,
+    server: {
+      ...config.server,
+      ...(nextRouting ? { routing: nextRouting } : { routing: undefined }),
+      conventions: {
+        ...conventions,
+        globalMiddlewares: discovery.globalMiddlewares,
+        routeMiddlewares: discovery.routeMiddlewares,
+      },
+    },
+  };
+}
+
 function readRoutingConfig<TBundlerCfg>(
   config: Config<TBundlerCfg> | undefined,
 ): Config<TBundlerCfg>["routing"] {
   return config?.routing;
 }
+
+function readServerRoutingConfig<TBundlerCfg>(
+  config: Config<TBundlerCfg> | undefined,
+): ServerRoutingConfigValue<TBundlerCfg> {
+  return config?.server?.routing;
+}
+
+type ServerRoutingConfigValue<TBundlerCfg> =
+  | Exclude<Config<TBundlerCfg>["server"], undefined>["routing"]
+  | undefined;
 
 function createPagesEntryImport(
   routes: NonNullable<ResolvedConfig["routing"]>["routes"],
@@ -459,6 +622,60 @@ function reportPageRouteDiagnostics(
       ].join("\n"),
     );
   }
+}
+
+function reportServerRouteDiagnostics(
+  diagnostics: Array<{
+    level: "warning" | "error";
+    message: string;
+    file?: string;
+  }>,
+): void {
+  const errors: string[] = [];
+  for (const diagnostic of diagnostics) {
+    const message = diagnostic.file
+      ? `${diagnostic.file} - ${diagnostic.message}`
+      : diagnostic.message;
+    if (diagnostic.level === "error") {
+      errors.push(message);
+    } else {
+      logger.warn`${message}`;
+    }
+  }
+  if (errors.length > 0) {
+    throw new Error(
+      ["[evjs] Server route discovery failed.", ...errors].join("\n"),
+    );
+  }
+}
+
+function reportServerConventionDiagnostics(
+  diagnostics: Array<{
+    level: "warning" | "error";
+    message: string;
+    file?: string;
+  }>,
+): void {
+  const errors: string[] = [];
+  for (const diagnostic of diagnostics) {
+    const message = diagnostic.file
+      ? `${diagnostic.file} - ${diagnostic.message}`
+      : diagnostic.message;
+    if (diagnostic.level === "error") {
+      errors.push(message);
+    } else {
+      logger.warn`${message}`;
+    }
+  }
+  if (errors.length > 0) {
+    throw new Error(
+      ["[evjs] Server convention discovery failed.", ...errors].join("\n"),
+    );
+  }
+}
+
+function createNoServerRoutesFoundMessage(dir: string): string {
+  return `[evjs] No server routes found in ${dir}. Add a route module exporting GET or POST such as ${dir.replace(/\/+$/, "")}/index.ts or set server.routing: false.`;
 }
 
 function orderPluginsByDependencies<TBundlerCfg>(
@@ -915,7 +1132,34 @@ function collectHtmlTemplates<TBundlerCfg>(
     });
   }
 
-  if (config.routing) {
+  if (config.routing?.mode === "mpa") {
+    let usesRoutingHtml = false;
+    for (const route of config.routing.routes) {
+      if (route.kind === "layout") continue;
+      if (route.html) {
+        templates.push({
+          path: route.html,
+          notFoundMessage: `[evjs] MPA page route "${route.id}" html template not found`,
+          notFileMessage: `[evjs] MPA page route "${route.id}" html template must be a file`,
+          mount: config.routing.mount,
+          mountNotFoundMessage: `[evjs] MPA page route "${route.id}" mount target was not found`,
+          mountInvalidMessage: `[evjs] MPA page route "${route.id}" mount selector is invalid`,
+        });
+      } else {
+        usesRoutingHtml = true;
+      }
+    }
+    if (usesRoutingHtml) {
+      templates.push({
+        path: config.routing.html,
+        notFoundMessage: "[evjs] Page routing html template not found",
+        notFileMessage: "[evjs] Page routing html template must be a file",
+        mount: config.routing.mount,
+        mountNotFoundMessage: "[evjs] Page routing mount target was not found",
+        mountInvalidMessage: "[evjs] Page routing mount selector is invalid",
+      });
+    }
+  } else if (config.routing) {
     templates.push({
       path: config.routing.html,
       notFoundMessage: "[evjs] Page routing html template not found",
@@ -940,63 +1184,51 @@ function collectHtmlTemplates<TBundlerCfg>(
 function getFrameworkOutputPaths(
   cwd: string,
   output: BuildOutput,
-  serverEnabled: boolean,
-): { rootDir: string; clientDir: string; serverDir?: string } {
+): { rootDir: string; clientDir: string; serverDir: string } {
   const rootDir = path.resolve(cwd, output.distDir);
+  const publicDir = output.paths?.publicDir ?? output.distDir;
+  const serverDir =
+    output.paths?.serverDir ?? path.join(output.distDir, "server");
   return {
     rootDir,
-    clientDir: serverEnabled ? path.join(rootDir, "client") : rootDir,
-    ...(serverEnabled ? { serverDir: path.join(rootDir, "server") } : {}),
+    clientDir: path.resolve(cwd, publicDir),
+    serverDir: path.resolve(cwd, serverDir),
   };
 }
 
 async function emitFrameworkManifest(
   cwd: string,
   output: BuildOutput,
-  serverEnabled: boolean,
 ): Promise<void> {
   const { rootDir, clientDir, serverDir } = getFrameworkOutputPaths(
     cwd,
     output,
-    serverEnabled,
   );
   await fs.promises.mkdir(rootDir, { recursive: true });
-  if (serverDir) {
-    await fs.promises.mkdir(serverDir, { recursive: true });
-    const serverManifest = createServerManifest(output);
-    if (!serverManifest) {
-      throw new Error(
-        "[evjs] Server-enabled build did not produce a server manifest.",
-      );
-    }
-    await fs.promises.writeFile(
-      path.join(serverDir, MANIFEST_FILE),
-      JSON.stringify(serverManifest, null, 2),
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(rootDir, BUILD_OUTPUT_FILE),
-      JSON.stringify(output, null, 2),
-      "utf-8",
-    );
-    await fs.promises.rm(path.join(serverDir, BUILD_OUTPUT_FILE), {
-      force: true,
-    });
-    await fs.promises.rm(path.join(rootDir, MANIFEST_FILE), { force: true });
-  } else {
-    await fs.promises.rm(path.join(rootDir, "client", MANIFEST_FILE), {
-      force: true,
-    });
-    await fs.promises.rm(path.join(rootDir, "server", MANIFEST_FILE), {
-      force: true,
-    });
-    await fs.promises.rm(path.join(rootDir, BUILD_OUTPUT_FILE), {
-      force: true,
-    });
-    await fs.promises.rm(path.join(rootDir, "server", BUILD_OUTPUT_FILE), {
-      force: true,
-    });
-  }
+  await fs.promises.mkdir(serverDir, { recursive: true });
+  const serverManifest = createServerManifest(output);
+  await fs.promises.writeFile(
+    path.join(serverDir, MANIFEST_FILE),
+    JSON.stringify(serverManifest, null, 2),
+    "utf-8",
+  );
+  await fs.promises.writeFile(
+    path.join(rootDir, BUILD_OUTPUT_FILE),
+    JSON.stringify(output, null, 2),
+    "utf-8",
+  );
+  await fs.promises.rm(path.join(serverDir, BUILD_OUTPUT_FILE), {
+    force: true,
+  });
+  await removeManifestIfInactive(rootDir, [clientDir, serverDir]);
+  await removeManifestIfInactive(path.join(rootDir, "client"), [
+    clientDir,
+    serverDir,
+  ]);
+  await removeManifestIfInactive(path.join(rootDir, "server"), [
+    clientDir,
+    serverDir,
+  ]);
 
   const publicManifest = createPublicManifest(output);
   await fs.promises.mkdir(clientDir, { recursive: true });
@@ -1005,6 +1237,21 @@ async function emitFrameworkManifest(
     JSON.stringify(publicManifest, null, 2),
     "utf-8",
   );
+}
+
+async function removeManifestIfInactive(
+  dir: string,
+  activeDirs: string[],
+): Promise<void> {
+  const normalizedDir = path.resolve(dir);
+  if (
+    activeDirs.some((activeDir) => path.resolve(activeDir) === normalizedDir)
+  ) {
+    return;
+  }
+  await fs.promises.rm(path.join(normalizedDir, MANIFEST_FILE), {
+    force: true,
+  });
 }
 
 function getHtmlAssets(html: BuildPlan["html"][number], output: BuildOutput) {
@@ -1065,11 +1312,7 @@ async function emitFrameworkHtml<TBundlerCfg>(
   plan: BuildPlan,
   isRebuild: boolean,
 ): Promise<void> {
-  const { clientDir } = getFrameworkOutputPaths(
-    cwd,
-    output,
-    config.serverEnabled,
-  );
+  const { clientDir } = getFrameworkOutputPaths(cwd, output);
 
   for (const html of plan.html) {
     const htmlInfo = createHtmlDocumentInfo(html, output);
@@ -1123,7 +1366,6 @@ async function linkAndEmitBuildOutput<TBundlerCfg>(options: {
   const output = linkBuildOutput({
     graph: options.graph,
     plan: options.plan,
-    serverEnabled: options.config.serverEnabled,
     clientEntryAssets: options.bundlerFacts.clientEntryAssets,
     firstClientEntryAssets: options.bundlerFacts.firstClientEntryAssets,
     serverEntryAssets: options.bundlerFacts.serverEntryAssets,
@@ -1135,11 +1377,7 @@ async function linkAndEmitBuildOutput<TBundlerCfg>(options: {
 
   await runBuildOutputHooks(options.hooks, output, options.pluginCtx);
   assertFrameworkManifestShape(output, "BuildOutput after buildOutput hooks");
-  await emitFrameworkManifest(
-    options.cwd,
-    output,
-    options.config.serverEnabled,
-  );
+  await emitFrameworkManifest(options.cwd, output);
   await emitFrameworkHtml(
     options.cwd,
     options.config,
@@ -1429,14 +1667,23 @@ async function prepareInternalFrameworkBuild<
     command,
     cwd,
   });
-  const rawResolvedConfig = await withPageRoutingDefaults(
+  const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
     configuredConfig,
     cwd,
   );
+  const rawResolvedConfig = await withServerRoutingDefaults(
+    pageResolvedConfig,
+    configuredConfig,
+    cwd,
+  );
+  const conventionResolvedConfig = await withServerConventionDefaults(
+    rawResolvedConfig,
+    cwd,
+  );
   const resolvedConfig = {
-    ...rawResolvedConfig,
-    plugins: orderPluginsByDependencies(rawResolvedConfig.plugins),
+    ...conventionResolvedConfig,
+    plugins: orderPluginsByDependencies(conventionResolvedConfig.plugins),
   };
 
   const optionBundler = resolveBundlerConfig<TBundlerCfg>(
@@ -1546,7 +1793,7 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
     command,
     cwd,
   });
-  const rawResolvedConfig = await withPageRoutingDefaults(
+  const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
     configuredConfig,
     cwd,
@@ -1577,9 +1824,52 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
       },
     },
   );
+  const rawResolvedConfig = await withServerRoutingDefaults(
+    pageResolvedConfig,
+    configuredConfig,
+    cwd,
+    {
+      allowEmptyRoutes: true,
+      reportDiagnostics: false,
+      onDiscovery(base, discovery) {
+        diagnostics.push(
+          ...discovery.diagnostics.map((diagnostic) =>
+            toInspectDiagnostic("server-routes", diagnostic),
+          ),
+        );
+        if (
+          discovery.routes.length === 0 &&
+          readServerRoutingConfig(configuredConfig) !== undefined &&
+          !discovery.diagnostics.some(
+            (diagnostic) => diagnostic.level === "error",
+          )
+        ) {
+          diagnostics.push({
+            level: "error",
+            source: "server-routes",
+            message: createNoServerRoutesFoundMessage(base.dir),
+          });
+        }
+      },
+    },
+  );
+  const conventionResolvedConfig = await withServerConventionDefaults(
+    rawResolvedConfig,
+    cwd,
+    {
+      reportDiagnostics: false,
+      onDiscovery(discovery) {
+        diagnostics.push(
+          ...discovery.diagnostics.map((diagnostic) =>
+            toInspectDiagnostic("server-conventions", diagnostic),
+          ),
+        );
+      },
+    },
+  );
   const resolvedConfig = {
-    ...rawResolvedConfig,
-    plugins: orderPluginsByDependencies(rawResolvedConfig.plugins),
+    ...conventionResolvedConfig,
+    plugins: orderPluginsByDependencies(conventionResolvedConfig.plugins),
   };
   const optionBundler = resolveBundlerConfig<TBundlerCfg>(
     options.bundler,
@@ -1670,9 +1960,12 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
         }))
         .sort(compareById),
       runtime: {
-        serverEnabled: config.serverEnabled,
-        ...(config.serverEnabled ? { server: config.server.runtime } : {}),
+        server: config.server.runtime,
         ...(config.transport.baseUrl ? { transport: config.transport } : {}),
+      },
+      output: {
+        client: config.output.client,
+        server: config.output.server,
       },
       buildPlan: plan
         ? {
@@ -1733,8 +2026,8 @@ function createInspectRouting<TBundlerCfg>(
     dir: config.routing.dir,
     html: config.routing.html,
     mount: config.routing.mount,
-    ...(config.routing.layout !== undefined
-      ? { layout: config.routing.layout }
+    ...(config.routing.conventions
+      ? { conventions: config.routing.conventions }
       : {}),
     ...(config.routing.rootModule
       ? { rootModule: config.routing.rootModule }
@@ -1845,14 +2138,23 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
     command: "dev",
     cwd,
   });
-  const rawResolvedConfig = await withPageRoutingDefaults(
+  const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
     configuredConfig,
     cwd,
   );
+  const rawResolvedConfig = await withServerRoutingDefaults(
+    pageResolvedConfig,
+    configuredConfig,
+    cwd,
+  );
+  const conventionResolvedConfig = await withServerConventionDefaults(
+    rawResolvedConfig,
+    cwd,
+  );
   const resolvedConfig = {
-    ...rawResolvedConfig,
-    plugins: orderPluginsByDependencies(rawResolvedConfig.plugins),
+    ...conventionResolvedConfig,
+    plugins: orderPluginsByDependencies(conventionResolvedConfig.plugins),
   };
 
   const bundler = resolveBundler(resolvedConfig.bundler, options?.bundler);
@@ -1908,8 +2210,6 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
   process.once("SIGTERM", stopApiOnParentShutdown);
 
   const restartApiServer = async () => {
-    if (!activeConfig.serverEnabled) return;
-
     const serverEntry = await findDevServerEntry(cwd, activePlan.distDir);
     if (!serverEntry) return;
 
@@ -1998,14 +2298,23 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
       command: "dev",
       cwd,
     });
-    const nextRawResolvedConfig = await withPageRoutingDefaults(
+    const nextPageResolvedConfig = await withPageRoutingDefaults(
       resolveConfig(nextConfiguredConfig),
       nextConfiguredConfig,
       cwd,
     );
+    const nextRawResolvedConfig = await withServerRoutingDefaults(
+      nextPageResolvedConfig,
+      nextConfiguredConfig,
+      cwd,
+    );
+    const nextConventionResolvedConfig = await withServerConventionDefaults(
+      nextRawResolvedConfig,
+      cwd,
+    );
     const nextResolvedConfig = {
-      ...nextRawResolvedConfig,
-      plugins: orderPluginsByDependencies(nextRawResolvedConfig.plugins),
+      ...nextConventionResolvedConfig,
+      plugins: orderPluginsByDependencies(nextConventionResolvedConfig.plugins),
     };
 
     return withActiveBundler(nextResolvedConfig, bundler);

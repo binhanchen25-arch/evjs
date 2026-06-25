@@ -1,6 +1,6 @@
 # api-routes
 
-Programmatic REST route handlers using `createRoute()`.
+REST route handlers using `server.routing` file routes.
 
 ## Run
 
@@ -12,18 +12,22 @@ npm run dev
 
 | File | Purpose |
 |------|---------| 
-| `src/server.ts` | Mounts routes via `createApp({ routes })` |
-| `src/api/posts.routes.ts` | CRUD route handlers for `/api/posts` |
-| `src/api/health.routes.ts` | Health check endpoint |
+| `src/middleware.ts` | Global server middleware for all server requests |
+| `src/apis/api/middleware.ts` | Route-scoped middleware for `/api/**` file routes |
+| `src/apis/api/posts.ts` | List/create handlers for `/api/posts` |
+| `src/apis/api/posts/$id.ts` | Dynamic handlers for `/api/posts/:id` |
+| `src/apis/api/health.ts` | Health check endpoint |
+| `src/apis/api/posts-store.ts` | Colocated helper module ignored by route discovery |
 
 ## What It Demonstrates
 
-- `createRoute(path, { GET, POST, PUT, DELETE })` for REST endpoints
-- Dynamic route params (`:id`)
+- Uppercase method exports (`GET`, `POST`, `PUT`, `DELETE`) for REST endpoints
+- Dynamic route files (`$id.ts` -> `:id`)
 - Query string parsing (`?limit=N`)
 - Custom status codes (201, 204, 404)
 - Auto `OPTIONS` and `405 Method Not Allowed`
-- Mounting route handlers via `createApp({ routes: [...] })`
+- Global and route-scoped `middleware.ts` conventions
+- Colocated helper files without route exports
 
 ## Try It
 
@@ -52,4 +56,7 @@ curl http://localhost:3000/api/health
 
 # Auto OPTIONS
 curl -X OPTIONS http://localhost:3000/api/posts -i
+
+# Route-scoped middleware short-circuit
+curl -H 'x-block-api: true' http://localhost:3000/api/posts -i
 ```

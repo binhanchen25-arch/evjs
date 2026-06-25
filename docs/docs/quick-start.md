@@ -15,7 +15,7 @@ Both arguments are optional — if omitted, the CLI prompts interactively.
 |----------|-------------|
 | `basic` | Routing + server functions |
 | `mpa` | Multi-page application setup |
-| `api-routes` | Programmatic REST API routes via `createRoute()` |
+| `api-routes` | REST API routes via `server.routing` file routes |
 | `complex-routing` | Params, search, root layout, loaders, nested paths |
 | `with-tailwind` | Tailwind CSS via PostCSS |
 | `with-trpc` | tRPC interop example |
@@ -31,7 +31,7 @@ ev dev
 
 The dev server runs at `http://localhost:3000` with Hot Module Replacement.
 Server functions in reachable `"use server"` modules are auto-discovered from
-app, page, and server entry import graphs.
+app, page, server file-route, and server middleware convention import graphs.
 
 ## Production Build
 
@@ -52,9 +52,12 @@ my-app/
 │   ├── pages/              # Page routes
 │   │   ├── index.tsx       # /
 │   │   └── users/$id.tsx   # /users/$id
-│   └── api/                # Server-only modules
-│       ├── users.server.ts # "use server" functions
-│       └── health.routes.ts
+│   ├── api/                # Server function modules
+│   │   └── users.server.ts # "use server" functions
+│   ├── apis/               # Server file routes
+│   │   └── api/
+│   │       └── health.ts   # /api/health
+│   └── middleware.ts       # Global server middleware
 ├── package.json
 └── tsconfig.json
 ```
@@ -81,10 +84,10 @@ by default.
 
 SPA root layout discovery is optional. Use one `layout.*` or `layout/index.*`
 source module beside the route directory, such as `src/layout.tsx` or
-`src/layout/index.tsx`, set `routing.layout` to another module path, or set
-`routing.layout: false` when the app should not have a framework root layout.
-SPA route layouts can also live inside the route directory as `layout.*` or
-`layout/index.*` modules.
+`src/layout/index.tsx`, set `routing.conventions.layout` to another module
+path, or set `routing.conventions.layout: false` when the app should not have a
+framework root layout. SPA route layouts can also live inside the route
+directory as `layout.*` or `layout/index.*` modules.
 
 ## MPA Mode
 
@@ -103,7 +106,8 @@ export default defineConfig({
 
 Each page is emitted as its own HTML document and client entry without
 SPA router setup. Framework layout conventions are SPA-only; MPA pages compose
-shared wrappers as normal components and do not accept `routing.layout`.
+shared wrappers as normal components and do not accept
+`routing.conventions.layout`.
 
 ## Packages
 

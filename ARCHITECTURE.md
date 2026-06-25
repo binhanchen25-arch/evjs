@@ -6,12 +6,16 @@ and the current status matrix lives in [ROADMAP.md](./ROADMAP.md).
 
 ## Overview
 
-evjs is a React framework with file-based page routes, explicit lower-level
-app/page declarations, server functions, REST routes, SSR, PPR, RSC integration
-points, and bundler adapters.
+evjs is a React framework whose framework-managed application model is
+file-convention first. Client pages come from `src/pages`, server request
+routes come from `src/apis`, middleware comes from `src/middleware.ts` and
+`src/apis/**/middleware.ts`, and `"use server"` modules provide server
+functions. `@evjs/client` and `@evjs/server` are independent runtime cores that
+provide browser/server primitives without becoming alternate framework
+configuration modes.
 
 ```txt
-src/pages + ev.config.ts + static server declarations
+src/pages + src/apis + src/middleware.ts + ev.config.ts
   -> AppGraph
   -> BuildPlan
   -> selected bundler adapter
@@ -118,9 +122,11 @@ sequenceDiagram
 
 Graph analysis may read static import closure for semantic discovery, but dev
 watching must remain narrower than that closure. `fileDependencies` should
-include explicit route/server roots and framework marker files such as
-`src/pages`, `@evjs/server createRoute()`, `"use server"`, and
-`"use client"`. Ordinary component and style edits stay in the bundler HMR path.
+include explicit file-convention roots and framework marker files such as
+`src/pages`, `src/apis`, discovered `middleware.ts` modules, `"use server"`,
+and `"use client"`. Programmatic `@evjs/server` route declarations are runtime
+code, not graph roots. Ordinary component and style edits stay in the bundler
+HMR path.
 
 HTML-only dev plan updates can be relinked from existing bundler stats. Dynamic
 entry or server renderer changes require `BundlerDevController.updatePlan()`.
@@ -139,8 +145,8 @@ the bundler dev instance.
   lifecycles
 
 @evjs/server
-  owns server functions, REST routes, SSR document rendering, PPR region
-  rendering, and RSC Flight endpoint routing
+  owns server functions, standalone REST route primitives, SSR document
+  rendering, PPR region rendering, and RSC Flight endpoint routing
 
 deployment adapters
   translate BuildOutput to platform artifacts and bootstraps
@@ -153,22 +159,22 @@ and navigation helpers instead of constructing route trees directly.
 
 ## Manifest
 
-The framework output contract is `BuildOutput`. Server-enabled builds serialize
-the complete contract to:
+The framework output contract is `BuildOutput`. Builds serialize the complete
+contract to:
 
 ```txt
 dist/server/manifest.json
 ```
 
-They also emit a browser-safe public manifest to `dist/client/manifest.json`.
-CSR-only builds stay flat and emit `dist/manifest.json`. Deployment plugins and
-platform adapters should consume `BuildOutput`.
+They also emit a browser-safe public manifest to `output.client` and a server
+bundle manifest to `output.server`. Deployment plugins and platform adapters
+should consume `BuildOutput`.
 
 ## Deployment
 
 `@evjs/ev` exposes platform-neutral deployment artifact helpers plus
 `nodeDeploymentAdapter()`. The Node adapter emits a production `dist/server.mjs`
-that imports only Node built-ins, `@evjs/server/node`, and the user server
+that imports only Node built-ins, `@evjs/server/node`, and the generated server
 bundle. Platform-specific adapters should consume `BuildOutput` instead of
 reading bundler config or stats.
 

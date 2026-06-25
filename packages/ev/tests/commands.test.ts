@@ -96,7 +96,10 @@ async function writeRouteTypeCheckTsConfig(cwd: string) {
 
 function createMockBundler(
   events: string[],
-  options: { onBuildPlan?: (plan: BuildPlan) => void } = {},
+  options: {
+    onBuildPlan?: (plan: BuildPlan) => void;
+    recordEndpoint?: boolean;
+  } = {},
 ): BundlerAdapter<Record<string, never>> {
   return {
     name: "mock",
@@ -106,7 +109,7 @@ function createMockBundler(
       events.push(
         `bundler.entries:${plan.entries.map((entry) => entry.name).join(",")}`,
       );
-      if (config.serverEnabled) {
+      if (options.recordEndpoint) {
         events.push(
           `bundler.endpoint:${config.server.functionRuntime.endpoint}`,
         );
@@ -116,18 +119,22 @@ function createMockBundler(
           main: { js: ["main.js"], css: [] },
         },
         firstClientEntryAssets: { js: ["main.js"], css: [] },
-        serverEntryAssets: {
-          server: { js: ["server.js"], css: [] },
-        },
-        serverEntry: config.serverEnabled ? "server.js" : undefined,
-        serverAssets: config.serverEnabled
-          ? { js: ["server.js"], css: [] }
-          : undefined,
+        ...serverBuildFacts(),
       };
     },
     async dev() {
       events.push("bundler.dev");
     },
+  };
+}
+
+function serverBuildFacts() {
+  return {
+    serverEntryAssets: {
+      server: { js: ["server.js"], css: [] },
+    },
+    serverEntry: "server.js",
+    serverAssets: { js: ["server.js"], css: [] },
   };
 }
 
@@ -211,7 +218,7 @@ describe("prepareFrameworkBuild", () => {
 
     await expect(
       prepareFrameworkBuild(
-        { server: false },
+        { output: { client: "dist" } },
         { cwd, command: "build", mode: "development" },
       ),
     ).rejects.toThrow(
@@ -224,7 +231,7 @@ describe("prepareFrameworkBuild", () => {
 
     await expect(
       prepareFrameworkBuild(
-        { server: false },
+        { output: { client: "dist" } },
         {
           cwd,
           bundler: [] as never,
@@ -236,7 +243,7 @@ describe("prepareFrameworkBuild", () => {
 
     await expect(
       prepareFrameworkBuild(
-        { server: false },
+        { output: { client: "dist" } },
         {
           cwd,
           bundler: {
@@ -275,13 +282,13 @@ describe("prepareFrameworkBuild", () => {
 
     const prepared = await prepareFrameworkBuild(
       {
-        server: false,
+        output: { client: "dist" },
         plugins: [plugin],
       },
       { cwd },
     );
 
-    expect(prepared.config.serverEnabled).toBe(false);
+    expect(prepared.config.output.client).toBe("dist");
     expect("graph" in prepared).toBe(false);
     expect("plan" in prepared).toBe(false);
     expect("hooks" in prepared).toBe(false);
@@ -306,9 +313,9 @@ describe("prepareFrameworkBuild", () => {
 describe("build", () => {
   it("requires a bundler from config or options", async () => {
     const cwd = await createProject();
-    await expect(build({ server: false }, { cwd })).rejects.toThrow(
-      "No bundler configured",
-    );
+    await expect(
+      build({ output: { client: "dist" } }, { cwd }),
+    ).rejects.toThrow("No bundler configured");
   });
 
   it("disposes prepared plugin hooks when build stops before bundler execution", async () => {
@@ -329,7 +336,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           plugins: [
             {
               name: "cleanup",
@@ -380,7 +387,7 @@ describe("build", () => {
     };
 
     await build(
-      { server: false, plugins: [plugin] },
+      { output: { client: "dist" }, plugins: [plugin] },
       {
         cwd,
         bundler,
@@ -391,8 +398,8 @@ describe("build", () => {
       "setup:production",
       "buildStart",
       "bundler.build",
-      "bundler.entries:main",
-      "buildOutput:main",
+      "bundler.entries:main,server",
+      "buildOutput:main,server",
       "buildEnd:main.patched.js",
       "dispose:production",
     ]);
@@ -419,7 +426,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           plugins: [plugin],
         },
         {
@@ -434,7 +441,7 @@ describe("build", () => {
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(false);
     expect(events).toEqual([
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
       "buildOutput",
       "dispose",
     ]);
@@ -457,7 +464,7 @@ describe("build", () => {
           },
           buildEnd(result: EvBuildResult) {
             events.push(
-              `manifest:buildEnd:${result.clientManifest.assets.js[0]}:${result.serverManifest?.entry ?? "none"}`,
+              `manifest:buildEnd:${result.clientManifest.assets.js[0]}:${result.serverManifest.entry ?? "none"}`,
             );
           },
         };
@@ -465,7 +472,7 @@ describe("build", () => {
     };
 
     await build(
-      { server: false, plugins: [plugin] },
+      { output: { client: "dist" }, plugins: [plugin] },
       {
         cwd,
         bundler,
@@ -478,9 +485,9 @@ describe("build", () => {
     expect(events).toEqual([
       "manifest:buildStart",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
       "manifest:html:main.js",
-      "manifest:buildEnd:main.js:none",
+      "manifest:buildEnd:main.js:server.js",
     ]);
   });
 
@@ -494,6 +501,11 @@ describe("build", () => {
             main: { js: ["main.js"], css: ["main.css"] },
           },
           firstClientEntryAssets: { js: ["main.js"], css: ["main.css"] },
+          serverEntryAssets: {
+            server: { js: ["server.js"], css: [] },
+          },
+          serverEntry: "server.js",
+          serverAssets: { js: ["server.js"], css: [] },
         };
       },
       async dev() {},
@@ -501,8 +513,8 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
         output: {
+          client: "dist",
           crossOriginLoading: "anonymous",
         },
       },
@@ -543,7 +555,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
       },
       {
         cwd,
@@ -555,7 +567,7 @@ describe("build", () => {
       "entry:evjs:pages-app",
       "metadata:pages-app",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
     ]);
     expect(fs.existsSync(path.join(cwd, ".evjs"))).toBe(false);
     await expect(
@@ -575,7 +587,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
       },
       {
         cwd,
@@ -589,7 +601,7 @@ describe("build", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     await build(
       {
-        server: false,
+        output: { client: "dist" },
       },
       {
         cwd,
@@ -620,7 +632,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         routing: {
           mode: "spa",
           dir: "./app/pages",
@@ -655,7 +667,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         routing: {
           mode: "spa",
           dir: "./app/pages",
@@ -670,7 +682,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
       },
       {
         cwd,
@@ -701,7 +713,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
       },
       {
         cwd,
@@ -736,7 +748,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         routing: false,
       },
       {
@@ -771,7 +783,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         pages: {
           home: "./src/pages/home.tsx",
         },
@@ -854,7 +866,7 @@ describe("build", () => {
 
       await build(
         {
-          server: false,
+          output: { client: "dist" },
         },
         {
           cwd,
@@ -909,7 +921,7 @@ describe("build", () => {
 
       await build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: {
             mode: "spa",
             dir: "./src/app/pages",
@@ -959,7 +971,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
       },
       {
         cwd,
@@ -971,11 +983,11 @@ describe("build", () => {
       "entry:evjs:pages-app",
       "metadata:pages-app",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
     ]);
   });
 
-  it("uses routing.layout as the SPA root layout module", async () => {
+  it("uses routing.conventions.layout as the SPA root layout module", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
     await fs.promises.mkdir(path.join(cwd, "src/shell"), { recursive: true });
@@ -1006,9 +1018,11 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         routing: {
-          layout: "./src/shell/AppLayout.tsx",
+          conventions: {
+            layout: "./src/shell/AppLayout.tsx",
+          },
         },
       },
       {
@@ -1020,7 +1034,7 @@ describe("build", () => {
     expect(events).toContain("root:./src/shell/AppLayout.tsx");
   });
 
-  it("disables SPA root layout discovery with routing.layout false", async () => {
+  it("disables SPA root layout discovery with routing.conventions.layout false", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/layout"), { recursive: true });
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
@@ -1046,9 +1060,11 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         routing: {
-          layout: false,
+          conventions: {
+            layout: false,
+          },
         },
       },
       {
@@ -1084,6 +1100,11 @@ describe("build", () => {
       "export default function About() { return null; }",
       "utf-8",
     );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/about.html"),
+      '<div id="app"></div>',
+      "utf-8",
+    );
     const events: string[] = [];
     const bundler: BundlerAdapter<Record<string, never>> = {
       name: "mock-mpa",
@@ -1094,12 +1115,16 @@ describe("build", () => {
         events.push(
           `metadata:${plan.entries.map((entry) => entry.metadata?.type ?? "none").join(",")}`,
         );
+        events.push(
+          `html:${plan.html.map((document) => `${document.id}:${document.template}`).join(",")}`,
+        );
         return {
           clientEntryAssets: {
             index: { js: ["index.js"], css: [] },
             about: { js: ["about.js"], css: [] },
           },
           firstClientEntryAssets: { js: ["index.js"], css: [] },
+          ...serverBuildFacts(),
         };
       },
       async dev() {},
@@ -1107,7 +1132,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         routing: {
           mode: "mpa",
         },
@@ -1119,11 +1144,65 @@ describe("build", () => {
     );
 
     expect(events).toEqual([
-      "entries:index:page-client,about:page-client",
-      "metadata:react-component-page,react-component-page",
+      "entries:index:page-client,about:page-client,server:server-runtime",
+      "metadata:react-component-page,react-component-page,none",
+      "html:index:./index.html,about:./src/pages/about.html",
     ]);
     expect(fs.existsSync(path.join(cwd, ".evjs"))).toBe(false);
     expect(fs.existsSync(path.join(cwd, "src/route-types.d.ts"))).toBe(false);
+  });
+
+  it("builds MPA page routes with colocated HTML templates without a root routing html", async () => {
+    const cwd = await createProject();
+    await fs.promises.rm(path.join(cwd, "index.html"));
+    await fs.promises.mkdir(path.join(cwd, "src/pages/product"), {
+      recursive: true,
+    });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/product/index.tsx"),
+      "export default function Product() { return null; }",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/product/index.html"),
+      '<html><body><main id="app"></main></body></html>',
+      "utf-8",
+    );
+    const events: string[] = [];
+    const bundler: BundlerAdapter<Record<string, never>> = {
+      name: "mock-mpa-colocated-html",
+      async build({ plan }) {
+        events.push(
+          `html:${plan.html.map((document) => `${document.id}:${document.template}`).join(",")}`,
+        );
+        return {
+          clientEntryAssets: {
+            product: { js: ["product.js"], css: [] },
+          },
+          firstClientEntryAssets: { js: ["product.js"], css: [] },
+          ...serverBuildFacts(),
+        };
+      },
+      async dev() {},
+    };
+
+    await build(
+      {
+        output: { client: "dist" },
+        routing: {
+          mode: "mpa",
+        },
+      },
+      {
+        cwd,
+        bundler,
+      },
+    );
+
+    expect(events).toEqual(["html:product:./src/pages/product/index.html"]);
+    await expect(
+      fs.promises.readFile(path.join(cwd, "dist/product.html"), "utf-8"),
+    ).resolves.toContain('<main id="app">');
   });
 
   it("removes stale default route types when MPA routing uses a custom directory", async () => {
@@ -1148,7 +1227,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         routing: {
           mode: "mpa",
           dir: "./app/pages",
@@ -1181,7 +1260,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         routing: {
           mode: "mpa",
           dir: "./app/pages",
@@ -1209,6 +1288,7 @@ describe("build", () => {
             main: { js: ["memory.js"], css: [] },
           },
           firstClientEntryAssets: { js: ["memory.js"], css: [] },
+          ...serverBuildFacts(),
         };
       },
       async dev() {},
@@ -1216,7 +1296,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         plugins: [
           {
             name: "reads-memory-output",
@@ -1237,7 +1317,7 @@ describe("build", () => {
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
   });
 
-  it("emits split public and server manifests for server-enabled builds", async () => {
+  it("emits split public and server manifests", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
     await fs.promises.writeFile(
@@ -1334,7 +1414,7 @@ describe("build", () => {
     );
   });
 
-  it("removes stale split client manifests when rebuilding as CSR-only", async () => {
+  it("removes stale split client manifests when rebuilding with flat client output", async () => {
     const cwd = await createProject();
     const events: string[] = [];
     const bundler = createMockBundler(events);
@@ -1344,7 +1424,7 @@ describe("build", () => {
       true,
     );
 
-    await build({ server: false }, { cwd, bundler });
+    await build({ output: { client: "dist" } }, { cwd, bundler });
 
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
     expect(fs.existsSync(path.join(cwd, "dist/client/manifest.json"))).toBe(
@@ -1355,7 +1435,7 @@ describe("build", () => {
   it("runs plugin config hooks before resolving config", async () => {
     const cwd = await createProject();
     const events: string[] = [];
-    const bundler = createMockBundler(events);
+    const bundler = createMockBundler(events, { recordEndpoint: true });
 
     const plugin: EvPlugin<Record<string, never>> = {
       name: "sets-server-base-path",
@@ -1468,7 +1548,7 @@ describe("build", () => {
 
     await expect(
       build(
-        { server: false, plugins: [plugin] },
+        { output: { client: "dist" }, plugins: [plugin] },
         {
           cwd,
           bundler,
@@ -1497,7 +1577,7 @@ describe("build", () => {
 
     await expect(
       build(
-        { server: false, plugins: [plugin] },
+        { output: { client: "dist" }, plugins: [plugin] },
         {
           cwd,
           bundler,
@@ -1528,7 +1608,7 @@ describe("build", () => {
     };
 
     await build(
-      { server: false, plugins: [plugin] },
+      { output: { client: "dist" }, plugins: [plugin] },
       {
         cwd,
         bundler,
@@ -1538,7 +1618,7 @@ describe("build", () => {
       "setup",
       "buildStart",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
     ]);
   });
 
@@ -1550,7 +1630,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           app: {
             entry: "./src/main.tsx",
             html: "./missing-app.html",
@@ -1581,7 +1661,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: {
             mode: "spa",
             dir: "./src/pages",
@@ -1609,7 +1689,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           html: "./templates",
         },
         {
@@ -1640,7 +1720,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -1678,7 +1758,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           pages: {
             home: {
               entry: "./src/pages/home.tsx",
@@ -1709,7 +1789,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -1735,7 +1815,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -1757,7 +1837,7 @@ describe("build", () => {
     try {
       await build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -1775,7 +1855,7 @@ describe("build", () => {
     );
     expect((error as Error).message).toContain(PAGE_ROUTE_CONVENTION_SUMMARY);
     expect((error as Error).message).toContain(
-      "See https://evaijs.github.io/evjs/docs/project-structure#convention-matrix for the page route file convention.",
+      "See https://evaijs.github.io/evjs/docs/file-conventions#client-page-routes for the page route file convention.",
     );
     expect(events).not.toContain("bundler.build");
   });
@@ -1798,7 +1878,7 @@ describe("build", () => {
     try {
       await build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -1820,7 +1900,7 @@ describe("build", () => {
     );
     expect((error as Error).message).toContain(PAGE_ROUTE_CONVENTION_SUMMARY);
     expect((error as Error).message).toContain(
-      "See https://evaijs.github.io/evjs/docs/project-structure#convention-matrix for the page route file convention.",
+      "See https://evaijs.github.io/evjs/docs/file-conventions#client-page-routes for the page route file convention.",
     );
     expect(events).not.toContain("bundler.build");
   });
@@ -1848,7 +1928,7 @@ describe("build", () => {
     try {
       await build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -1898,7 +1978,7 @@ describe("build", () => {
     try {
       await build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -2193,7 +2273,7 @@ describe("build", () => {
     expect(events).not.toContain("bundler.build");
   });
 
-  it("fails on server-rendered pages with server disabled before running the bundler", async () => {
+  it("builds server-rendered pages in flat output mode", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
     await fs.promises.writeFile(
@@ -2208,27 +2288,27 @@ describe("build", () => {
     const events: string[] = [];
     const bundler = createMockBundler(events);
 
-    await expect(
-      build(
-        {
-          server: false,
-          pages: {
-            campaign: {
-              path: "/campaign",
-              component: "./src/pages/campaign.tsx",
-              html: "./index.html",
-            },
+    await build(
+      {
+        output: { client: "dist" },
+        pages: {
+          campaign: {
+            path: "/campaign",
+            component: "./src/pages/campaign.tsx",
+            html: "./index.html",
           },
         },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      'Page "campaign" uses render: "ssg" but server is disabled.',
+      },
+      {
+        cwd,
+        bundler,
+      },
     );
-    expect(events).not.toContain("bundler.build");
+    expect(events).toContain("bundler.build");
+    expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, "dist/server/manifest.json"))).toBe(
+      true,
+    );
   });
 
   it("fails on invalid explicit page declarations before running the bundler", async () => {
@@ -2239,7 +2319,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           pages: {
             home: "",
           },
@@ -2257,7 +2337,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           pages: {
             home: {
               path: "/dashboard",
@@ -2288,7 +2368,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           app: {
             entry: "",
           },
@@ -2310,7 +2390,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           entry: "./src/missing-main.tsx",
         },
         {
@@ -2332,7 +2412,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: {
             dir: "",
           },
@@ -2367,7 +2447,193 @@ describe("build", () => {
     expect(events).not.toContain("bundler.build");
   });
 
-  it("fails on missing explicit server entries before running the bundler", async () => {
+  it("discovers server middleware conventions for generated server app entries", async () => {
+    const cwd = await createProject();
+    await fs.promises.mkdir(path.join(cwd, "src/apis/api"), {
+      recursive: true,
+    });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/main.tsx"),
+      "export const clientEntry = true;",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/middleware.ts"),
+      [
+        "export default async function middleware(_ctx, next) {",
+        "  await next();",
+        "}",
+      ].join("\n"),
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/apis/api/middleware.ts"),
+      [
+        "export default async function middleware(_ctx, next) {",
+        "  await next();",
+        "}",
+      ].join("\n"),
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/apis/api/health.ts"),
+      "export const GET = async () => Response.json({ ok: true });",
+      "utf-8",
+    );
+
+    let observedPlan: BuildPlan | undefined;
+    const events: string[] = [];
+    const bundler = createMockBundler(events, {
+      onBuildPlan(plan) {
+        observedPlan = plan;
+      },
+    });
+
+    await build(
+      {
+        server: {
+          routing: true,
+        },
+      },
+      {
+        cwd,
+        bundler,
+      },
+    );
+
+    expect(events).toContain("bundler.build");
+    expect(observedPlan?.entries).toContainEqual(
+      expect.objectContaining({
+        name: "server",
+        import: "evjs:server-routes",
+        metadata: {
+          type: "server-app",
+          middlewares: [
+            {
+              id: "src/middleware.ts:global-middleware",
+              module: "src/middleware.ts",
+              scope: "global",
+              scopeSegments: [],
+            },
+          ],
+          routes: [
+            {
+              id: "src/apis/api/health.ts:/api/health:GET",
+              module: "src/apis/api/health.ts",
+              path: "/api/health",
+              methods: ["GET"],
+              moduleSegments: ["api"],
+              middlewares: [
+                {
+                  id: "src/apis/api/middleware.ts:route-middleware",
+                  module: "src/apis/api/middleware.ts",
+                  scope: "route",
+                  scopeSegments: ["api"],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("does not fall back to src/server/routes for server file routes", async () => {
+    const cwd = await createProject();
+    await fs.promises.mkdir(path.join(cwd, "src/apis"), {
+      recursive: true,
+    });
+    await fs.promises.mkdir(path.join(cwd, "src/server/routes"), {
+      recursive: true,
+    });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/server/routes/health.ts"),
+      "export const GET = async () => Response.json({ ok: true });",
+      "utf-8",
+    );
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    await expect(
+      build(
+        {
+          server: {
+            routing: true,
+          },
+        },
+        {
+          cwd,
+          bundler,
+        },
+      ),
+    ).rejects.toThrow(
+      "[evjs] No server routes found in ./src/apis. Add a route module exporting GET or POST such as ./src/apis/index.ts or set server.routing: false.",
+    );
+    expect(events).not.toContain("bundler.build");
+  });
+
+  it("does not fall back to src/server/middleware for global server middleware", async () => {
+    const cwd = await createProject();
+    await fs.promises.mkdir(path.join(cwd, "src/apis"), {
+      recursive: true,
+    });
+    await fs.promises.mkdir(path.join(cwd, "src/server"), {
+      recursive: true,
+    });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/main.tsx"),
+      "export const clientEntry = true;",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/server/middleware.ts"),
+      [
+        "export default async function middleware(_ctx, next) {",
+        "  await next();",
+        "}",
+      ].join("\n"),
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/apis/health.ts"),
+      "export const GET = async () => Response.json({ ok: true });",
+      "utf-8",
+    );
+
+    let observedPlan: BuildPlan | undefined;
+    const events: string[] = [];
+    const bundler = createMockBundler(events, {
+      onBuildPlan(plan) {
+        observedPlan = plan;
+      },
+    });
+
+    await build(
+      {
+        server: {
+          routing: true,
+        },
+      },
+      {
+        cwd,
+        bundler,
+      },
+    );
+
+    expect(events).toContain("bundler.build");
+    const serverEntry = observedPlan?.entries.find(
+      (entry) => entry.name === "server",
+    );
+    expect(serverEntry?.metadata).toEqual(
+      expect.objectContaining({
+        type: "server-app",
+        routes: [expect.objectContaining({ module: "src/apis/health.ts" })],
+      }),
+    );
+    expect(serverEntry?.metadata).not.toHaveProperty("middlewares");
+  });
+
+  it("fails on unsupported server.entry config before running the bundler", async () => {
     const cwd = await createProject();
     const events: string[] = [];
     const bundler = createMockBundler(events);
@@ -2376,6 +2642,7 @@ describe("build", () => {
       build(
         {
           server: {
+            // @ts-expect-error runtime config loading can still produce unknown keys.
             entry: "./src/missing-server.ts",
           },
         },
@@ -2385,7 +2652,7 @@ describe("build", () => {
         },
       ),
     ).rejects.toThrow(
-      "src/missing-server.ts - Server entry source file not found.",
+      "[evjs] server.entry is not supported. Use server.routing file conventions under src/apis instead.",
     );
     expect(events).not.toContain("bundler.build");
   });
@@ -2413,279 +2680,7 @@ describe("build", () => {
     expect(events).not.toContain("bundler.build");
   });
 
-  it("fails on unsupported exported server route declarations before running the bundler", async () => {
-    const cwd = await createProject();
-    await fs.promises.mkdir(path.join(cwd, "src"), { recursive: true });
-    await fs.promises.writeFile(
-      path.join(cwd, "src/main.tsx"),
-      "export const clientEntry = true;",
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/server.ts"),
-      'import "./api";',
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/api.ts"),
-      [
-        'import { createRoute } from "@evjs/server";',
-        'const routePath = "/api/dynamic";',
-        "export const dynamic = createRoute(routePath, {",
-        "  GET: async () => Response.json({ ok: true }),",
-        "});",
-      ].join("\n"),
-      "utf-8",
-    );
-    const events: string[] = [];
-    const bundler = createMockBundler(events);
-
-    await expect(
-      build(
-        {
-          server: {
-            entry: "./src/server.ts",
-          },
-        },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      'src/api.ts - Server route "dynamic" must use a string-literal createRoute() path.',
-    );
-    expect(events).not.toContain("bundler.build");
-  });
-
-  it("fails on malformed server route modules before running the bundler", async () => {
-    const cwd = await createProject();
-    await fs.promises.mkdir(path.join(cwd, "src"), { recursive: true });
-    await fs.promises.writeFile(
-      path.join(cwd, "src/main.tsx"),
-      "export const clientEntry = true;",
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/server.ts"),
-      'import "./api";',
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/api.ts"),
-      [
-        'import { createRoute } from "@evjs/server";',
-        'export const users = createRoute("/api/users", {',
-        "  GET: async () => Response.json([])",
-      ].join("\n"),
-      "utf-8",
-    );
-    const events: string[] = [];
-    const bundler = createMockBundler(events);
-
-    await expect(
-      build(
-        {
-          server: {
-            entry: "./src/server.ts",
-          },
-        },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow("Server route module could not be parsed:");
-    expect(events).not.toContain("bundler.build");
-  });
-
-  it("fails on unsupported server route definition keys before running the bundler", async () => {
-    const cwd = await createProject();
-    await fs.promises.mkdir(path.join(cwd, "src"), { recursive: true });
-    await fs.promises.writeFile(
-      path.join(cwd, "src/main.tsx"),
-      "export const clientEntry = true;",
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/server.ts"),
-      'import "./api";',
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/api.ts"),
-      [
-        'import { createRoute } from "@evjs/server";',
-        'export const users = createRoute("/api/users", {',
-        "  get: async () => Response.json([]),",
-        "});",
-      ].join("\n"),
-      "utf-8",
-    );
-    const events: string[] = [];
-    const bundler = createMockBundler(events);
-
-    await expect(
-      build(
-        {
-          server: {
-            entry: "./src/server.ts",
-          },
-        },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      'src/api.ts - Server route "users" definition key "get" is not supported. Use GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS or "middlewares".',
-    );
-    expect(events).not.toContain("bundler.build");
-  });
-
-  it("fails on invalid server route handler values before running the bundler", async () => {
-    const cwd = await createProject();
-    await fs.promises.mkdir(path.join(cwd, "src"), { recursive: true });
-    await fs.promises.writeFile(
-      path.join(cwd, "src/main.tsx"),
-      "export const clientEntry = true;",
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/server.ts"),
-      'import "./api";',
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/api.ts"),
-      [
-        'import { createRoute } from "@evjs/server";',
-        'export const users = createRoute("/api/users", {',
-        '  GET: "not a function",',
-        "});",
-      ].join("\n"),
-      "utf-8",
-    );
-    const events: string[] = [];
-    const bundler = createMockBundler(events);
-
-    await expect(
-      build(
-        {
-          server: {
-            entry: "./src/server.ts",
-          },
-        },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      'src/api.ts - Server route "users" GET handler must be a function.',
-    );
-    expect(events).not.toContain("bundler.build");
-  });
-
-  it("fails on invalid server route path shapes before running the bundler", async () => {
-    const cwd = await createProject();
-    await fs.promises.mkdir(path.join(cwd, "src"), { recursive: true });
-    await fs.promises.writeFile(
-      path.join(cwd, "src/main.tsx"),
-      "export const clientEntry = true;",
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/server.ts"),
-      'import "./api";',
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/api.ts"),
-      [
-        'import { createRoute } from "@evjs/server";',
-        'export const users = createRoute("/api/users?filter=all", {',
-        "  GET: async () => Response.json([]),",
-        "});",
-      ].join("\n"),
-      "utf-8",
-    );
-    const events: string[] = [];
-    const bundler = createMockBundler(events);
-
-    await expect(
-      build(
-        {
-          server: {
-            entry: "./src/server.ts",
-          },
-        },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      'src/api.ts - Server route "users" must use a createRoute() path without query strings or hashes.',
-    );
-    expect(events).not.toContain("bundler.build");
-  });
-
-  it("fails on duplicate server route paths before running the bundler", async () => {
-    const cwd = await createProject();
-    await fs.promises.mkdir(path.join(cwd, "src/api"), { recursive: true });
-    await fs.promises.writeFile(
-      path.join(cwd, "src/main.tsx"),
-      "export const clientEntry = true;",
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/server.ts"),
-      ['import "./api/a-customers";', 'import "./api/b-customers";'].join("\n"),
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/api/a-customers.ts"),
-      [
-        'import { createRoute } from "@evjs/server";',
-        'export const customersGet = createRoute("/api/customers", {',
-        "  GET: async () => Response.json([]),",
-        "});",
-      ].join("\n"),
-      "utf-8",
-    );
-    await fs.promises.writeFile(
-      path.join(cwd, "src/api/b-customers.ts"),
-      [
-        'import { createRoute } from "@evjs/server";',
-        'export const customersPost = createRoute("/api/customers", {',
-        "  POST: async () => Response.json({ ok: true }),",
-        "});",
-      ].join("\n"),
-      "utf-8",
-    );
-    const events: string[] = [];
-    const bundler = createMockBundler(events);
-
-    await expect(
-      build(
-        {
-          server: {
-            entry: "./src/server.ts",
-          },
-        },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      'src/api/b-customers.ts - Server route path "/api/customers" is already declared by src/api/a-customers.ts. Declare all HTTP methods for a path in one createRoute() call.',
-    );
-    expect(events).not.toContain("bundler.build");
-  });
-
-  it("fails on reachable use-server modules in CSR builds before running the bundler", async () => {
+  it("builds reachable use-server modules in flat output mode", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src"), { recursive: true });
     await fs.promises.writeFile(
@@ -2710,23 +2705,19 @@ describe("build", () => {
     const events: string[] = [];
     const bundler = createMockBundler(events);
 
-    await expect(
-      build(
-        {
-          server: false,
-        },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      'src/api/user.server.ts - This "use server" module is reachable from the app graph, but server is disabled. Remove the import or enable server in ev.config.ts.',
+    await build(
+      {
+        output: { client: "dist" },
+      },
+      {
+        cwd,
+        bundler,
+      },
     );
-    expect(events).not.toContain("bundler.build");
+    expect(events).toContain("bundler.build");
   });
 
-  it("fails on reachable use-server modules with long headers in CSR builds before running the bundler", async () => {
+  it("builds reachable use-server modules with long headers in flat output mode", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src"), { recursive: true });
     await fs.promises.writeFile(
@@ -2752,20 +2743,16 @@ describe("build", () => {
     const events: string[] = [];
     const bundler = createMockBundler(events);
 
-    await expect(
-      build(
-        {
-          server: false,
-        },
-        {
-          cwd,
-          bundler,
-        },
-      ),
-    ).rejects.toThrow(
-      'src/api/user.server.ts - This "use server" module is reachable from the app graph, but server is disabled. Remove the import or enable server in ev.config.ts.',
+    await build(
+      {
+        output: { client: "dist" },
+      },
+      {
+        cwd,
+        bundler,
+      },
     );
-    expect(events).not.toContain("bundler.build");
+    expect(events).toContain("bundler.build");
   });
 
   it("fails on unsupported use-server exports before running the bundler", async () => {
@@ -2894,7 +2881,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -2923,7 +2910,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -2955,7 +2942,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -2994,7 +2981,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -3026,7 +3013,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           routing: true,
         },
         {
@@ -3082,7 +3069,7 @@ describe("build", () => {
     };
 
     await build(
-      { server: false, plugins: [pluginB, pluginA] },
+      { output: { client: "dist" }, plugins: [pluginB, pluginA] },
       {
         cwd,
         bundler,
@@ -3097,7 +3084,7 @@ describe("build", () => {
       "buildStart:a",
       "buildStart:b",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
       "buildEnd:a",
       "buildEnd:b",
     ]);
@@ -3123,7 +3110,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         plugins: [
           plugin("plugin-a", ["plugin-c"]),
           plugin("plugin-b"),
@@ -3141,7 +3128,7 @@ describe("build", () => {
       "setup:plugin-c",
       "setup:plugin-a",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
     ]);
   });
 
@@ -3152,7 +3139,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         plugins: [
           {
             name: "post",
@@ -3187,7 +3174,7 @@ describe("build", () => {
       "setup:normal",
       "setup:post",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
     ]);
   });
 
@@ -3214,7 +3201,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         plugins: [
           plugin("plugin-b", {
             dependencies: ["plugin-c"],
@@ -3235,7 +3222,7 @@ describe("build", () => {
       "setup:plugin-a",
       "setup:plugin-b",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
     ]);
   });
 
@@ -3246,7 +3233,7 @@ describe("build", () => {
 
     await build(
       {
-        server: false,
+        output: { client: "dist" },
         plugins: [
           {
             name: "plugin-b",
@@ -3274,7 +3261,7 @@ describe("build", () => {
       "setup:plugin-c",
       "setup:plugin-b",
       "bundler.build",
-      "bundler.entries:main",
+      "bundler.entries:main,server",
     ]);
   });
 
@@ -3286,7 +3273,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           plugins: [{ name: "plugin-b", dependencies: ["plugin-a"] }],
         },
         { cwd, bundler },
@@ -3302,7 +3289,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           plugins: [
             { name: "plugin-a", dependencies: ["plugin-b"] },
             { name: "plugin-b", dependencies: ["plugin-a"] },
@@ -3323,7 +3310,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           plugins: [
             { name: "plugin-a", optionalDependencies: ["plugin-b"] },
             { name: "plugin-b", dependencies: ["plugin-a"] },
@@ -3344,7 +3331,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           plugins: [{ name: "plugin-a" }, { name: "plugin-a" }],
         },
         { cwd, bundler },
@@ -3360,7 +3347,7 @@ describe("build", () => {
     await expect(
       build(
         {
-          server: false,
+          output: { client: "dist" },
           plugins: [
             {
               name: "",
@@ -3385,7 +3372,7 @@ describe("dev", () => {
 
     await expect(
       dev(
-        { server: false },
+        { output: { client: "dist" } },
         {
           cwd,
           bundler: {
@@ -3423,7 +3410,7 @@ describe("dev", () => {
     };
 
     await Promise.race([
-      dev({ server: false }, { cwd, bundler }),
+      dev({ output: { client: "dist" } }, { cwd, bundler }),
       new Promise((_, reject) =>
         setTimeout(
           () => reject(new Error("dev startup timed out")),
@@ -3470,7 +3457,7 @@ describe("dev", () => {
     await Promise.race([
       dev(
         {
-          server: false,
+          output: { client: "dist" },
           routing: {
             mode: "mpa",
           },
@@ -3508,7 +3495,7 @@ describe("dev", () => {
     const events: string[] = [];
     const bundler = createRouteUpdateBundler(cwd, events, "/posts/$postId");
 
-    const running = dev({ server: false }, { cwd, bundler });
+    const running = dev({ output: { client: "dist" } }, { cwd, bundler });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
     await fs.promises.writeFile(
@@ -3546,7 +3533,7 @@ describe("dev", () => {
     const events: string[] = [];
     const bundler = createRouteUpdateBundler(cwd, events, "/admin");
 
-    const running = dev({ server: false }, { cwd, bundler });
+    const running = dev({ output: { client: "dist" } }, { cwd, bundler });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
     await fs.promises.mkdir(path.join(cwd, "src/pages/admin"), {
@@ -3596,7 +3583,7 @@ describe("dev", () => {
     const events: string[] = [];
     const bundler = createRouteUpdateBundler(cwd, events, "/posts/$postId");
 
-    const running = dev({ server: false }, { cwd, bundler });
+    const running = dev({ output: { client: "dist" } }, { cwd, bundler });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
     await fs.promises.rm(path.join(cwd, "src/pages/posts/$postId.tsx"));
@@ -3656,7 +3643,7 @@ describe("dev", () => {
 
     const running = dev(
       {
-        server: false,
+        output: { client: "dist" },
         plugins: [plugin],
       },
       { cwd, bundler },
@@ -3705,7 +3692,7 @@ describe("dev", () => {
 
     const events: string[] = [];
     let currentConfig: Config<Record<string, never>> = {
-      server: false,
+      output: { client: "dist" },
       pages: {
         home: "./src/pages/Home.tsx",
       },
@@ -3798,7 +3785,7 @@ describe("dev", () => {
     }
 
     let currentConfig: Config<Record<string, never>> = {
-      server: false,
+      output: { client: "dist" },
       pages: {
         home: "./src/pages/Home.tsx",
       },

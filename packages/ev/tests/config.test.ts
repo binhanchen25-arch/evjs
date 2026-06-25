@@ -38,7 +38,9 @@ describe("defineConfig", () => {
     const config = defineConfig({
       routing: {
         dir: "./src/pages",
-        layout: "./src/shell/AppLayout.tsx",
+        conventions: {
+          layout: "./src/shell/AppLayout.tsx",
+        },
         mount: "#root",
       },
     });
@@ -46,8 +48,46 @@ describe("defineConfig", () => {
     expect(config).toEqual({
       routing: {
         dir: "./src/pages",
-        layout: "./src/shell/AppLayout.tsx",
+        conventions: {
+          layout: "./src/shell/AppLayout.tsx",
+        },
         mount: "#root",
+      },
+    });
+  });
+
+  it("accepts server routing configuration", () => {
+    const config = defineConfig({
+      server: {
+        routing: {
+          dir: "./src/apis",
+        },
+      },
+    });
+
+    expect(config).toEqual({
+      server: {
+        routing: {
+          dir: "./src/apis",
+        },
+      },
+    });
+  });
+
+  it("accepts server convention configuration", () => {
+    const config = defineConfig({
+      server: {
+        conventions: {
+          middleware: false,
+        },
+      },
+    });
+
+    expect(config).toEqual({
+      server: {
+        conventions: {
+          middleware: false,
+        },
       },
     });
   });
@@ -74,7 +114,6 @@ describe("resolveConfig", () => {
     expect(resolved.html).toBe(CONFIG_DEFAULTS.html);
     expect(resolved.dev.port).toBe(CONFIG_DEFAULTS.port);
     expect(resolved.dev.https).toBe(false);
-    expect(resolved.serverEnabled).toBe(true);
     expect(resolved.server.basePath).toBe("/__evjs");
     expect(resolved.server.runtime).toEqual({
       basePath: "/__evjs",
@@ -83,12 +122,15 @@ describe("resolveConfig", () => {
       rsc: "/__evjs/rsc",
     });
     expect(resolved.server.functionRuntime.endpoint).toBe("/__evjs/fn");
+    expect(resolved.server.routing).toBeUndefined();
     expect(resolved.transport).toEqual({ baseUrl: undefined });
     expect(resolved.apps).toBeUndefined();
     expect(resolved.routing).toBeUndefined();
     expect(resolved.server.dev.port).toBe(CONFIG_DEFAULTS.serverPort);
     expect(resolved.server.dev.https).toBe(false);
     expect(resolved.output).toEqual({
+      client: "dist/client",
+      server: "dist/server",
       crossOriginLoading: CONFIG_DEFAULTS.crossOriginLoading,
     });
     expect(resolved.bundler).toBeUndefined();
@@ -141,22 +183,32 @@ describe("resolveConfig", () => {
     );
   });
 
-  it("resolves output crossorigin loading configuration", () => {
+  it("resolves output configuration", () => {
     expect(
       resolveConfig({
         output: {
           crossOriginLoading: "anonymous",
         },
       }).output,
-    ).toEqual({ crossOriginLoading: "anonymous" });
+    ).toEqual({
+      client: "dist/client",
+      server: "dist/server",
+      crossOriginLoading: "anonymous",
+    });
 
     expect(
       resolveConfig({
         output: {
+          client: "dist",
+          server: ".ev/server",
           crossOriginLoading: "use-credentials",
         },
       }).output,
-    ).toEqual({ crossOriginLoading: "use-credentials" });
+    ).toEqual({
+      client: "dist",
+      server: ".ev/server",
+      crossOriginLoading: "use-credentials",
+    });
 
     expect(
       resolveConfig({
@@ -164,7 +216,11 @@ describe("resolveConfig", () => {
           crossOriginLoading: false,
         },
       }).output,
-    ).toEqual({ crossOriginLoading: false });
+    ).toEqual({
+      client: "dist/client",
+      server: "dist/server",
+      crossOriginLoading: false,
+    });
   });
 
   it("rejects invalid output declarations", () => {
@@ -182,7 +238,7 @@ describe("resolveConfig", () => {
         },
       }),
     ).toThrow(
-      "[evjs] output.crossOrigin is not supported. Use crossOriginLoading.",
+      "[evjs] output.crossOrigin is not supported. Use client, server, or crossOriginLoading.",
     );
 
     expect(() =>
@@ -193,6 +249,25 @@ describe("resolveConfig", () => {
       }),
     ).toThrow(
       '[evjs] output.crossOriginLoading must be false, "anonymous", or "use-credentials".',
+    );
+
+    expect(() =>
+      resolveConfig({
+        output: {
+          client: "" as never,
+        },
+      }),
+    ).toThrow("[evjs] output.client must be a non-empty string.");
+
+    expect(() =>
+      resolveConfig({
+        output: {
+          client: "dist",
+          server: "dist/",
+        },
+      }),
+    ).toThrow(
+      "[evjs] output.client and output.server must point to different directories.",
     );
   });
 
@@ -206,6 +281,9 @@ describe("resolveConfig", () => {
       dir: "./src/pages",
       html: "./index.html",
       mount: "#app",
+      conventions: {
+        layout: true,
+      },
       routes: [],
     });
   });
@@ -216,7 +294,9 @@ describe("resolveConfig", () => {
       routing: {
         dir: "./app/pages",
         html: "./shell.html",
-        layout: "./app/ShellLayout.tsx",
+        conventions: {
+          layout: "./app/ShellLayout.tsx",
+        },
         mount: "#root",
       },
     });
@@ -225,7 +305,9 @@ describe("resolveConfig", () => {
       mode: "spa",
       dir: "./app/pages",
       html: "./shell.html",
-      layout: "./app/ShellLayout.tsx",
+      conventions: {
+        layout: "./app/ShellLayout.tsx",
+      },
       mount: "#root",
       routes: [],
     });
@@ -235,7 +317,9 @@ describe("resolveConfig", () => {
     const resolved = resolveConfig({
       routing: {
         mode: "spa",
-        layout: false,
+        conventions: {
+          layout: false,
+        },
       },
     });
 
@@ -244,7 +328,26 @@ describe("resolveConfig", () => {
       dir: "./src/pages",
       html: "./index.html",
       mount: "#app",
-      layout: false,
+      conventions: {
+        layout: false,
+      },
+      routes: [],
+    });
+  });
+
+  it("supports disabling all page routing conventions", () => {
+    const resolved = resolveConfig({
+      routing: {
+        mode: "spa",
+        conventions: false,
+      },
+    });
+
+    expect(resolved.routing).toEqual({
+      mode: "spa",
+      dir: "./src/pages",
+      html: "./index.html",
+      mount: "#app",
       routes: [],
     });
   });
@@ -254,11 +357,13 @@ describe("resolveConfig", () => {
       resolveConfig({
         routing: {
           mode: "mpa",
-          layout: "./src/shell/AppLayout.tsx",
+          conventions: {
+            layout: true,
+          },
         },
       }),
     ).toThrow(
-      "[evjs] routing.layout is only supported in SPA mode. MPA pages should import shared shell components directly or use shared HTML templates.",
+      "[evjs] routing.conventions.layout is only supported in SPA mode. MPA pages should import shared shell components directly or use shared HTML templates.",
     );
   });
 
@@ -312,10 +417,47 @@ describe("resolveConfig", () => {
     expect(() =>
       resolveConfig({
         routing: {
-          layout: "",
+          conventions: null as never,
         },
       }),
-    ).toThrow("[evjs] routing.layout must be a non-empty string.");
+    ).toThrow(
+      "[evjs] routing.conventions must be true, false, or a routing conventions object.",
+    );
+
+    expect(() =>
+      resolveConfig({
+        routing: {
+          conventions: {
+            layout: "",
+          },
+        },
+      }),
+    ).toThrow("[evjs] routing.conventions.layout must be a non-empty string.");
+
+    expect(() =>
+      resolveConfig({
+        routing: {
+          conventions: {
+            layout: 1 as never,
+          },
+        },
+      }),
+    ).toThrow(
+      "[evjs] routing.conventions.layout must be a boolean or a non-empty string.",
+    );
+
+    expect(() =>
+      resolveConfig({
+        routing: {
+          conventions: {
+            // @ts-expect-error runtime config loading can still produce unknown keys.
+            loading: true,
+          },
+        },
+      }),
+    ).toThrow(
+      "[evjs] routing.conventions.loading is not supported. Use layout.",
+    );
 
     expect(() =>
       resolveConfig({
@@ -347,7 +489,7 @@ describe("resolveConfig", () => {
         },
       }),
     ).toThrow(
-      "[evjs] routing.fallback is not supported. Use mode, dir, html, mount, or layout.",
+      "[evjs] routing.fallback is not supported. Use mode, dir, html, mount, or conventions.",
     );
   });
 
@@ -694,17 +836,8 @@ describe("resolveConfig", () => {
     ).toThrow("[evjs] dev.proxy[0].secure must be a boolean when provided.");
   });
 
-  it("sets serverEnabled=false when server is false", () => {
-    const resolved = resolveConfig({ server: false });
-    expect(resolved.serverEnabled).toBe(false);
-    expect(resolved.server.runtime.fn).toBe("/__evjs/fn");
-    expect(resolved.server.runtime.ppr).toBe("/__evjs/ppr");
-    expect(resolved.dev.proxy).toEqual([]);
-  });
-
-  it("keeps user dev proxy rules without framework proxy rules when server is false", () => {
+  it("keeps framework proxy rules with user dev proxy rules", () => {
     const resolved = resolveConfig({
-      server: false,
       dev: {
         proxy: [
           {
@@ -717,11 +850,16 @@ describe("resolveConfig", () => {
       },
     });
 
-    expect(resolved.serverEnabled).toBe(false);
     expect(resolved.dev.proxy).toEqual([
       {
         context: ["/api"],
         target: "http://localhost:4000",
+        changeOrigin: true,
+        secure: false,
+      },
+      {
+        context: ["/__evjs/fn", "/__evjs/ppr", "/__evjs/rsc"],
+        target: "http://localhost:3001",
         changeOrigin: true,
         secure: false,
       },
@@ -731,13 +869,10 @@ describe("resolveConfig", () => {
   it("respects server overrides", () => {
     const resolved = resolveConfig({
       server: {
-        entry: "./server.ts",
         basePath: "/api",
         dev: { port: 4000 },
       },
     });
-    expect(resolved.serverEnabled).toBe(true);
-    expect(resolved.server.entry).toBe("./server.ts");
     expect(resolved.server.runtime.fn).toBe("/api/fn");
     expect(resolved.server.runtime.ppr).toBe("/api/ppr");
     expect(resolved.server.functionRuntime.endpoint).toBe("/api/fn");
@@ -846,6 +981,98 @@ describe("resolveConfig", () => {
     });
   });
 
+  it("resolves server file routing configuration", () => {
+    expect(
+      resolveConfig({
+        server: {
+          routing: true,
+        },
+      }).server.routing,
+    ).toEqual({
+      dir: CONFIG_DEFAULTS.serverRoutingDir,
+      routes: [],
+    });
+
+    expect(
+      resolveConfig({
+        server: {
+          routing: {
+            dir: "./src/custom-routes",
+          },
+        },
+      }).server.routing,
+    ).toEqual({
+      dir: "./src/custom-routes",
+      routes: [],
+    });
+
+    expect(
+      resolveConfig({
+        server: {
+          routing: false,
+        },
+      }).server.routing,
+    ).toBeUndefined();
+  });
+
+  it("resolves server convention configuration", () => {
+    expect(
+      resolveConfig({
+        server: {
+          routing: true,
+        },
+      }).server.conventions,
+    ).toEqual({
+      middleware: true,
+      globalMiddlewares: [],
+      routeMiddlewares: [],
+    });
+
+    expect(
+      resolveConfig({
+        server: {
+          conventions: true,
+        },
+      }).server.conventions,
+    ).toEqual({
+      middleware: true,
+      globalMiddlewares: [],
+      routeMiddlewares: [],
+    });
+
+    expect(
+      resolveConfig({
+        server: {
+          routing: true,
+          conventions: false,
+        },
+      }).server.conventions,
+    ).toBeUndefined();
+
+    expect(
+      resolveConfig({
+        server: {
+          routing: true,
+          conventions: {
+            middleware: false,
+          },
+        },
+      }).server.conventions,
+    ).toBeUndefined();
+
+    expect(
+      resolveConfig({
+        server: {
+          conventions: true,
+        },
+      }).server.conventions,
+    ).toEqual({
+      middleware: true,
+      globalMiddlewares: [],
+      routeMiddlewares: [],
+    });
+  });
+
   it("rejects invalid server and transport declarations", () => {
     expect(() =>
       resolveConfig({
@@ -900,16 +1127,83 @@ describe("resolveConfig", () => {
         },
       }),
     ).toThrow(
-      "[evjs] server.endpoint is not supported. Use entry, basePath, rsc, or dev.",
+      "[evjs] server.endpoint is not supported. Use routing, conventions, basePath, rsc, or dev.",
     );
 
     expect(() =>
       resolveConfig({
         server: {
-          entry: "",
+          // @ts-expect-error runtime config loading can still produce unknown keys.
+          entry: "./src/server.ts",
         },
       }),
-    ).toThrow("[evjs] server.entry must be a non-empty string.");
+    ).toThrow(
+      "[evjs] server.entry is not supported. Use server.routing file conventions under src/apis instead.",
+    );
+
+    expect(() =>
+      resolveConfig({
+        server: {
+          routing: null as never,
+        },
+      }),
+    ).toThrow(
+      "[evjs] server.routing must be true, false, or a server routing object.",
+    );
+
+    expect(() =>
+      resolveConfig({
+        server: {
+          routing: {
+            // @ts-expect-error runtime config loading can still produce unknown keys.
+            prefix: "/api",
+          },
+        },
+      }),
+    ).toThrow("[evjs] server.routing.prefix is not supported. Use dir.");
+
+    expect(() =>
+      resolveConfig({
+        server: {
+          routing: {
+            dir: "",
+          },
+        },
+      }),
+    ).toThrow("[evjs] server.routing.dir must be a non-empty string.");
+
+    expect(() =>
+      resolveConfig({
+        server: {
+          conventions: null as never,
+        },
+      }),
+    ).toThrow(
+      "[evjs] server.conventions must be true, false, or a server conventions object.",
+    );
+
+    expect(() =>
+      resolveConfig({
+        server: {
+          conventions: {
+            // @ts-expect-error runtime config loading can still produce unknown keys.
+            errors: true,
+          },
+        },
+      }),
+    ).toThrow(
+      "[evjs] server.conventions.errors is not supported. Use middleware.",
+    );
+
+    expect(() =>
+      resolveConfig({
+        server: {
+          conventions: {
+            middleware: "yes" as never,
+          },
+        },
+      }),
+    ).toThrow("[evjs] server.conventions.middleware must be a boolean.");
 
     expect(() =>
       resolveConfig({

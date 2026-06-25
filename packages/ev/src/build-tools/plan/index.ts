@@ -12,6 +12,7 @@ import type {
   RenderMode,
   RuntimePlan,
   ServerBuildPlan,
+  ServerMiddlewareNode,
   ServerRenderPlan,
 } from "@evjs/shared/manifest";
 import { isRouteDerivedPage } from "@evjs/shared/manifest";
@@ -22,6 +23,8 @@ import {
 } from "../page-rendering-contract.js";
 import { sortPageRoutes } from "../page-route-order.js";
 import { PAGES_APP_ENTRY_IMPORT } from "../pages-entry.js";
+import type { DiscoveredServerRouteNode } from "../server-routes.js";
+import { SERVER_ROUTES_ENTRY_IMPORT } from "../server-routes-entry.js";
 import { sanitizePageId } from "../utils.js";
 
 const DEFAULT_PUBLIC_PATH: RuntimePlan["publicPath"] = "auto";
@@ -61,15 +64,28 @@ export interface BuildPlanConfig {
     entry?: string;
     html: string;
     mount: string;
+    conventions?: {
+      layout: boolean | string;
+    };
     routes: PageRouteNode[];
     rootModule?: string;
   };
   transport?: {
     baseUrl?: string;
   };
-  serverEnabled: boolean;
+  output: {
+    client: string;
+    server: string;
+  };
   server: {
-    entry?: string;
+    routing?: {
+      dir: string;
+      routes: DiscoveredServerRouteNode[];
+    };
+    conventions?: {
+      globalMiddlewares: ServerMiddlewareNode[];
+      routeMiddlewares: ServerMiddlewareNode[];
+    };
     basePath: string;
     functionRuntime: {
       endpoint: string;
@@ -95,37 +111,38 @@ export function createBuildPlan(
   options: CreateBuildPlanOptions = {},
 ): BuildPlan {
   const mode = options.mode ?? readBuildMode();
-  validatePageBuildContracts(config, graph);
-  const serverRenderers = createServerRenderers(config, graph);
+  validatePageBuildContracts(graph);
+  const serverRenderers = createServerRenderers(graph);
   const entries = createEntries(config, graph, serverRenderers);
   const html = createHtmlPlans(config, graph);
   validateBuildOutputNames(entries, html);
-  const server = createServerPlan(config, serverRenderers);
+  const server = createServerPlan(config, graph, serverRenderers);
 
   return {
     version: 1,
     buildId: options.buildId ?? mode,
     mode,
     distDir: options.distDir ?? "dist",
-    serverEnabled: config.serverEnabled,
+    output: {
+      clientDir: config.output.client,
+      serverDir: config.output.server,
+    },
     entries,
     html,
     server,
     runtime: {
       publicPath: options.publicPath ?? DEFAULT_PUBLIC_PATH,
-      server: config.serverEnabled
-        ? {
-            basePath: config.server.basePath,
-            fn: config.server.functionRuntime.endpoint,
-            ppr: hasPprPages(graph)
-              ? joinPath(config.server.basePath, "ppr")
-              : undefined,
-            rsc: hasRscPages(graph)
-              ? (config.server.runtime?.rsc ??
-                joinPath(config.server.basePath, "rsc"))
-              : config.server.runtime?.rsc,
-          }
-        : undefined,
+      server: {
+        basePath: config.server.basePath,
+        fn: config.server.functionRuntime.endpoint,
+        ppr: hasPprPages(graph)
+          ? joinPath(config.server.basePath, "ppr")
+          : undefined,
+        rsc: hasRscPages(graph)
+          ? (config.server.runtime?.rsc ??
+            joinPath(config.server.basePath, "rsc"))
+          : config.server.runtime?.rsc,
+      },
       transport: config.transport,
     },
   };
@@ -143,7 +160,8 @@ export function diffBuildPlan(
     entries: diffByKey(previous.entries, next.entries, buildEntryKey),
     html: diffByKey(previous.html, next.html, (html) => html.id),
     serverChanged:
-      previous.serverEnabled !== next.serverEnabled ||
+      previous.output.clientDir !== next.output.clientDir ||
+      previous.output.serverDir !== next.output.serverDir ||
       stableStringify(previous.server) !== stableStringify(next.server),
   };
 }
@@ -225,15 +243,15 @@ function createEntries(
     });
   }
 
-  if (config.serverEnabled) {
-    entries.push({
-      name: "server",
-      import: resolveServerEntry(config, serverRenderers),
-      environment: "server",
-      runtime: "node",
-      kind: "server-runtime",
-    });
-  }
+  const serverEntry = createServerRuntimeEntry(config, graph);
+  entries.push({
+    name: "server",
+    import: serverEntry.import,
+    environment: "server",
+    runtime: "node",
+    kind: "server-runtime",
+    ...(serverEntry.metadata ? { metadata: serverEntry.metadata } : {}),
+  });
 
   return entries;
 }
@@ -255,14 +273,9 @@ function createPagesAppRoutes(graph: AppGraph, appId: string): PageRouteNode[] {
   );
 }
 
-function validatePageBuildContracts(
-  config: BuildPlanConfig,
-  graph: AppGraph,
-): void {
+function validatePageBuildContracts(graph: AppGraph): void {
   for (const page of Object.values(graph.pages)) {
-    validatePageBuildContract(`Page "${page.id}"`, page, {
-      serverEnabled: config.serverEnabled,
-    });
+    validatePageBuildContract(`Page "${page.id}"`, page);
   }
 }
 
@@ -311,12 +324,7 @@ function describeHtmlOwner(document: HtmlPlan): string {
   return `page "${document.owner.pageId}"`;
 }
 
-function createServerRenderers(
-  config: BuildPlanConfig,
-  graph: AppGraph,
-): ServerRenderPlan[] {
-  if (!config.serverEnabled) return [];
-
+function createServerRenderers(graph: AppGraph): ServerRenderPlan[] {
   const renderers: ServerRenderPlan[] = [];
   for (const page of Object.values(graph.pages)) {
     if (page.render === "csr") continue;
@@ -497,15 +505,11 @@ function isMpaFileRoutePage(
 
 function createServerPlan(
   config: BuildPlanConfig,
+  graph: AppGraph,
   renderers: ServerRenderPlan[],
 ): ServerBuildPlan {
-  if (!config.serverEnabled) {
-    return { enabled: false };
-  }
-
   return {
-    enabled: true,
-    entry: resolveServerEntry(config, renderers),
+    entry: createServerRuntimeEntry(config, graph).import,
     ...(renderers.length > 0 ? { renderers } : {}),
     functionRuntime: {
       endpoint: config.server.functionRuntime.endpoint,
@@ -515,12 +519,39 @@ function createServerPlan(
   };
 }
 
-function resolveServerEntry(
+function createServerRuntimeEntry(
   config: BuildPlanConfig,
-  _renderers: ServerRenderPlan[],
-): string {
-  if (config.server.entry) return config.server.entry;
-  return "@evjs/server/fetch";
+  graph: AppGraph,
+): Pick<BuildEntry, "import" | "metadata"> {
+  const routes = getConfiguredServerRoutes(config, graph);
+  const middlewares = config.server.conventions?.globalMiddlewares ?? [];
+  const serverFunctions = graph.serverFunctions;
+  if (
+    routes.length > 0 ||
+    middlewares.length > 0 ||
+    serverFunctions.length > 0
+  ) {
+    return {
+      import: SERVER_ROUTES_ENTRY_IMPORT,
+      metadata: {
+        type: "server-app",
+        routes,
+        ...(middlewares.length > 0 ? { middlewares } : {}),
+        ...(serverFunctions.length > 0 ? { serverFunctions } : {}),
+      },
+    };
+  }
+  return { import: "@evjs/server/fetch" };
+}
+
+function getConfiguredServerRoutes(
+  config: BuildPlanConfig,
+  graph: AppGraph,
+): DiscoveredServerRouteNode[] {
+  const configured = config.server.routing?.routes ?? [];
+  if (configured.length === 0) return [];
+  const graphIds = new Set(graph.serverRoutes.map((route) => route.id));
+  return configured.filter((route) => graphIds.has(route.id));
 }
 
 function readBuildMode(): "development" | "production" {

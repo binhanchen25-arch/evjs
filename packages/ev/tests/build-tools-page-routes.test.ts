@@ -45,7 +45,7 @@ describe("discoverPageRoutes", () => {
       ".jsx",
     ]);
     expect(PAGE_ROUTE_CONVENTION_DOCS_URL).toBe(
-      "https://evaijs.github.io/evjs/docs/project-structure#convention-matrix",
+      "https://evaijs.github.io/evjs/docs/file-conventions#client-page-routes",
     );
     expect(PAGE_ROUTE_CONVENTION_RULES.map((rule) => rule.id)).toEqual([
       "directory-index",
@@ -63,6 +63,7 @@ describe("discoverPageRoutes", () => {
       "client-module",
       "server-module",
       "root-layout",
+      "mpa-html-template",
     ]);
     expect(PAGE_ROUTE_CONVENTION_RULES.map((rule) => rule.category)).toEqual([
       "route",
@@ -80,6 +81,7 @@ describe("discoverPageRoutes", () => {
       "ignored",
       "ignored",
       "layout",
+      "html",
     ]);
     expect(PAGE_ROUTE_CONVENTION_RULES).toEqual(
       expect.arrayContaining([
@@ -159,10 +161,18 @@ describe("discoverPageRoutes", () => {
             "src/pages/layout.tsx",
           ]),
         }),
+        expect.objectContaining({
+          id: "mpa-html-template",
+          category: "html",
+          valid: expect.arrayContaining([
+            "about.html beside about.tsx",
+            "users/index.html beside users/index.tsx",
+          ]),
+        }),
       ]),
     );
     expect(PAGE_ROUTE_CONVENTION_SUMMARY).toBe(
-      "Page route files use index files for directory roots, $param filenames for dynamic segments, one page file per URL path, one dynamic param name per URL shape, unique generated route ids, route groups for pathless organization, and lowercase URL-safe static segments; ignored colocated modules include _-prefixed private modules, dot-prefixed hidden modules, declaration files, test/spec modules, Storybook modules, client-only *.client.* modules, and server-only *.server.* modules; SPA layout auto-discovery supports layout source modules beside the route directory",
+      "Page route files use index files for directory roots, $param filenames for dynamic segments, one page file per URL path, one dynamic param name per URL shape, unique generated route ids, route groups for pathless organization, and lowercase URL-safe static segments; ignored colocated modules include _-prefixed private modules, dot-prefixed hidden modules, declaration files, test/spec modules, Storybook modules, client-only *.client.* modules, and server-only *.server.* modules; SPA layout auto-discovery supports layout source modules beside the route directory; MPA page routes can use colocated HTML templates with the same basename",
     );
     expect(isPageRouteSourceModuleFile("index.tsx")).toBe(true);
     expect(isPageRouteSourceModuleFile("index.d.ts")).toBe(false);
@@ -297,7 +307,9 @@ describe("discoverPageRoutes", () => {
     const cwd = await createFixture({
       "src/layout/index.tsx": "export default function Root() { return null; }",
       "src/pages/index.tsx": "export default function Home() { return null; }",
+      "src/pages/index.html": '<div id="app"></div>',
       "src/pages/about.tsx": "export default function About() { return null; }",
+      "src/pages/about.html": '<div id="app"></div>',
       "src/pages/users/$userId.tsx":
         "export default function User() { return null; }",
       "src/pages/posts/$postId.tsx":
@@ -337,6 +349,73 @@ describe("discoverPageRoutes", () => {
         id: "users_userId",
         path: "/users/$userId",
         module: "./src/pages/users/$userId.tsx",
+      },
+    ]);
+    expect(discovery.diagnostics).toEqual([]);
+  });
+
+  it("discovers colocated MPA HTML templates with the same basename", async () => {
+    const cwd = await createFixture({
+      "src/pages/index.tsx": "export default function Home() { return null; }",
+      "src/pages/index.html": '<div id="app"></div>',
+      "src/pages/about.tsx": "export default function About() { return null; }",
+      "src/pages/about.html": '<div id="app"></div>',
+      "src/pages/users/index.tsx":
+        "export default function Users() { return null; }",
+      "src/pages/users/index.html": '<div id="app"></div>',
+      "src/pages/users/$userId.tsx":
+        "export default function User() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "mpa",
+    });
+
+    expect(discovery.routes).toEqual([
+      {
+        id: "index",
+        path: "/",
+        module: "./src/pages/index.tsx",
+        html: "./src/pages/index.html",
+      },
+      {
+        id: "about",
+        path: "/about",
+        module: "./src/pages/about.tsx",
+        html: "./src/pages/about.html",
+      },
+      {
+        id: "users",
+        path: "/users",
+        module: "./src/pages/users/index.tsx",
+        html: "./src/pages/users/index.html",
+      },
+      {
+        id: "users_userId",
+        path: "/users/$userId",
+        module: "./src/pages/users/$userId.tsx",
+      },
+    ]);
+    expect(discovery.diagnostics).toEqual([]);
+  });
+
+  it("does not treat routing.html as an MPA file-route convention", async () => {
+    const cwd = await createFixture({
+      "src/pages/index.tsx": "export default function Home() { return null; }",
+      "src/pages/routing.html": '<div id="app"></div>',
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "mpa",
+    });
+
+    expect(discovery.routes).toEqual([
+      {
+        id: "index",
+        path: "/",
+        module: "./src/pages/index.tsx",
       },
     ]);
     expect(discovery.diagnostics).toEqual([]);
@@ -436,12 +515,10 @@ describe("discoverPageRoutes", () => {
     expect(englishClientRoutesDoc).toContain(
       "`routing.routes` is not a public",
     );
-    expect(englishClientRoutesDoc).toContain(
-      "when `routing.layout` points at an explicit module",
-    );
+    expect(englishClientRoutesDoc).toContain("`routing.conventions.layout`");
     expect(chineseClientRoutesDoc).toContain("`routing.routes` 不是公开的");
     expect(chineseClientRoutesDoc).toContain(
-      "即使 `routing.layout` 显式指向其他模块",
+      "即使 `routing.conventions.layout` 显式指向其他模块",
     );
   });
 
@@ -1230,7 +1307,7 @@ describe("discoverPageRoutes", () => {
         level: "error",
         file: "src/layout.tsx",
         message:
-          "Multiple root layout modules found beside the page route directory: ./src/layout.tsx, ./src/layout.jsx, ./src/layout/index.js. Keep one layout module or configure routing.layout explicitly.",
+          "Multiple root layout modules found beside the page route directory: ./src/layout.tsx, ./src/layout.jsx, ./src/layout/index.js. Keep one layout module or configure routing.conventions.layout explicitly.",
       },
     ]);
   });

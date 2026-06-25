@@ -171,7 +171,6 @@ async function emitFrameworkArtifacts(options: {
   const output = linkBuildOutput({
     graph: options.graph,
     plan: options.plan,
-    serverEnabled: options.config.serverEnabled,
     clientEntryAssets: options.facts.clientEntryAssets,
     firstClientEntryAssets: options.facts.firstClientEntryAssets,
     serverEntryAssets: options.facts.serverEntryAssets,
@@ -183,24 +182,20 @@ async function emitFrameworkArtifacts(options: {
   await options.onBuildOutput?.(output);
 
   const rootDir = path.join(options.cwd, options.plan.distDir);
-  const clientDir = options.config.serverEnabled
-    ? path.join(rootDir, "client")
-    : rootDir;
+  const clientDir = path.resolve(options.cwd, options.plan.output.clientDir);
   await fs.mkdir(rootDir, { recursive: true });
-  if (options.config.serverEnabled) {
-    const serverDir = path.join(rootDir, "server");
-    await fs.mkdir(serverDir, { recursive: true });
-    await fs.writeFile(
-      path.join(serverDir, "manifest.json"),
-      JSON.stringify(createServerManifest(output), null, 2),
-      "utf-8",
-    );
-    await fs.writeFile(
-      path.join(rootDir, "build-output.json"),
-      JSON.stringify(output, null, 2),
-      "utf-8",
-    );
-  }
+  const serverDir = path.join(rootDir, "server");
+  await fs.mkdir(serverDir, { recursive: true });
+  await fs.writeFile(
+    path.join(serverDir, "manifest.json"),
+    JSON.stringify(createServerManifest(output), null, 2),
+    "utf-8",
+  );
+  await fs.writeFile(
+    path.join(rootDir, "build-output.json"),
+    JSON.stringify(output, null, 2),
+    "utf-8",
+  );
   await fs.mkdir(clientDir, { recursive: true });
   await fs.writeFile(
     path.join(clientDir, "manifest.json"),
@@ -432,7 +427,7 @@ describe("webpackAdapter build", () => {
       `,
       });
       const config = resolveConfig<WebpackConfig>({
-        server: false,
+        output: { client: "dist" },
         pages: {
           home: {
             component: "./src/pages/Home ! page 中文.tsx",
@@ -491,16 +486,6 @@ describe("webpackAdapter build", () => {
         "index.html":
           '<!doctype html><html><head></head><body><div id="app"></div></body></html>',
         "src/main.ts": "console.log('client app');",
-        "src/server.ts": `
-        import { createApp } from "@evjs/server";
-        import { createReactFrameworkServer } from "@evjs/server/react";
-
-        const app = createApp({
-          framework: createReactFrameworkServer(),
-        });
-
-        export default { fetch: app.fetch };
-      `,
         "src/pages/Dashboard !page 中文.ts": `
         export const render = "ssr";
         export const hydrate = "load";
@@ -513,9 +498,6 @@ describe("webpackAdapter build", () => {
       const baseConfig = resolveConfig<WebpackConfig>({
         entry: "./src/main.ts",
         routing: true,
-        server: {
-          entry: "./src/server.ts",
-        },
       });
       const routing = requireRouting(baseConfig.routing);
       const config = {
@@ -980,7 +962,7 @@ describe("webpackAdapter dev", () => {
       `,
     });
     const config = resolveConfig<WebpackConfig>({
-      server: false,
+      output: { client: "dist" },
       dev: { port },
       pages: {
         home: {
@@ -1036,7 +1018,7 @@ describe("webpackAdapter dev", () => {
       "src/main.tsx": `console.log("spa");`,
     });
     const config = resolveConfig<WebpackConfig>({
-      server: false,
+      output: { client: "dist" },
       dev: { port },
       entry: "./src/main.tsx",
       html: "./index.html",
@@ -1111,7 +1093,7 @@ describe("webpackAdapter dev", () => {
       `,
     });
     const config = resolveConfig<WebpackConfig>({
-      server: false,
+      output: { client: "dist" },
       dev: { port },
       pages: {
         home: {
@@ -1153,7 +1135,7 @@ describe("webpackAdapter dev", () => {
     });
     try {
       const nextConfig = resolveConfig<WebpackConfig>({
-        server: false,
+        output: { client: "dist" },
         dev: { port },
         pages: {
           home: {
@@ -1206,7 +1188,7 @@ describe("webpackAdapter dev", () => {
       `,
     });
     const config = resolveConfig<WebpackConfig>({
-      server: false,
+      output: { client: "dist" },
       dev: { port },
       pages: {
         home: {
@@ -1248,7 +1230,7 @@ describe("webpackAdapter dev", () => {
     });
     try {
       const nextConfig = resolveConfig<WebpackConfig>({
-        server: false,
+        output: { client: "dist" },
         dev: { port },
         pages: {
           home: {
@@ -1277,7 +1259,10 @@ describe("webpackAdapter dev", () => {
       const session = controller as unknown as {
         plan: { entries: Array<{ name: string }> };
       };
-      expect(session.plan.entries.map((entry) => entry.name)).toEqual(["home"]);
+      expect(session.plan.entries.map((entry) => entry.name)).toEqual([
+        "home",
+        "server",
+      ]);
     } finally {
       await controller?.close?.();
     }
@@ -1297,7 +1282,7 @@ describe("webpackAdapter dev", () => {
       `,
     });
     const config = resolveConfig<WebpackConfig>({
-      server: false,
+      output: { client: "dist" },
       dev: { port },
       pages: {
         home: {
@@ -1347,7 +1332,7 @@ describe("webpackAdapter dev", () => {
       );
 
       const nextConfig = resolveConfig<WebpackConfig>({
-        server: false,
+        output: { client: "dist" },
         dev: { port },
         pages: {
           home: {
