@@ -14,7 +14,7 @@ my-evjs-app/
 ├── tsconfig.json
 └── src/
     ├── styles.css               # 全局 CSS / Tailwind 入口
-    ├── middleware.ts            # 全局 server middleware
+    ├── middleware.ts            # framework request middleware
     ├── layout/
     │   └── index.tsx            # 可选 SPA 根布局
     ├── pages/                   # 页面路由
@@ -26,10 +26,9 @@ my-evjs-app/
     │   ├── campaign.tsx         # /campaign
     │   ├── insights.tsx         # /insights
     │   └── users/$userId.tsx    # /users/$userId
-    ├── api/
-    │   └── operators.server.ts  # "use server" functions
     ├── apis/                    # server file routes
-    │   ├── middleware.ts        # route-scoped server route middleware
+    │   ├── middleware.ts        # API route middleware
+    │   ├── users.server.ts      # 就近放置的 "use server" functions
     │   └── api/
     │       └── health.ts        # /api/health server file route
     ├── components/              # 可复用 UI
@@ -65,8 +64,8 @@ my-evjs-app/
   生成声明使用生成专用的 `@evjs/ev/internal/client/route-types` helper，
   并增强 `@evjs/ev/page` 导航类型。保持忽略生成的 route types，不要在应用代码里导入它们。
 - 渲染元信息放在页面模块旁边。
-- `api/*.server.ts` 放 server functions。
-- `api/*.routes.ts` 放标准 HTTP route handlers。
+- 以 `"use server";` 开头的 `*.server.*` 模块放 server functions。它们没有目录约定，
+  可以放在 pages、features 或 server file routes 旁边。
 - `server.ts` 只在你持有自定义 server entry 时组合 standalone/manual `@evjs/server` routes、middleware 和 framework rendering。
 - `features/` 把业务逻辑从 route/page files 中移走。
 
@@ -113,10 +112,10 @@ my-evjs-app/
 | `<routing-dir-parent>/layout.{tsx,ts,jsx,js}` 或 `<routing-dir-parent>/layout/index.{tsx,ts,jsx,js}` | 可选外部 SPA 根布局 | 包裹已发现 SPA 路由树的一层应用 shell | MPA 公共外框、route-specific 嵌套布局或多个根布局候选 |
 | `src/pages/**/layout.{tsx,ts,jsx,js}` 或 `src/pages/**/layout/index.{tsx,ts,jsx,js}` | SPA route layout | 在同一 URL 前缀下包裹子路由的 pathless layout route | MPA 公共外框，或命名为 `layout` 的非 layout helper 目录 |
 | `<routing-dir-parent>/route-types.d.ts` | SPA 导航类型生成物 | 编辑器和类型检查支持 | 手工修改、从应用代码导入、放入模板或脚手架源码，或用于 MPA 模式 |
-| `src/api/*.server.ts` | 推荐的 server function 边界 | 以 `"use server";` 开头并导出命名 callable server functions 的文件 | 浏览器专用 helper、默认导出或 runtime re-export |
+| 带 `"use server";` 的 `**/*.server.{ts,tsx,js,jsx}` | 推荐的 server function 模块命名 | 可达并导出命名 callable server functions 的模块 | 浏览器专用 helper、默认导出、runtime re-export，或依赖目录名触发发现 |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | 启用 `server.routing` 时的服务端文件路由发现 | 导出大写 HTTP method 的 Request/Response route 模块 | `route.ts` 哨兵、`foo.get.ts` method suffix 文件、bracket/catch-all/optional routes、`middleware`/`middlewares`、默认导出，或从 route candidate 导出 helper |
-| `src/middleware.{ts,tsx,js,jsx}` | 启用 server conventions 时的全局服务端中间件约定 | 在 server file routes、server functions、SSR、PPR 和 RSC 之前运行的 Hono-compatible middleware | Matcher 配置、route handlers 或 helper exports |
-| `src/apis/**/middleware.{ts,tsx,js,jsx}` | route-scoped server file-route middleware | 作用于该目录树下 descendant server file routes 的 Hono-compatible middleware | `api.ts` 这类 flat sibling routes、全局 server functions/SSR middleware，或 matcher 配置 |
+| `src/middleware.{ts,tsx,js,jsx}` | Framework request middleware | 在 framework-managed server requests 之前运行的 Hono-compatible middleware，包括 server file routes、server functions、SSR、PPR 和 RSC | 只属于 API routes 的逻辑、matcher 配置、route handlers 或 helper exports |
+| `src/apis/**/middleware.{ts,tsx,js,jsx}` | API route middleware | 作用于该目录树下 descendant server file routes 的 Hono-compatible middleware | `api.ts` 这类 flat sibling routes、server functions/SSR 的 framework request middleware，或 matcher 配置 |
 | `src/apis` 下的 server route paths 和 dynamic URL shapes | graph/build plan 生成前的 server route 冲突检查 | 每个 URL path 只保留一个 server route module，每个 dynamic URL shape 只保留一种参数命名 | 并存的 `users.ts`/`users/index.ts`、`users/$id.ts`/`users/$userId.ts`，或把同一路径的方法拆到多个文件 |
 | `src/features`、`src/components`、`src/lib`、`src/hooks` | 没有直接框架约定 | 业务代码、可复用 UI、浏览器安全 helper 和 React hooks | 依赖文件名被路由发现的文件 |
 
@@ -244,14 +243,15 @@ export default function Campaign() {
 
 ## 服务端边界
 
-默认把 callable server functions 放在 `src/api/` 下，把服务端文件路由放在
-`src/apis` 下。
+Server functions 没有约定目录。把 callable server functions 放在以
+`"use server";` 开头的可达模块中，并优先使用 `*.server.*` 文件名，让路由发现忽略这些
+就近放置的 server-only 文件。
 
 ```ts
-// src/api/operators.server.ts
+// src/apis/users.server.ts
 "use server";
 
-export async function listOperators() {
+export async function listUsers() {
   return [{ id: "ada", name: "Ada Lovelace" }];
 }
 ```
@@ -265,8 +265,11 @@ export const GET = async () => Response.json({ ok: true });
 `/api/health`。根路由使用 `src/apis/index.ts`；动态段使用
 `$param` 文件名，并映射为 Hono params，例如 `:userId`。
 
-服务端 middleware 使用 Hono 的 middleware 签名，并放在专门的 `middleware.ts`
-约定文件中：
+服务端文件路由默认放在 `src/apis` 下。Server middleware 分成两个互不混用的作用域，
+都使用 Hono 的 `MiddlewareHandler` 签名。
+
+Framework request middleware 位于 `src/middleware.ts`。它会在 framework-managed
+server requests 之前运行，包括 server file routes、server functions、SSR、PPR 和 RSC：
 
 ```ts
 // src/middleware.ts
@@ -280,8 +283,12 @@ const middleware: MiddlewareHandler = async (ctx, next) => {
 export default middleware;
 ```
 
+API route middleware 位于 server file-route tree 内。`src/apis/middleware.ts`
+作用于 `src/apis` 下的所有 server file routes；嵌套的
+`src/apis/**/middleware.ts` 只作用于 descendant routes：
+
 ```ts
-// src/apis/api/middleware.ts
+// src/apis/middleware.ts
 import type { MiddlewareHandler } from "@evjs/ev/request";
 
 const middleware: MiddlewareHandler = async (ctx, next) => {
@@ -305,12 +312,12 @@ export const GET = async (_req, ctx) => {
 ## 命名建议
 
 - `pages/` 是文件路由目录，也可以包含 SSR/PPR/RSC components。
-- `api/` 放 callable server functions 和自定义 route helpers。
-- `apis/` 是启用 `server.routing` 时的服务端文件路由目录。
-- `middleware.ts` 是全局服务端 middleware；嵌套的
-  `apis/**/middleware.ts` 会把 middleware 作用域限制到 descendant file
-  routes。
+- `apis/` 是启用 `server.routing` 时的服务端文件路由目录。被可达应用代码导入的
+  server functions 可以用 `*.server.*` 文件名就近放在这里。
+- `src/middleware.ts` 是 framework request middleware；嵌套的
+  `apis/**/middleware.ts` 是作用于 descendant server file routes 的 API route
+  middleware。
 - `features/` 放业务领域模块。
 - `components/` 放通用 UI。
 - `lib/` 放浏览器安全的共享工具。
-- 服务端密钥和 Node-only API 应留在 `api/`、`apis/`，或只被 server-only code 引用的模块中。
+- 服务端密钥和 Node-only API 应留在 `*.server.*`、`apis/`，或只被 server-only code 引用的模块中。

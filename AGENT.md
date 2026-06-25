@@ -21,8 +21,8 @@ There is no longer a public `@evjs/build-tools` or `@evjs/manifest` workspace pa
 
 1. File conventions are the framework ownership model. `src/pages` plus
    `routing` owns client SPA/MPA routes; `src/apis` plus `server.routing` owns
-   server file routes; `src/middleware.ts` and `src/apis/**/middleware.ts` own
-   server middleware convention discovery.
+   server file routes; `src/middleware.ts` owns framework request middleware;
+   `src/apis/**/middleware.ts` owns API route middleware for server file routes.
 2. `@evjs/ev` is the framework control plane for config, plugin hooks, graph
    analysis, build plans, manifests, deployment helpers, and convention
    discovery. Its runtime-facing subpaths are curated file-convention authoring

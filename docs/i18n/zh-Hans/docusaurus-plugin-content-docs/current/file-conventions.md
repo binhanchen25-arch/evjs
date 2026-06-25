@@ -13,10 +13,10 @@
 | `src/pages/**/layout.{ts,tsx,js,jsx}` | `routing` | 页面路由树内的 SPA route layout。 |
 | `src/pages/**/layout/index.{ts,tsx,js,jsx}` | `routing` | SPA route layout 的目录形式。 |
 | `<routing-dir-parent>/route-types.d.ts` | generated | evjs 生成的 SPA 导航类型声明。 |
-| 带 `"use server";` 的 `*.server.ts` 文件 | server functions | 推荐的 server function 命名约定。 |
+| 带 `"use server";` 的 `*.server.{ts,tsx,js,jsx}` 文件 | server functions | 推荐的 server function 命名约定。 |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | `server.routing` | 启用 `server.routing` 时的服务端文件路由。 |
-| `src/middleware.{ts,tsx,js,jsx}` | `server.conventions.middleware` | 启用 server conventions 时的全局 server middleware。 |
-| `src/apis/**/middleware.{ts,tsx,js,jsx}` | `server.conventions.middleware` | route-scoped server file-route middleware。 |
+| `src/middleware.{ts,tsx,js,jsx}` | `server.conventions.middleware` | 启用 server conventions 时的 framework request middleware。 |
+| `src/apis/**/middleware.{ts,tsx,js,jsx}` | `server.conventions.middleware` | server file routes 的 API route middleware。 |
 
 默认客户端路由目录是 `./src/pages`。默认服务端文件路由目录是
 `./src/apis`。需要更换客户端路由目录时配置 `routing.dir`；需要更换服务端文件路由目录时配置
@@ -24,7 +24,7 @@
 
 ## 路径段规则
 
-页面路由、服务端文件路由和 route-scoped server middleware 使用同一套路径段规则：
+页面路由、服务端文件路由和 API route middleware 使用同一套路径段规则：
 
 | 模式 | 结果 |
 | --- | --- |
@@ -120,11 +120,11 @@ SPA 模式会把生成的路由类型写入 `<routing-dir-parent>/route-types.d.
 
 ## 服务端函数
 
-Server function 由 `"use server";` 指令发现，不依赖单一目录。推荐约定是放在
-`src/api/` 下，并使用 `.server.ts` 后缀：
+Server function 由 `"use server";` 指令发现，不依赖目录。使用 `.server.ts` 或
+`.server.tsx` 文件名，让路由发现忽略就近放置的 server-only 文件：
 
 ```ts
-// src/api/users.server.ts
+// src/apis/users.server.ts
 "use server";
 
 export async function listUsers() {
@@ -186,8 +186,11 @@ Server route candidate 只能导出大写 HTTP methods。共享 helper 应移到
 
 ## 服务端中间件
 
-Server middleware 使用专门的 `middleware.*` 文件，并遵循 Hono 的
-`MiddlewareHandler` 签名：
+evjs 有两个 server middleware 作用域。Middleware 文件 default-export 一个
+Hono-compatible middleware 函数，不能导出命名值或 matcher 配置。
+
+Framework request middleware 会包裹 framework-managed server requests，包括 server
+file routes、server functions、SSR、PPR 和 RSC：
 
 ```ts
 // src/middleware.ts
@@ -201,13 +204,13 @@ const middleware: MiddlewareHandler = async (ctx, next) => {
 export default middleware;
 ```
 
-全局 middleware：
+Framework request middleware：
 
 ```text
 src/middleware.ts
 ```
 
-Route-scoped middleware：
+API route middleware：
 
 ```text
 src/apis/middleware.ts
@@ -218,12 +221,11 @@ src/apis/(admin)/middleware.ts
 
 执行顺序是：
 
-1. global middleware；
-2. 从父目录到子目录的 route-scoped middleware；
+1. framework request middleware；
+2. 从父目录到子目录的 API route middleware；
 3. HTTP method handler。
 
-Middleware 文件必须默认导出一个 middleware 函数，不能导出命名值或 matcher
-配置。Route-scoped middleware 只作用于后代 server file routes；例如
+API route middleware 只作用于后代 server file routes；例如
 `src/apis/api/middleware.ts` 覆盖
 `src/apis/api/users.ts`，但不覆盖 flat sibling
 `src/apis/api.ts`。

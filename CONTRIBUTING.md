@@ -28,9 +28,10 @@
 ## Core Principles
 
 - Framework-owned app structure uses file conventions. Client pages live under
-  `src/pages`, server file routes under `src/apis`, global server middleware in
-  `src/middleware.ts`, route-scoped server middleware in
-  `src/apis/**/middleware.ts`, and server functions in `"use server"` modules.
+  `src/pages`, server file routes under `src/apis`, framework request
+  middleware in `src/middleware.ts`, API route middleware in
+  `src/apis/**/middleware.ts`, and server functions in reachable
+  `"use server"` modules.
 - `@evjs/ev` owns config, plugins, convention discovery, graph/build planning,
   manifest/deployment helpers, and bundler contracts. It should not expose
   client or server runtime mirrors; its runtime-facing subpaths are curated
@@ -80,7 +81,9 @@ and adapters depend on `@evjs/ev` instead of on each other.
 2. Use Biome formatting and linting. Avoid `any` and broad namespace imports unless there is a concrete reason.
 3. Do not add hidden production source files such as `.evjs/server/entry.ts`; framework-owned entries should be library/runtime entries or bundler adapter mechanics.
 4. Keep framework semantics out of bundler adapters. Adapters consume `BuildPlan` and return build facts.
-5. Server function files must start with `"use server";` and export named functions or supported named async values.
+5. Server function files must start with `"use server";`, use `.server.*`
+   filenames when colocated with route convention files, and export named
+   functions or supported named async values.
 6. Use `ev.config.ts`; new docs should import `defineConfig` from `@evjs/ev`.
 7. Config/build imports stay on `@evjs/ev`. File-convention app source imports
    page helpers from `@evjs/ev/page`, request helpers from `@evjs/ev/request`,
@@ -101,7 +104,8 @@ and adapters depend on `@evjs/ev` instead of on each other.
 
 ### Add a server function
 
-1. Create `src/api/[name].server.ts`.
+1. Create a reachable `[name].server.ts` module, colocated with the caller or
+   related server route.
 2. Add `"use server";` at the top.
 3. Export named async functions.
 4. Import and use them in client code with `useQuery(fn, ...args)`, `useMutation(fn)`, or `getFnQueryOptions(fn, ...args)`.
@@ -118,8 +122,9 @@ and adapters depend on `@evjs/ev` instead of on each other.
 2. Export uppercase HTTP method handlers such as `GET` or `POST`.
 3. Keep helper exports out of route candidates; place helpers in colocated
    non-route modules and import them.
-4. Add filesystem-scoped middleware with `src/middleware.ts` or
-   `src/apis/**/middleware.ts`, not route-module middleware exports.
+4. Add framework request middleware with `src/middleware.ts` or API route
+   middleware with `src/apis/**/middleware.ts`, not route-module middleware
+   exports.
 
 ### Add a configured page
 

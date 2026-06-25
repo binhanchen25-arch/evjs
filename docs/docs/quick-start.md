@@ -52,12 +52,11 @@ my-app/
 │   ├── pages/              # Page routes
 │   │   ├── index.tsx       # /
 │   │   └── users/$id.tsx   # /users/$id
-│   ├── api/                # Server function modules
-│   │   └── users.server.ts # "use server" functions
 │   ├── apis/               # Server file routes
+│   │   ├── users.server.ts # "use server" functions
 │   │   └── api/
 │   │       └── health.ts   # /api/health
-│   └── middleware.ts       # Global server middleware
+│   └── middleware.ts       # Framework request middleware
 ├── package.json
 └── tsconfig.json
 ```
@@ -67,7 +66,7 @@ my-app/
 ```tsx
 // src/pages/users/$id.tsx
 import { usePageParams, useQuery } from "@evjs/ev/page";
-import { getUser } from "../../api/users.server";
+import { getUser } from "../../apis/users.server";
 
 export default function UserPage() {
   const { id } = usePageParams();

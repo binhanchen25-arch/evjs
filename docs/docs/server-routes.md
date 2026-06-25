@@ -92,11 +92,14 @@ export const GET = async (_req, ctx) => {
 };
 ```
 
-## File Route Middleware
+## Middleware
 
-File-route middleware is a filesystem-scoped convention. Middleware files
-default-export a Hono-compatible middleware function and do not contain matcher
-configuration:
+evjs has two server middleware scopes. Middleware files default-export a
+Hono-compatible middleware function and do not contain matcher configuration.
+
+Framework request middleware lives at `src/middleware.ts` and runs before every
+framework-managed server request: server file routes, server functions, SSR,
+PPR, and RSC framework handling:
 
 ```ts
 // src/middleware.ts
@@ -110,10 +113,8 @@ const middleware: MiddlewareHandler = async (ctx, next) => {
 export default middleware;
 ```
 
-Global middleware lives at `src/middleware.ts` and runs before server file
-routes, server functions, SSR, PPR, and RSC framework handling. Route-scoped
-middleware lives inside the route tree and runs only for descendant server file
-routes:
+API route middleware lives inside the server file-route tree and runs only for
+descendant server file routes:
 
 ```text
 src/apis/middleware.ts            -> all file routes
@@ -122,9 +123,9 @@ src/apis/api/admin/middleware.ts  -> routes under api/admin/**
 src/apis/(admin)/middleware.ts    -> routes under (admin)/**
 ```
 
-Execution order is global middleware, then route-scoped middleware from parent
-directory to child directory, then the HTTP method handler. Route groups do not
-add URL segments, but they do participate in filesystem scoping.
+Execution order is framework request middleware, then API route middleware from
+parent directory to child directory, then the HTTP method handler. Route groups
+do not add URL segments, but they do participate in filesystem scoping.
 `src/apis/api/middleware.ts` covers `src/apis/api/index.ts`,
 `src/apis/api/users.ts`, and nested files under `src/apis/api/**`; it does not
 cover the flat sibling `src/apis/api.ts`.
@@ -148,8 +149,8 @@ export default requireAuth;
 `ctx` is Hono's `Context`. `next` continues the remaining middleware/handler
 chain. Returning a `Response` short-circuits the request. After `await next()`,
 middleware can modify the downstream response with APIs such as `ctx.header()`
-or `ctx.res`. Route-scoped middleware is mounted in the route handler chain, so
-it can read route params with `ctx.req.param()`.
+or `ctx.res`. API route middleware is mounted in the route handler chain, so it
+can read route params with `ctx.req.param()`.
 
 ## Built-in Behaviors
 

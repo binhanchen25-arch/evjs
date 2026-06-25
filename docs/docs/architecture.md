@@ -4,7 +4,8 @@ evjs is a React framework built around file conventions, explicit source
 declarations, a framework graph, a bundler-independent build plan, and one
 runtime manifest. The framework-owned route model is file-based: client pages
 come from `src/pages`, server file routes come from `src/apis`, and server
-middleware comes from `src/middleware.ts` plus `src/apis/**/middleware.ts`.
+middleware is split between framework request middleware in `src/middleware.ts`
+and API route middleware in `src/apis/**/middleware.ts`.
 
 ```txt
 src/pages + src/apis + src/middleware.ts + ev.config.ts
@@ -299,10 +300,12 @@ the discovered files into one internal TanStack Router app entry. In MPA mode,
 the same files become independent page outputs without a client router.
 
 `server.routing` points to `src/apis` by default. A server route file becomes a
-route only when it exports uppercase HTTP methods. Middleware is discovered by
-filesystem scope from `src/middleware.ts` and `src/apis/**/middleware.ts`;
-route modules do not export middleware and there is no `server.entry`
-composition path.
+route only when it exports uppercase HTTP methods. Framework request middleware
+is discovered from `src/middleware.ts` and wraps framework-managed server
+requests. API route middleware is discovered by filesystem scope from
+`src/apis/**/middleware.ts` and only wraps descendant server file routes. Route
+modules do not export middleware and there is no `server.entry` composition
+path.
 
 Page modules own path-to-component wiring by filename and rendering metadata
 through static exports such as `render`, `hydrate`, `rsc`, and `prerender`.

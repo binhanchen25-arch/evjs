@@ -38,7 +38,8 @@ npx biome check --write    # 修复 lint/格式
 4. **布局** —— SPA 根布局会从路由目录旁边唯一的 `layout.*` 或
    `layout/index.*` 源码模块自动发现。SPA route layout 放在路由目录内，同样使用
    `layout.*` 或 `layout/index.*`。MPA 路由不消费框架 layout
-5. **服务端函数** —— 必须以 `"use server";` 开头，使用 `.server.ts` 或 `src/api/`
+5. **服务端函数** —— 必须以 `"use server";` 开头，并使用 `.server.ts` 或
+   `.server.tsx` 文件名；server functions 没有目录约定
 6. **服务端函数导出** —— 只使用命名可调用导出：function declaration 或
    `const` arrow/function expression。不使用默认导出、跨模块 re-export 或导出非函数值
 7. **配置文件** —— 命名为 `ev.config.ts`（不是 `evjs.config.ts`）

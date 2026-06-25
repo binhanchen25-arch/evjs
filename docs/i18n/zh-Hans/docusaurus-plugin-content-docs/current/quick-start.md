@@ -51,12 +51,11 @@ my-app/
 │   ├── pages/              # 文件路由
 │   │   ├── index.tsx       # /
 │   │   └── users/$id.tsx   # /users/$id
-│   ├── api/                # 服务端函数模块
-│   │   └── users.server.ts # "use server" 函数
 │   ├── apis/               # 服务端文件路由
+│   │   ├── users.server.ts # "use server" 函数
 │   │   └── api/
 │   │       └── health.ts   # /api/health
-│   └── middleware.ts       # 全局 server middleware
+│   └── middleware.ts       # Framework request middleware
 ├── package.json
 └── tsconfig.json
 ```
@@ -66,7 +65,7 @@ my-app/
 ```tsx
 // src/pages/users/$id.tsx
 import { usePageParams, useQuery } from "@evjs/ev/page";
-import { getUser } from "../../api/users.server";
+import { getUser } from "../../apis/users.server";
 
 export default function UserPage() {
   const { id } = usePageParams();

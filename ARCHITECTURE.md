@@ -8,11 +8,12 @@ and the current status matrix lives in [ROADMAP.md](./ROADMAP.md).
 
 evjs is a React framework whose framework-managed application model is
 file-convention first. Client pages come from `src/pages`, server request
-routes come from `src/apis`, middleware comes from `src/middleware.ts` and
-`src/apis/**/middleware.ts`, and `"use server"` modules provide server
-functions. `@evjs/ev` exposes curated file-convention authoring subpaths and
-generated-only internal bridges, while `@evjs/client` and `@evjs/server` remain
-independent runtime cores that provide browser/server primitives without
+routes come from `src/apis`, framework request middleware comes from
+`src/middleware.ts`, API route middleware comes from
+`src/apis/**/middleware.ts`, and reachable `"use server"` modules provide
+server functions. `@evjs/ev` exposes curated file-convention authoring subpaths
+and generated-only internal bridges, while `@evjs/client` and `@evjs/server`
+remain independent runtime cores that provide browser/server primitives without
 becoming alternate framework configuration modes.
 
 ```txt
@@ -129,10 +130,10 @@ sequenceDiagram
 Graph analysis may read static import closure for semantic discovery, but dev
 watching must remain narrower than that closure. `fileDependencies` should
 include explicit file-convention roots and framework marker files such as
-`src/pages`, `src/apis`, discovered `middleware.ts` modules, `"use server"`,
-and `"use client"`. Programmatic `@evjs/server` route declarations are runtime
-code, not graph roots. Ordinary component and style edits stay in the bundler
-HMR path.
+`src/pages`, `src/apis`, discovered framework/API middleware modules,
+`"use server"`, and `"use client"`. Programmatic `@evjs/server` route
+declarations are runtime code, not graph roots. Ordinary component and style
+edits stay in the bundler HMR path.
 
 HTML-only dev plan updates can be relinked from existing bundler stats. Dynamic
 entry or server renderer changes require `BundlerDevController.updatePlan()`.

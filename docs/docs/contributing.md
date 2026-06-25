@@ -41,7 +41,9 @@ npx biome check --write    # Fix lint/format
    `layout/index.*` source module beside the route directory. SPA route layouts
    live inside the route directory as `layout.*` or `layout/index.*`. MPA
    routing does not consume framework layouts
-5. **Server functions** — Must start with `"use server";`, use `.server.ts` or `src/api/`
+5. **Server functions** — Must start with `"use server";` and use
+   `.server.ts` or `.server.tsx` filenames; there is no server-function
+   convention directory
 6. **Server function exports** — Named callable exports only: function
    declarations or `const` arrow/function expressions. No default exports,
    cross-module re-exports, or exported non-function values
@@ -61,7 +63,8 @@ npx biome check --write    # Fix lint/format
 ## Common Tasks
 
 ### Add a new server function
-1. Create `src/api/[name].server.ts`
+1. Create a reachable `[name].server.ts` module, colocated with the caller or
+   related server route
 2. Add `"use server";` at the top
 3. Export named function declarations or `const` async function expressions
 4. Import and use in client with `useQuery(fn)` or `useMutation(fn)`

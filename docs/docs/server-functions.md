@@ -11,7 +11,7 @@ build system transforms them into RPC calls automatically.
 ## Basic Usage
 
 ```ts
-// src/api/users.server.ts
+// src/apis/users.server.ts
 "use server";
 
 export async function getUsers() {
@@ -58,7 +58,9 @@ export const deleteUser = async (id: string) => {
 - Ambient `declare` exports are not server functions because they emit no
   runtime implementation. Use a real function body for every exported server
   function.
-- **Recommendation**: Use the `.server.ts` extension (e.g. `users.server.ts`) or place them in a `src/api/` directory to help differentiate them from client code.
+- **Recommendation**: Use a `.server.ts` or `.server.tsx` filename (for
+  example `users.server.ts`) so route discovery ignores colocated server-only
+  files. Server functions have no convention directory.
 - No default exports, runtime re-exports from other modules, or exported
   non-function runtime values such as constants
 - Reachable `"use server"` modules are transformed into client references and
@@ -72,7 +74,7 @@ Server functions run inside the framework request lifecycle, so they can use the
 request helpers exported by `@evjs/ev/request`:
 
 ```ts
-// src/api/session.server.ts
+// src/apis/session.server.ts
 "use server";
 
 import { getCookie, headers, request, waitUntil } from "@evjs/ev/request";
@@ -111,7 +113,7 @@ import {
   getFnQueryKey,
   getFnQueryOptions,
 } from "@evjs/ev/page";
-import { getUsers, getUser, createUser } from "../api/users.server";
+import { getUsers, getUser, createUser } from "../apis/users.server";
 
 // Queries — pass server functions directly, types are inferred
 const { data: users } = useQuery(getUsers);               // data: User[]

@@ -87,10 +87,14 @@ export const GET = async (_req, ctx) => {
 };
 ```
 
-## 文件路由中间件
+## Middleware
 
-File-route middleware 是按文件系统作用域生效的约定。Middleware 文件 default-export
-一个 Hono-compatible middleware 函数，不包含 matcher 配置：
+evjs 有两个 server middleware 作用域。Middleware 文件 default-export 一个
+Hono-compatible middleware 函数，不包含 matcher 配置。
+
+Framework request middleware 位于 `src/middleware.ts`，会在所有
+framework-managed server requests 之前运行：server file routes、server functions、
+SSR、PPR 和 RSC framework handling：
 
 ```ts
 // src/middleware.ts
@@ -104,9 +108,8 @@ const middleware: MiddlewareHandler = async (ctx, next) => {
 export default middleware;
 ```
 
-全局 middleware 位于 `src/middleware.ts`，会在 server file routes、server
-functions、SSR、PPR 和 RSC framework handling 之前运行。Route-scoped middleware
-位于 route tree 内，只作用于 descendant server file routes：
+API route middleware 位于 server file-route tree 内，只作用于 descendant server
+file routes：
 
 ```text
 src/apis/middleware.ts            -> 所有文件路由
@@ -115,8 +118,8 @@ src/apis/api/admin/middleware.ts  -> api/admin/** 下的路由
 src/apis/(admin)/middleware.ts    -> (admin)/** 下的路由
 ```
 
-执行顺序是全局 middleware、从父目录到子目录的 route-scoped middleware、最后是 HTTP
-method handler。Route group 不增加 URL segment，但参与文件系统作用域划分。
+执行顺序是 framework request middleware、从父目录到子目录的 API route middleware、
+最后是 HTTP method handler。Route group 不增加 URL segment，但参与文件系统作用域划分。
 `src/apis/api/middleware.ts` 覆盖 `src/apis/api/index.ts`、`src/apis/api/users.ts`
 以及 `src/apis/api/**` 下的嵌套文件；不覆盖 flat sibling `src/apis/api.ts`。
 
@@ -138,7 +141,7 @@ export default requireAuth;
 
 `ctx` 是 Hono `Context`。`next` 会继续后续 middleware/handler chain。返回
 `Response` 可以短路请求。`await next()` 之后，middleware 可以通过 `ctx.header()`
-或 `ctx.res` 修改下游响应。Route-scoped middleware 通过 route handler chain 挂载，
+或 `ctx.res` 修改下游响应。API route middleware 通过 route handler chain 挂载，
 因此可以用 `ctx.req.param()` 读取 route params。
 
 ## 内置行为

@@ -14,7 +14,7 @@ For the complete filename, ignored-file, and layout rules, see
 
 ```
 src/
-├── api/*.server.ts        # Optional server functions
+├── apis/*.server.ts       # Optional colocated server functions
 ├── layout/
 │   └── index.tsx          # Optional SPA root layout
 └── pages/
@@ -133,7 +133,7 @@ page logic needs the current route params, search params, or loader data:
 ```tsx
 // src/pages/users/$userId.tsx
 import { usePageParams, useQuery } from "@evjs/ev/page";
-import { getUser } from "../../api/users.server";
+import { getUser } from "../../apis/users.server";
 
 export default function UserPage() {
   const { userId } = usePageParams();

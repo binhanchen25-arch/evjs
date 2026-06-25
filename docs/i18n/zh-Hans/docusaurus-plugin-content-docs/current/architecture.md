@@ -3,7 +3,8 @@
 evjs 是围绕文件约定、显式 source declaration、框架 graph、bundler 无关 build
 plan，以及单一 runtime manifest 构建的 React 框架。框架托管的路由模型是文件化的：
 客户端页面来自 `src/pages`，服务端文件路由来自 `src/apis`，server middleware
-来自 `src/middleware.ts` 和 `src/apis/**/middleware.ts`。
+分成 `src/middleware.ts` 中的 framework request middleware，以及
+`src/apis/**/middleware.ts` 中的 API route middleware。
 
 ```txt
 src/pages + src/apis + src/middleware.ts + ev.config.ts
@@ -277,9 +278,10 @@ plugins
 Router app entry；MPA 模式会把同一批文件转成不带客户端路由器的独立页面输出。
 
 `server.routing` 默认指向 `src/apis`。服务端路由文件只有导出大写 HTTP methods
-时才会成为 route。Middleware 按文件系统作用域从 `src/middleware.ts` 和
-`src/apis/**/middleware.ts` 发现；route module 不导出 middleware，也不存在
-`server.entry` 组合路径。
+时才会成为 route。Framework request middleware 从 `src/middleware.ts` 发现，并包裹
+framework-managed server requests。API route middleware 按文件系统作用域从
+`src/apis/**/middleware.ts` 发现，只包裹 descendant server file routes。Route module
+不导出 middleware，也不存在 `server.entry` 组合路径。
 
 Page modules 通过文件名拥有 path-to-component wiring，并通过 `render`、`hydrate`、
 `rsc`、`prerender` 等静态导出拥有渲染元信息。当 graph creation 发现 SSR、RSC
