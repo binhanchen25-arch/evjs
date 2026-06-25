@@ -13,7 +13,7 @@ evjs is a React fullstack framework built on TanStack Query, Hono, Utoopack,
 and a framework-owned SPA router runtime. It provides:
 
 - **Server Functions** — write backend logic in files (we recommend using the `.server.ts` suffix), call from React as if local
-- **Server Routes** — build programmatic REST endpoints and APIs using the `createRoute()` handler
+- **Server Routes** — build file-based REST endpoints under `src/apis` with uppercase HTTP method exports
 - **Query Integration** — type-safe `useQuery(getUsers)` with auto query keys and transport
 - **File-based Page Routing** — write default-exported React pages under
   `src/pages`; evjs generates type-safe navigation and owns the router details
@@ -31,7 +31,7 @@ npm run dev
 
 ## References
 
-For detailed guides on specific topics, see the `references/` directory:
+For detailed guides on specific topics, see the docs:
 
 - [quick-start.md](../docs/docs/quick-start.md) — Scaffolding projects with `npx @evjs/create-app`
 - [project-structure.md](../docs/docs/project-structure.md) — Recommended directory structure and domain-driven design (features)
@@ -40,7 +40,7 @@ For detailed guides on specific topics, see the `references/` directory:
 - [deploy.md](../docs/docs/deploy.md) — Deploying to Node, Docker, Deno, and Edge environments
 - [client-routes.md](../docs/docs/client-routes.md) — Route definitions, layouts, params, loaders, navigation
 - [server-functions.md](../docs/docs/server-functions.md) — Server functions, queries, mutations, error handling
-- [server-routes.md](../docs/docs/server-routes.md) — Creating REST API endpoints using programmatic `createRoute()`
+- [server-routes.md](../docs/docs/server-routes.md) — Creating file-based REST API endpoints and API route middleware
 - [config.md](../docs/docs/config.md) — `ev.config.ts` options, defaults, client/server settings
 
 ## Key Rules
@@ -52,10 +52,11 @@ For detailed guides on specific topics, see the `references/` directory:
 - For mutations, wrap args in objects/arrays: `mutate({ name, email })` or `mutate([name, email])`
 - `ServerError` on server → automatically mapped to `ServerFunctionError` on client
 
-**REST Routes (`createRoute()`):**
-- Use `createRoute()` for REST API endpoints, webhooks, or standard Web Request/Response handling
-- If mixing `createRoute()` endpoints, you must explicitly configure `server.entry` in `ev.config.ts`
-- **Route Paths:** Always use string literals for `path` values (e.g., `path: "/posts"`). The type system **rejects** broad `string` variables and template strings at compile time.
+**Server File Routes:**
+- Use `src/apis` for framework-managed REST endpoints and export uppercase HTTP method handlers such as `GET`, `POST`, `PUT`, and `DELETE`
+- Put API route middleware in `src/apis/**/middleware.ts`; it applies only to descendant server file routes
+- Use `src/middleware.ts` only for framework request middleware that should also cover server functions, SSR, PPR, and RSC
+- Programmatic `createRoute()` remains a standalone `@evjs/server` runtime primitive, not an evjs file-route convention
 
 **Page Routing:**
 - SPA page routes live in `src/pages` and use an optional root layout at
@@ -66,10 +67,10 @@ For detailed guides on specific topics, see the `references/` directory:
 - Page components are plain default exports. Do not wrap them in `definePage`
   and do not type props as framework route props.
 - Read route data with `usePageParams()`, `usePageSearch()`, and
-  `usePageLoaderData()` from `@evjs/client`.
-- Use `Link`, `Navigate`, `useLinkProps`, and `redirect` from `@evjs/client`
+  `usePageLoaderData()` from `@evjs/ev/page`.
+- Use `Link`, `Navigate`, `useLinkProps`, and `redirect` from `@evjs/ev/page`
   for SPA navigation. Generated `route-types.d.ts` augments
-  `@evjs/client`; app code should not import TanStack Router directly.
+  `@evjs/ev/page`; app code should not import TanStack Router directly.
 
 **React Data Loading:**
 - Page loaders should fetch using: `context.queryClient.ensureQueryData(getFnQueryOptions(myFn))`

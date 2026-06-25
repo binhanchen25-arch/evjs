@@ -22,7 +22,7 @@ npm install @evjs/server
 Create standard REST endpoints using the `createRoute()` factory:
 
 ```ts
-// src/api/users.ts
+// src/routes/users.ts
 import { createRoute } from "@evjs/server";
 
 export const GET = createRoute("/api/users", {
@@ -30,14 +30,15 @@ export const GET = createRoute("/api/users", {
 });
 ```
 
-The `path` must be a **string literal** string so framework build analysis can statically discover it.
+The `path` must be a **string literal** so the route definition keeps precise
+compile-time types.
 
 ### 2. Server Functions
 
 Use the `"use server"` directive in `*.server.ts` files:
 
 ```ts
-// src/api/posts.server.ts
+// src/posts.server.ts
 "use server";
 
 export async function getPosts() {

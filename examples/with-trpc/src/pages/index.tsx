@@ -2,7 +2,7 @@ import { useQuery } from "@evjs/ev/page";
 import { createTRPCClient, type TRPCLink } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
 import { useCallback, useEffect, useState } from "react";
-import { getServerTime, trpcHandler } from "../api/trpc.server";
+import { getServerTime, trpcHandler } from "../apis/trpc.server";
 import type { AppRouter } from "../trpc";
 
 // ── tRPC Glue ──

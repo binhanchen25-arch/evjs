@@ -173,7 +173,7 @@ function ServerFunctionCheck() {
   const [message, setMessage] = useState<string>("");
 
   async function checkServerFn() {
-    const { sayHello } = await import("../api/demo.server");
+    const { sayHello } = await import("../apis/demo.server");
     const result = await sayHello("World");
     setMessage(result);
   }

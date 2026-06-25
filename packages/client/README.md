@@ -10,7 +10,7 @@
 - **Router-Free Pages** — MPA and framework-managed pages use the page runtime without adding a client router.
 - **Data Fetching** — Wraps [TanStack Query](https://tanstack.com/query) with built-in server function proxies.
 - **Server Function Support** — `useQuery(fn)` and `useMutation(fn)` for typed server-boundary calls.
-- **Focused Client API** — Application code imports transport, page hooks, navigation helpers, and RSC helpers from `@evjs/client`; generated framework bootstrap uses `@evjs/client/internal`.
+- **Focused Client API** — Standalone/manual client code imports transport, page hooks, navigation helpers, and RSC helpers from `@evjs/client`; file-convention app source reaches the same authoring APIs through `@evjs/ev/page` and `@evjs/ev/transport`; generated framework bootstrap uses `@evjs/client/internal`.
 
 ## Install
 
@@ -70,7 +70,7 @@ artifacts.
 
 ```tsx
 // src/pages/users/$userId.tsx
-import { usePageParams } from "@evjs/client";
+import { usePageParams } from "@evjs/ev/page";
 
 export default function UserPage() {
   const { userId } = usePageParams();
@@ -124,17 +124,22 @@ export default defineConfig({
 
 ## Server Functions
 
-Use the `"use server"` directive in `*.server.ts` files. `@evjs/client` provides hooks to call them:
+Use the `"use server"` directive in reachable `*.server.ts` files. In
+file-convention apps, import the page/query hooks from `@evjs/ev/page`:
 
 ```tsx
-import { useQuery } from "@evjs/client";
-import { getPosts } from "./api/posts.server";
+// src/pages/posts.tsx
+import { useQuery } from "@evjs/ev/page";
+import { getPosts } from "../apis/posts.server";
 
 function Posts() {
   const { data } = useQuery(getPosts);
   return <ul>{data?.map(p => <li key={p.id}>{p.title}</li>)}</ul>;
 }
 ```
+
+Standalone/manual clients can import the same query hooks directly from
+`@evjs/client` when they own the runtime integration.
 
 ## API
 
@@ -183,8 +188,10 @@ function Posts() {
 
 Application-facing client runtime APIs are exported from `@evjs/client`.
 Generic TanStack Query APIs that are not paired with evjs server functions
-should come from `@tanstack/react-query`, while evjs page, navigation,
-server-function, and RSC APIs come from `@evjs/client`.
+should come from `@tanstack/react-query`. Standalone/manual clients use
+`@evjs/client` for evjs page, navigation, server-function, and RSC APIs; normal
+file-convention app source imports the public authoring surface from
+`@evjs/ev/page` and `@evjs/ev/transport`.
 
 ## License
 

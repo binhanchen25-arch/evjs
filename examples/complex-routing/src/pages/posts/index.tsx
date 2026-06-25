@@ -1,5 +1,5 @@
 import { Link, useQuery } from "@evjs/ev/page";
-import { getPosts } from "../../api/data.server";
+import { getPosts } from "../../apis/data.server";
 
 const styles = {
   card: {

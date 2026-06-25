@@ -255,20 +255,33 @@ route 文件，或改用显式 `pages` 配置并提供唯一 page id。
 page module 中读取以下 named static exports。请使用字面量值，这样 graph analysis
 不需要执行用户代码也能解析。
 无效的字面量值会在 app graph analysis 阶段报错，并且发生在 bundling 之前。
-PPR 不是独立的 `render` 值；请使用 `render = "ssr"` 搭配
-`prerender = { partial: true }`。
-`prerender` 对象只能包含 `partial`、`delivery` 和 `revalidate`，并且至少要声明
-其中一个属性。`revalidate` 必须是 `false` 或表示秒数的正整数。没有选项的
-full prerendering 请使用 `true`。
-Analyzer 支持直接的 `export const` 声明，也支持本地 export specifier，
-例如 `const mode = "ssr"; export { mode as render };`。Page metadata 不会跟随
-来自其他模块的 re-export；把 metadata 名称从其他模块重新导出会被报告为无效。
-运行时 metadata export 必须是带静态 initializer 的本地变量；
-`export let render;` 这类未初始化声明、function export 和 class export 都是无效的。
-`export type { mode as render }` 这类 type-only export
-以及 `export declare const render: "ssr"` 这类 ambient declaration 都会被忽略，
-因为它们不会产生运行时值。每个 metadata 名称只能导出一次；重复的 `render`、
-`hydrate`、`prerender` 或 `rsc` 导出是 graph-analysis 错误，而不是 last-write-wins。
+
+PPR 使用 SSR 加 prerender metadata：
+
+- `render = "ssr"` 声明 server document。
+- `prerender = { partial: true }` 开启 partial prerendering。
+- PPR 不是独立的 `render` 值。
+- `prerender` 对象只能包含 `partial`、`delivery` 和 `revalidate`。
+- `prerender` 对象至少要声明其中一个属性。
+- `revalidate` 必须是 `false` 或表示秒数的正整数。
+- 没有选项的 full prerendering 请使用 `true`。
+
+Analyzer 支持：
+
+- 直接的 `export const` 声明；
+- 本地 export specifier，例如
+  `const mode = "ssr"; export { mode as render };`。
+
+Analyzer 会拒绝：
+
+- 来自其他模块的 page metadata re-export；
+- `export let render;` 这类未初始化 runtime metadata；
+- 用作 metadata 的 function export 和 class export；
+- 重复的 `render`、`hydrate`、`prerender` 或 `rsc` runtime export。
+
+`export type { mode as render }` 这类 type-only export，以及
+`export declare const render: "ssr"` 这类 ambient declaration 都会被忽略，因为它们不会产生
+runtime value。重复 metadata 名称是 graph-analysis 错误，而不是 last-write-wins。
 
 | 导出 | 可选值 | 含义 |
 | --- | --- | --- |
@@ -488,9 +501,12 @@ export default defineConfig({
 });
 ```
 
-启用 `server.routing` 时，server conventions 默认启用。当前 convention 会发现
-`src/middleware.ts` 作为 framework request middleware，并发现
-`src/apis/**/middleware.ts` 作为 API route middleware。缺失的 middleware 文件会被忽略。
+启用 `server.routing` 时，server conventions 默认启用。当前 convention 会发现：
+
+- `src/middleware.ts` 作为 framework request middleware；
+- `src/apis/**/middleware.ts` 作为 API route middleware。
+
+缺失的 middleware 文件会被忽略。
 Framework request middleware 会在 framework-managed server requests 之前运行，包括
 server file routes、server functions、SSR、PPR 和 RSC。API route middleware 只作用于
 `server.routing.dir` 下的 descendant server file routes。
@@ -508,17 +524,23 @@ export default defineConfig({
 
 使用 `server.conventions: false` 可以关闭所有 server conventions。
 
-提供 `output`、`dev`、`server`、`server.dev` 和 `transport` 时，它们都必须是
-object。`output.client` 和 `output.server` 必须是非空字符串，并且指向不同目录。
-`server.routing` 必须是 `true`、`false` 或
-object；object 形式只接受可选的非空 `dir` 字符串。`server.conventions` 必须是
-`true`、`false` 或 object；object
-形式目前支持 `middleware`。`server.basePath` 必须是以 `/` 开头的非空 URL pathname，不能包含空白字符、query
-string 或 hash；尾部 `/` 会被归一化移除。如果 `server.rsc` 配置为 object，
-`server.rsc.endpoint` 也遵循同样的 URL pathname 规则。`dev.https` 和
-`server.dev.https` 中的 key/cert 值必须是非空字符串，HTTPS object config 不能是
-`null` 或 array。`dev.port` 和 `server.dev.port` 必须是 `1` 到 `65535` 之间的 TCP
-端口整数。
+这些配置字段会在 build work 开始前校验：
+
+- 提供 `output`、`dev`、`server`、`server.dev` 和 `transport` 时，它们都必须是
+  object。
+- `output.client` 和 `output.server` 必须是非空字符串，并且指向不同目录。
+- `server.routing` 必须是 `true`、`false` 或 object；object 形式只接受可选的非空
+  `dir` 字符串。
+- `server.conventions` 必须是 `true`、`false` 或 object；object 形式目前支持
+  `middleware`。
+- `server.basePath` 必须是以 `/` 开头的非空 URL pathname，不能包含空白字符、query
+  string 或 hash。
+- `server.basePath` 尾部 `/` 会被归一化移除。
+- 如果 `server.rsc` 配置为 object，`server.rsc.endpoint` 也遵循同样的 URL pathname
+  规则。
+- `dev.https` 和 `server.dev.https` 中的 key/cert 值必须是非空字符串。
+- HTTPS object config 不能是 `null` 或 array。
+- `dev.port` 和 `server.dev.port` 必须是 `1` 到 `65535` 之间的 TCP 端口整数。
 
 派生路径：
 

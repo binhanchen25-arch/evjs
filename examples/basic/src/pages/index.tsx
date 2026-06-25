@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from "@evjs/ev/page";
 import { useState } from "react";
-import { createUser, getUsers } from "../api/users.server";
+import { createUser, getUsers } from "../apis/users.server";
 
 const cardStyle = {
   border: "1px solid #e2e8f0",

@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from "@evjs/ev/page";
 import { useState } from "react";
-import type { Todo, User } from "../api/db.server";
+import type { Todo, User } from "../apis/db.server";
 import {
   createTodo,
   createUser,
@@ -14,7 +14,7 @@ import {
   getTodos,
   getUsers,
   toggleTodo,
-} from "../api/db.server";
+} from "../apis/db.server";
 
 // ── Users Page ──
 

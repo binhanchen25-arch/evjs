@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { getMerchantOperationsSnapshot } from "./api/operators.server";
+import { getMerchantOperationsSnapshot } from "./apis/operators.server";
 import type { OperationsSnapshot } from "./domain/operations";
 import "./styles.css";
 

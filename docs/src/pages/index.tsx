@@ -2,14 +2,27 @@ import Link from "@docusaurus/Link";
 import Translate, { translate } from "@docusaurus/Translate";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import Layout from "@theme/Layout";
+import type { ReactNode } from "react";
 import styles from "./index.module.css";
 
 /* ─── Feature data ─── */
 
-function useFeatures() {
+type FeatureIconName =
+  | "bolt"
+  | "routes"
+  | "server"
+  | "function"
+  | "query"
+  | "runtime";
+
+function useFeatures(): Array<{
+  icon: FeatureIconName;
+  title: string;
+  description: string;
+}> {
   return [
     {
-      icon: "⚡",
+      icon: "bolt",
       title: translate({
         id: "homepage.feature.zeroConfig.title",
         message: "Zero Config",
@@ -21,7 +34,7 @@ function useFeatures() {
       }),
     },
     {
-      icon: "🔒",
+      icon: "routes",
       title: translate({
         id: "homepage.feature.clientRoutes.title",
         message: "Client Routes",
@@ -33,7 +46,7 @@ function useFeatures() {
       }),
     },
     {
-      icon: "🛣️",
+      icon: "server",
       title: translate({
         id: "homepage.feature.serverRoutes.title",
         message: "Server Routes",
@@ -41,11 +54,11 @@ function useFeatures() {
       description: translate({
         id: "homepage.feature.serverRoutes.description",
         message:
-          "Standard Request/Response REST endpoints via createRoute() — build APIs alongside your React app.",
+          "File-based REST endpoints from src/apis with uppercase HTTP method exports and scoped middleware.",
       }),
     },
     {
-      icon: "🚀",
+      icon: "function",
       title: translate({
         id: "homepage.feature.serverFn.title",
         message: "Server Functions",
@@ -57,7 +70,7 @@ function useFeatures() {
       }),
     },
     {
-      icon: "📡",
+      icon: "query",
       title: translate({
         id: "homepage.feature.dataFetching.title",
         message: "Data Fetching",
@@ -69,7 +82,7 @@ function useFeatures() {
       }),
     },
     {
-      icon: "🌐",
+      icon: "runtime",
       title: translate({
         id: "homepage.feature.multiRuntime.title",
         message: "Multi-Runtime",
@@ -88,11 +101,6 @@ function useFeatures() {
 function HeroSection() {
   return (
     <header className={styles.hero}>
-      {/* Animated grid */}
-      <div className={styles.heroGrid} />
-      {/* Floating glow orbs */}
-      <div className={styles.heroGlow} />
-
       <div className={styles.heroContent}>
         <h1 className={styles.heroTitle}>evjs</h1>
         <p className={styles.heroSubtitle}>
@@ -180,7 +188,9 @@ function FeaturesSection() {
         <div className={styles.featuresGrid}>
           {features.map((feature) => (
             <div key={feature.title} className={styles.featureCard}>
-              <div className={styles.featureIcon}>{feature.icon}</div>
+              <div className={styles.featureIcon}>
+                <FeatureIcon name={feature.icon} />
+              </div>
               <h3 className={styles.featureTitle}>{feature.title}</h3>
               <p className={styles.featureDesc}>{feature.description}</p>
             </div>
@@ -192,6 +202,63 @@ function FeaturesSection() {
 }
 
 /* ─── Icons ─── */
+
+function FeatureIcon({ name }: { name: FeatureIconName }) {
+  const paths: Record<FeatureIconName, ReactNode> = {
+    bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
+    routes: (
+      <>
+        <circle cx="6" cy="6" r="2.5" />
+        <circle cx="18" cy="18" r="2.5" />
+        <path d="M8.5 6H14a4 4 0 0 1 0 8h-4a4 4 0 0 0 0 8h5.5" />
+      </>
+    ),
+    server: (
+      <>
+        <rect x="4" y="4" width="16" height="6" rx="2" />
+        <rect x="4" y="14" width="16" height="6" rx="2" />
+        <path d="M8 7h.01M8 17h.01M12 7h4M12 17h4" />
+      </>
+    ),
+    function: (
+      <>
+        <path d="M8 7c0-2 1.5-4 4-4h2" />
+        <path d="M6 11h8" />
+        <path d="M7 21h1c2.5 0 4-2 4-4V7" />
+        <path d="m16 13 2 2 2-2" />
+        <path d="m16 19 2-2 2 2" />
+      </>
+    ),
+    query: (
+      <>
+        <path d="M5 5h14v10H8l-3 3V5Z" />
+        <path d="M8 9h8M8 12h5" />
+      </>
+    ),
+    runtime: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+      </>
+    ),
+  };
+
+  return (
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
+      {paths[name]}
+    </svg>
+  );
+}
 
 function GitHubIcon() {
   return (

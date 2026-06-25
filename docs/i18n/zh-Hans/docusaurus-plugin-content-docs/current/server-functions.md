@@ -217,25 +217,36 @@ initTransport({
 Fetch `mode` 不提供配置。服务端函数请求使用浏览器默认 CORS 行为；跨域
 cookie 应通过 `credentials` 和服务端 CORS 响应头配合控制。
 
-默认 HTTP adapter 发送 POST JSON，形状是 `{ fnId, args }`，其中 `fnId` 是精确的
-生成 server function ID，`args` 始终是数组。请求必须使用
-`Content-Type: application/json`；缺失或其他 media type 会被框架 HTTP endpoint
-以结构化 `415` 响应拒绝。其他 HTTP method 会收到带 `Allow: POST` 的结构化 `405`
-响应。缺失、非字符串、空字符串或带首尾空白的 `fnId`，以及非数组的 `args`，都会在
-dispatch 前以 `400` 拒绝。自定义 transport 即使不使用 HTTP，也应保持同样的逻辑契约。
-框架 HTTP endpoint 会以同样的 `{ error, fnId, status }` JSON 结构拒绝超过 1 MiB 的
-请求体，并返回 `413`。
-默认 adapter 的网络错误或 abort 错误会作为 `ServerFunctionError` 抛出，
-`status` 为 `0`，原始错误保留在 `cause` 中。
-结构化 error envelope 只会从精确的 `application/json` 响应中识别，允许带
-content-type 参数。
-对于非 JSON 错误响应，adapter 会使用 trim 后的响应体作为错误消息；当响应体为空或
-仅包含空白字符时，会回退到 `statusText`。
-成功的 HTTP 响应也必须使用 `Content-Type: application/json`，默认 adapter
-才会解析 `{ result }` payload。
-默认 adapter 使用的 fetch shim 或测试替身必须返回类 Response 对象：成功响应需要
-boolean `ok`、`headers.get("Content-Type")` 和 `json()`；错误响应还需要 number
-`status`、string `statusText` 以及 `text()`。
+默认 HTTP adapter 的请求规则如下：
+
+- 发送 POST JSON，形状是 `{ fnId, args }`。
+- `fnId` 是精确的生成 server function ID。
+- `args` 始终是数组。
+- 请求必须使用 `Content-Type: application/json`；缺失或其他 media type 会收到结构化
+  `415` 响应。
+- 其他 HTTP method 会收到带 `Allow: POST` 的结构化 `405` 响应。
+- 缺失、非字符串、空字符串或带首尾空白的 `fnId`，以及非数组的 `args`，都会在
+  dispatch 前以 `400` 拒绝。
+- 超过 1 MiB 的请求体会以同样的 `{ error, fnId, status }` JSON 结构被拒绝，并返回
+  `413`。
+
+自定义 transport 即使不使用 HTTP，也应保持同样的逻辑契约。
+
+默认 adapter 的响应规则也比较严格：
+
+- 网络错误或 abort 错误会作为 `ServerFunctionError` 抛出，`status` 为 `0`，原始错误
+  保留在 `cause` 中。
+- 结构化 error envelope 只会从精确的 `application/json` 响应中识别，允许带
+  content-type 参数。
+- 对于非 JSON 错误响应，adapter 会使用 trim 后的响应体作为错误消息；当响应体为空或
+  仅包含空白字符时，会回退到 `statusText`。
+- 成功的 HTTP 响应也必须使用 `Content-Type: application/json`，默认 adapter 才会解析
+  `{ result }` payload。
+
+默认 adapter 使用的 fetch shim 或测试替身必须返回类 Response 对象：
+
+- 成功响应需要 boolean `ok`、`headers.get("Content-Type")` 和 `json()`；
+- 错误响应还需要 number `status`、string `statusText` 以及 `text()`。
 
 ### 自定义适配器（如 WebSocket）
 

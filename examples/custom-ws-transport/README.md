@@ -14,7 +14,7 @@ npm run dev
 |------|---------|
 | `src/layout/index.tsx` | SPA root layout |
 | `src/pages/index.tsx` | `initTransport` with WebSocket adapter and users CRUD UI |
-| `src/api/users.server.ts` | Server functions |
+| `src/apis/users.server.ts` | Server functions |
 
 
 ## What It Demonstrates

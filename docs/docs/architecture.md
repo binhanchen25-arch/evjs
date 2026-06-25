@@ -334,27 +334,43 @@ belongs in the referenced page module, not in `ev.config.ts`.
 
 The public config exposes `server.basePath`; the function endpoint is derived from that base path.
 
-RSC `use client` reference extraction preserves default exports, identifier
-exports, class exports, same-module aliases, namespace re-export names such as
-`export * as Widgets from "./widgets"`, and re-exported names including
-string-literal aliases in `BuildOutput.rsc`. Type-only exports are ignored. The
-client reference transform emits internal bindings with export specifiers so
-reserved words and string-literal aliases stay valid JavaScript.
-`BuildOutput.rsc.clientReferences` and `BuildOutput.rsc.serverReferences` use
-the extracted reference id as a trimmed string key. Those ids may contain file
-paths, URL syntax, `#`, or `:`; the value object carries the trimmed `module`
-and optional trimmed `exportName`.
-Reference-only RSC output can omit `BuildOutput.rsc.endpoint`; RSC page output
-cannot, because Flight requests need a concrete endpoint. The manifest linker
-rejects RSC page output when `runtime.server.rsc` is missing.
-For full BuildOutput manifests, each RSC page renderer reference must resolve to an
-`rsc-page` renderer whose `owner.pageId` matches the RSC page id; public
+RSC `use client` reference extraction preserves these names in
+`BuildOutput.rsc`:
+
+- default exports;
+- identifier exports;
+- class exports;
+- same-module aliases;
+- namespace re-export names such as `export * as Widgets from "./widgets"`;
+- re-exported names, including string-literal aliases.
+
+Type-only exports are ignored. The client reference transform emits internal
+bindings with export specifiers, so reserved words and string-literal aliases
+stay valid JavaScript.
+
+The RSC manifest rules are strict:
+
+- `BuildOutput.rsc.clientReferences` and `BuildOutput.rsc.serverReferences` use
+  the extracted reference id as a trimmed string key.
+- Reference ids may contain file paths, URL syntax, `#`, or `:`.
+- The value object carries the trimmed `module` and optional trimmed
+  `exportName`.
+- Reference-only RSC output can omit `BuildOutput.rsc.endpoint`.
+- RSC page output cannot omit `BuildOutput.rsc.endpoint`, because Flight
+  requests need a concrete endpoint.
+- The manifest linker rejects RSC page output when `runtime.server.rsc` is
+  missing.
+
+For full BuildOutput manifests, each RSC page renderer reference must resolve
+to an `rsc-page` renderer whose `owner.pageId` matches the RSC page id. Public
 manifests may omit that server-only renderer metadata.
+
 After ignoring type-only and ambient declarations, a `"use client"` module must
-still expose at least one runtime client reference.
-Bare runtime `export * from "./widgets"` is rejected because the framework
-manifest must know every client reference export name; use explicit named
-re-exports or a namespace re-export instead.
+still expose at least one runtime client reference. Bare runtime
+`export * from "./widgets"` is rejected because the framework manifest must know
+every client reference export name; use explicit named re-exports or a
+namespace re-export instead.
+
 Malformed `"use client"` modules are reported during graph analysis with the
 file path and parser message before the bundler transform runs.
 

@@ -14,7 +14,7 @@ npm run dev
 |------|---------|
 | `src/layout/index.tsx` | SPA root layout |
 | `src/pages/` | Page route files |
-| `src/api/users.server.ts` | `"use server"` CRUD functions |
+| `src/apis/users.server.ts` | `"use server"` CRUD functions |
 
 ## What It Demonstrates
 

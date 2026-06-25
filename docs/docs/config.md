@@ -276,24 +276,35 @@ evjs reads these named static exports from framework-managed page modules when
 the corresponding component page config field is omitted. Use literal values so
 graph analysis can resolve them without executing user code. Invalid literal
 values fail during app graph analysis before bundling.
-PPR is not a separate `render` value; use `render = "ssr"` with
-`prerender = { partial: true }`.
-`prerender` objects may only contain `partial`, `delivery`, and `revalidate`,
-and must declare at least one of those properties. `revalidate` must be `false`
-or a positive integer number of seconds. Use `true` for full prerendering
-without options.
-The analyzer supports direct `export const` declarations and local export
-specifiers such as `const mode = "ssr"; export { mode as render };`. It does
-not follow re-exports from another module for page metadata; exporting a
-metadata name from another module is reported as invalid. Runtime metadata
-exports must be local variables with a static initializer; uninitialized
-declarations such as `export let render;`, function exports, and class exports
-are invalid. Type-only exports
-such as `export type { mode as render }` and ambient declarations such as
-`export declare const render: "ssr"` are ignored because they do not emit a
-runtime value. Export each metadata name only once; duplicate `render`,
-`hydrate`, `prerender`, or `rsc` exports are graph-analysis errors instead of
-last-write-wins behavior.
+
+PPR uses SSR plus prerender metadata:
+
+- `render = "ssr"` declares the server document.
+- `prerender = { partial: true }` enables partial prerendering.
+- PPR is not a separate `render` value.
+- `prerender` objects may only contain `partial`, `delivery`, and
+  `revalidate`.
+- `prerender` objects must declare at least one of those properties.
+- `revalidate` must be `false` or a positive integer number of seconds.
+- Use `true` for full prerendering without options.
+
+The analyzer accepts:
+
+- direct `export const` declarations;
+- local export specifiers such as
+  `const mode = "ssr"; export { mode as render };`.
+
+The analyzer rejects:
+
+- page metadata re-exported from another module;
+- uninitialized runtime metadata such as `export let render;`;
+- function exports and class exports used as metadata;
+- duplicate `render`, `hydrate`, `prerender`, or `rsc` runtime exports.
+
+Type-only exports such as `export type { mode as render }` and ambient
+declarations such as `export declare const render: "ssr"` are ignored because
+they do not emit a runtime value. Duplicate metadata names are graph-analysis
+errors instead of last-write-wins behavior.
 
 | Export | Values | Meaning |
 | --- | --- | --- |
@@ -523,9 +534,12 @@ export default defineConfig({
 ```
 
 Server conventions are enabled by default when `server.routing` is enabled.
-The current convention discovers `src/middleware.ts` as framework request
-middleware and `src/apis/**/middleware.ts` as API route middleware. Missing
-middleware files are ignored. Framework request middleware runs before
+The current convention discovers:
+
+- `src/middleware.ts` as framework request middleware;
+- `src/apis/**/middleware.ts` as API route middleware.
+
+Missing middleware files are ignored. Framework request middleware runs before
 framework-managed server requests, including server file routes, server
 functions, SSR, PPR, and RSC. API route middleware runs only for descendant
 server file routes under `server.routing.dir`.
@@ -543,19 +557,26 @@ export default defineConfig({
 
 Use `server.conventions: false` to disable all server conventions.
 
-`output`, `dev`, `server`, `server.dev`, and `transport` must be objects when
-provided. `output.client` and `output.server` must be non-empty strings that
-point to different directories.
-`server.routing` must be `true`, `false`, or an object with an optional
-non-empty `dir` string. `server.conventions` must be `true`, `false`, or an
-object; object form currently supports `middleware`.
-`server.basePath` must be a non-empty URL
-pathname that starts with `/`, without whitespace, a query string, or a hash;
-trailing slashes are normalized away. If `server.rsc` is configured as an
-object, `server.rsc.endpoint` follows the same URL pathname rule. HTTPS
-key/cert values for `dev.https` and `server.dev.https` must be non-empty
-strings, and HTTPS object config cannot be `null` or an array. `dev.port` and
-`server.dev.port` must be integer TCP ports from `1` to `65535`.
+These config fields are validated before build work starts:
+
+- `output`, `dev`, `server`, `server.dev`, and `transport` must be objects when
+  provided.
+- `output.client` and `output.server` must be non-empty strings that point to
+  different directories.
+- `server.routing` must be `true`, `false`, or an object with an optional
+  non-empty `dir` string.
+- `server.conventions` must be `true`, `false`, or an object; object form
+  currently supports `middleware`.
+- `server.basePath` must be a non-empty URL pathname that starts with `/`,
+  without whitespace, a query string, or a hash.
+- Trailing slashes in `server.basePath` are normalized away.
+- If `server.rsc` is configured as an object, `server.rsc.endpoint` follows the
+  same URL pathname rule.
+- HTTPS key/cert values for `dev.https` and `server.dev.https` must be
+  non-empty strings.
+- HTTPS object config cannot be `null` or an array.
+- `dev.port` and `server.dev.port` must be integer TCP ports from `1` to
+  `65535`.
 
 Derived runtime paths:
 

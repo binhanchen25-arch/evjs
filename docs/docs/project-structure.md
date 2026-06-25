@@ -78,7 +78,9 @@ This shape covers the complete framework surface:
 - `*.server.*` modules that start with `"use server";` contain server
   functions. They have no convention directory and can live beside pages,
   features, or server file routes.
-- `server.ts` composes standalone/manual `@evjs/server` routes, middleware, and framework rendering when you own a custom server entry.
+- `server.ts` is ordinary application organization for standalone/manual
+  `@evjs/server` code. evjs does not discover it as a file convention, and it
+  is unrelated to `server.routing`.
 - `features/` keeps domain logic out of route/page files.
 
 ## Convention Matrix
@@ -180,45 +182,64 @@ page outputs that do not map cleanly to `src/pages`.
 ## Page Modules
 
 Each discovered file under `src/pages` default-exports a React component.
-Dynamic segments use `$param`, and `index.tsx` maps to the directory root.
-Bracket route segments such as `[id].tsx` are rejected; catch-all and optional
-segments such as `$...slug.tsx` or `$slug?.tsx` are not part of the convention
-yet. Dynamic param names must be JavaScript identifiers after `$`, and static
-route segments must use lowercase URL-safe letters, numbers, `.`, `_`, `-`, or
-`~`. Reserved object-property names such as `$__proto__.tsx`,
-`$constructor.tsx`, and `$prototype.tsx` are rejected as dynamic params.
-`$_splat.tsx` is also reserved because wildcard routes expose `*` as `_splat`.
-Dynamic siblings cannot differ only by parameter name, so choose one of `$id.tsx`
-or `$userId.tsx` for the same URL shape. A single route path also cannot repeat
-the same dynamic param name, so `teams/$teamId/users/$teamId.tsx` is rejected.
-Flat route files and directory index route files cannot claim the same URL path,
-so choose either `users.tsx` or `users/index.tsx` for `/users`.
-Route group segments such as `(marketing)` are pathless organization, so
-`src/pages/(marketing)/about.tsx` maps to `/about`. Malformed group segments
-such as `(marketing` are rejected. Route discovery considers `.tsx`, `.jsx`,
-`.ts`, and `.js` files, but ignores declarations, test/spec files, hidden dot
-paths, Storybook `*.story.*` / `*.stories.*` files, `*.client.*` client-only
-modules, `*.server.*` server-only modules, non-source files, and `_`-prefixed
-private route segments. Put non-route helpers in `_`-prefixed files/folders or
-outside `src/pages`. SPA and MPA share one
-deterministic route order: `/` first, parent routes before children, and static
-siblings before dynamic siblings. For example, `users/settings.tsx` ranks before
-`users/$id.tsx`. Static siblings use locale-independent code-point ordering, so
-`a-b.tsx`, `a.b.tsx`, `a0.tsx`, `a_c.tsx`, `aa.tsx`, and `a~d.tsx` keep that
-same order on every machine. Route examples and config should use `/`
-separators; filesystem `\` separators are normalized before route parsing so
-paths and generated route IDs stay the same across operating systems. The
-resolved route list used by graph and build-plan generation follows the same
-rules, so duplicate paths, dynamic URL shapes, route IDs, empty dynamic params,
-reserved dynamic params, duplicate dynamic params, explicit `:_splat` params,
-whitespace, query strings, or hashes are rejected there too. Explicit wildcard
+Keep the rules in four buckets:
+
+1. **Component contract**: route files default-export the page component.
+   Rendering metadata lives beside that component. Syntax errors and missing
+   default exports are reported during route discovery before the bundler runs.
+2. **Filename syntax**: `index.tsx` maps to the directory root. Dynamic segments
+   use `$param`; bracket segments such as `[id].tsx`, catch-all segments such as
+   `$...slug.tsx`, and optional segments such as `$slug?.tsx` are rejected.
+3. **URL segment safety**: dynamic names must be JavaScript identifiers after
+   `$`. Static segments must be lowercase URL-safe letters, numbers, `.`, `_`,
+   `-`, or `~`. Reserved names such as `$__proto__.tsx`, `$constructor.tsx`,
+   `$prototype.tsx`, and `$_splat.tsx` are rejected.
+4. **Organization only**: route groups such as `(marketing)` are pathless, so
+   `src/pages/(marketing)/about.tsx` maps to `/about`. Malformed group segments
+   such as `(marketing` are rejected.
+
+Route discovery only considers `.tsx`, `.jsx`, `.ts`, and `.js` source files.
+These colocated files are ignored:
+
+- declarations;
+- test/spec files;
+- Storybook `*.story.*` and `*.stories.*` files;
+- hidden dot paths;
+- `*.client.*` client-only modules;
+- `*.server.*` server-only modules;
+- non-source files;
+- `_`-prefixed private route segments.
+
+Put non-route helpers in `_`-prefixed files/folders or outside `src/pages`.
+
+Collision and ordering rules are also deterministic:
+
+- Dynamic siblings cannot differ only by parameter name. Choose one of
+  `$id.tsx` or `$userId.tsx` for the same URL shape.
+- A route path cannot repeat the same dynamic param name, so
+  `teams/$teamId/users/$teamId.tsx` is rejected.
+- Flat route files and directory index route files cannot claim the same URL
+  path. Choose either `users.tsx` or `users/index.tsx` for `/users`.
+- SPA and MPA both order `/` first, parent routes before children, and static
+  siblings before dynamic siblings. For example, `users/settings.tsx` ranks
+  before `users/$id.tsx`.
+- Static siblings use locale-independent code-point ordering: `a-b.tsx`,
+  `a.b.tsx`, `a0.tsx`, `a_c.tsx`, `aa.tsx`, and `a~d.tsx` keep that order on
+  every machine.
+- Examples and config should use `/` separators. Filesystem `\` separators are
+  normalized before route parsing so paths and generated route IDs stay the same
+  across operating systems.
+
+The resolved route list used by graph and build-plan generation follows the
+same rules. It rejects duplicate paths, dynamic URL shapes, route IDs, empty
+dynamic params, reserved dynamic params, duplicate dynamic params, explicit
+`:_splat` params, whitespace, query strings, and hashes. Explicit wildcard
 routes can contain at most one `*` segment because page hooks expose one
 `_splat` value.
-Generated route IDs also come from URL paths and normalize separators and
-punctuation to underscores, so `admin/panel.tsx` and `admin_panel.tsx` both
-produce `admin_panel` and cannot exist together.
-Rendering metadata belongs with the page component. Syntax and default-export
-errors are reported during route discovery before the bundler runs:
+
+Generated route IDs come from URL paths and normalize separators and
+punctuation to underscores. That means `admin/panel.tsx` and
+`admin_panel.tsx` both produce `admin_panel` and cannot exist together.
 
 ### Route Filename Examples
 
@@ -268,16 +289,25 @@ export default function Campaign() {
 }
 ```
 
-Page files should stay thin. Read params/search, export page-local loader or
-rendering metadata, and compose components from `features/` or `components/`.
-Business logic belongs in domain modules. Rendering metadata is literal-only:
-`render` and `hydrate` are string literals, `prerender` is `true` or an object
-literal with `partial`, `delivery`, or `revalidate`, `prerender.revalidate` is
-`false` or a positive integer number of seconds, and `rsc` is a boolean literal
-for RSC pages. Malformed page modules are reported during graph analysis with
-the file path and parser message before the bundler runs; malformed PPR region
-modules from the experimental compatibility path are reported the same way when
-region metadata is read.
+Page files should stay thin:
+
+- read params/search;
+- export page-local loaders or rendering metadata;
+- compose components from `features/` or `components/`;
+- keep business logic in domain modules.
+
+Rendering metadata is literal-only:
+
+- `render` and `hydrate` are string literals;
+- `prerender` is `true` or an object literal with `partial`, `delivery`, or
+  `revalidate`;
+- `prerender.revalidate` is `false` or a positive integer number of seconds;
+- `rsc` is a boolean literal for RSC pages.
+
+Malformed page modules are reported during graph analysis with the file path
+and parser message before the bundler runs. Malformed PPR region modules from
+the experimental compatibility path are reported the same way when region
+metadata is read.
 
 ## Server Boundary
 

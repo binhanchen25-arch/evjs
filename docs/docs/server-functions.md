@@ -240,36 +240,48 @@ For framework builds, prefer `transport.baseUrl` in `ev.config.ts` when the
 browser talks to a framework server on another origin. That build-time value is
 published in the manifest and shared by browser-initiated framework requests
 such as server functions, RSC Flight, and client helpers for server routes.
-  The built-in adapter owns `Content-Type: application/json`; use this option
-  for additional headers such as auth, tracing, or CSRF tokens.
+The built-in adapter owns `Content-Type: application/json`; use `headers` only
+for additional headers such as auth, tracing, or CSRF tokens.
 
 Fetch `mode` is not configurable. Server function requests rely on the browser's
 default CORS behavior; cross-origin cookies should be controlled with
 `credentials` and matching server CORS headers.
 
-The default HTTP adapter sends POST JSON shaped as `{ fnId, args }`, where
-`fnId` is the exact generated server function ID and `args` is always an array.
-Requests must use `Content-Type: application/json`; the framework HTTP endpoint
-rejects missing or other media types with a structured `415` response. Other
-HTTP methods receive a structured `405` response with `Allow: POST`. Missing,
-non-string, empty, or leading/trailing-whitespace `fnId` values and non-array
-`args` values are rejected with `400` before dispatch. Custom transports should
-keep the same logical contract even when they do not use HTTP. The framework
-HTTP endpoint rejects request bodies larger than 1 MiB with a structured `413`
-JSON error using the same `{ error, fnId, status }` envelope.
-Network or abort failures from the default adapter are reported as
-`ServerFunctionError` with `status: 0` and the original error in `cause`.
-Structured error envelopes are only recognized from exact
-`application/json` responses, with optional content-type parameters.
-For non-JSON error responses, the adapter uses the trimmed response body as the
-error message and falls back to `statusText` when the body is empty or only
-whitespace.
-Successful HTTP responses must also use `Content-Type: application/json`
-before the default adapter parses the `{ result }` payload.
+The default HTTP adapter has these request rules:
+
+- It sends POST JSON shaped as `{ fnId, args }`.
+- `fnId` is the exact generated server function ID.
+- `args` is always an array.
+- Requests must use `Content-Type: application/json`; missing or different
+  media types receive a structured `415` response.
+- Other HTTP methods receive a structured `405` response with `Allow: POST`.
+- Missing, non-string, empty, or leading/trailing-whitespace `fnId` values and
+  non-array `args` values are rejected with `400` before dispatch.
+- Request bodies larger than 1 MiB are rejected with a structured `413` JSON
+  error using the same `{ error, fnId, status }` envelope.
+
+Custom transports should keep the same logical contract even when they do not
+use HTTP.
+
+The default adapter also has strict response rules:
+
+- Network or abort failures become `ServerFunctionError` with `status: 0` and
+  the original error in `cause`.
+- Structured error envelopes are only recognized from exact
+  `application/json` responses, with optional content-type parameters.
+- For non-JSON error responses, the adapter uses the trimmed response body as
+  the error message and falls back to `statusText` when the body is empty or
+  only whitespace.
+- Successful HTTP responses must also use `Content-Type: application/json`
+  before the default adapter parses the `{ result }` payload.
+
 Fetch shims and test doubles used with the default adapter must return
-Response-like objects with boolean `ok`, `headers.get("Content-Type")`,
-`json()` for successful responses, and numeric `status`, string `statusText`,
-plus `text()` for error responses.
+Response-like objects:
+
+- successful responses need boolean `ok`, `headers.get("Content-Type")`, and
+  `json()`;
+- error responses also need numeric `status`, string `statusText`, and
+  `text()`.
 
 ### Custom Adapter (e.g., WebSocket)
 

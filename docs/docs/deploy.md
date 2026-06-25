@@ -115,29 +115,37 @@ Browser
     <- Browser receives one document response
 ```
 
-In this topology `/__evjs/ppr/<page>/<region>` is not a browser initial-load
-request. It is an internal region resolver endpoint used by the edge/runtime
-layer. The direct endpoint matches exactly two encoded path segments after the
-PPR base path: `<pageId>/<regionId>`, where `regionId` is an opaque internal
-manifest id rather than a user-authored API. Source modules declare
-`prerender.delivery = "merge"` to wait for required regions before returning the
-document, or
-`prerender.delivery = "stream"` to flush the cached shell first and append
-region patches to the same HTML response as internal region requests complete.
-Composed PPR page responses receive a conservative default `Cache-Control` from
-their region policies: `no-store` when any region is dynamic, or the smallest
-region `s-maxage` when every region declares `{ revalidate }`. Explicit shell
-`Cache-Control` headers are preserved.
+In this topology:
+
+- `/__evjs/ppr/<page>/<region>` is not a browser initial-load request.
+- It is an internal region resolver endpoint used by the edge/runtime layer.
+- The direct endpoint matches exactly two encoded path segments after the PPR
+  base path: `<pageId>/<regionId>`.
+- `regionId` is an opaque internal manifest id, not a user-authored API.
+- `prerender.delivery = "merge"` waits for required regions before returning
+  the document.
+- `prerender.delivery = "stream"` flushes the cached shell first, then appends
+  region patches to the same HTML response as internal region requests complete.
+
+Composed PPR page responses receive conservative default caching:
+
+- `Cache-Control: no-store` when any region is dynamic;
+- the smallest region `s-maxage` when every region declares `{ revalidate }`;
+- preserved explicit shell `Cache-Control` headers.
+
 Direct PPR `HEAD` requests can report cache headers but do not seed the region
-body cache; use `GET` when a deployment intentionally warms PPR regions.
+body cache. Use `GET` when a deployment intentionally warms PPR regions.
+
 Split edge/origin adapters can provide `framework.ppr.regionCache` to back PPR
 region body caching with a platform cache, KV store, or regional memory cache.
 When `framework.ppr.staleWhileRevalidate` is set, stale entries inside that
-window return with `x-evjs-cache: STALE` while the runtime refreshes the cache
-with `waitUntil()` when the platform exposes it. Cache provider failures are
-logged and fall back to fresh rendering.
+window return with `x-evjs-cache: STALE`; the runtime refreshes the cache with
+`waitUntil()` when the platform exposes it. Cache provider failures are logged
+and fall back to fresh rendering.
 
-If browser and server run on different origins, configure `transport.baseUrl` at build time so browser-initiated framework requests share the same server base URL.
+If browser and server run on different origins, configure `transport.baseUrl` at
+build time so browser-initiated framework requests share the same server base
+URL.
 
 ## Routing Priority
 

@@ -14,8 +14,7 @@ npm run dev
 |------|---------|
 | `src/layout/index.tsx` | SPA root layout |
 | `src/pages/index.tsx` | UI consuming both tRPC and evjs APIs |
-| `src/api/trpc.server.ts` | tRPC router exposed as server function |
-| `src/api/users.server.ts` | Standard evjs server functions |
+| `src/apis/trpc.server.ts` | tRPC router and evjs server functions |
 
 ## What It Demonstrates
 

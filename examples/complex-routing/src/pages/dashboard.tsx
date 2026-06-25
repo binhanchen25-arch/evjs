@@ -1,5 +1,5 @@
 import { useQuery } from "@evjs/ev/page";
-import { getStats } from "../api/data.server";
+import { getStats } from "../apis/data.server";
 
 const styles = {
   card: {

@@ -66,7 +66,8 @@ my-evjs-app/
 - 渲染元信息放在页面模块旁边。
 - 以 `"use server";` 开头的 `*.server.*` 模块放 server functions。它们没有目录约定，
   可以放在 pages、features 或 server file routes 旁边。
-- `server.ts` 只在你持有自定义 server entry 时组合 standalone/manual `@evjs/server` routes、middleware 和 framework rendering。
+- `server.ts` 只是 standalone/manual `@evjs/server` 代码的普通应用组织文件。evjs
+  不会把它作为文件约定发现，它也和 `server.routing` 无关。
 - `features/` 把业务逻辑从 route/page files 中移走。
 
 ## 约定矩阵
@@ -155,35 +156,57 @@ basename 的 colocated 模板替代全局 `index.html` 模板，例如
 ## 页面模块
 
 `src/pages` 下每个被发现的文件都默认导出一个 React 组件。动态段使用 `$param`，
-`index.tsx` 映射到当前目录根路径。`[id].tsx` 这类 bracket 路由段会被拒绝。
-`$...slug.tsx` 或 `$slug?.tsx` 这类 catch-all 和可选段暂不属于约定。
-动态参数名必须是 `$` 后面的 JavaScript 标识符；静态路由段必须小写，并且只能使用
-URL-safe 小写字母、数字、`.`、`_`、`-` 或 `~`。`$__proto__.tsx`、
-`$constructor.tsx`、`$prototype.tsx` 这类保留对象属性名也会被拒绝。`$_splat.tsx`
-也会被拒绝，因为 wildcard 路由会把 `*` 暴露为 `_splat`。只有参数名不同的同级动态路由也不允许共存；
-同一个 URL shape 应在 `$id.tsx` 和 `$userId.tsx` 中选择一个。同一个 route path
-也不能重复动态参数名，所以 `teams/$teamId/users/$teamId.tsx` 会被拒绝。
-扁平路由文件和目录 `index` 路由文件不能声明同一个 URL path，因此 `/users`
-应在 `users.tsx` 和 `users/index.tsx` 中选择一种。`(marketing)`
-这类 route group 段是 pathless 组织目录，因此 `src/pages/(marketing)/about.tsx`
-会映射到 `/about`；`(marketing` 这类不完整 group segment 会被拒绝。路由发现会考虑
-`.tsx`、`.jsx`、`.ts` 和 `.js` 文件，但会忽略声明文件、测试/spec 文件、隐藏 dot 路径、
-`*.client.*` 客户端专用模块、`*.server.*` 服务端专用模块、非源码文件，以及 `_`
-前缀的私有路由段；Storybook 的 `*.story.*` / `*.stories.*` 文件也不会成为路由。
-非路由 helper 应放在 `_` 前缀文件/目录中，或移到 `src/pages` 外部。SPA 和 MPA 使用同一套确定性顺序：`/` 最先，父路由排在子路由之前，
-同级静态路由排在动态路由之前，因此 `users/settings.tsx` 会排在
-`users/$id.tsx` 之前。同级静态路由使用与 locale 无关的 code-point 顺序，因此
-`a-b.tsx`、`a.b.tsx`、`a0.tsx`、`a_c.tsx`、`aa.tsx`、`a~d.tsx`
-在任何机器上都保持这个顺序。路由示例和配置应使用 `/` 分隔符；文件系统里的 `\`
-分隔符会在路由解析前归一化，因此不同操作系统上的路径和生成 route id 保持一致。
-graph 和 build plan 使用的 resolved route list 也遵循同样规则；重复的 path、
-动态 URL shape 或 route id，以及空动态参数、保留动态参数、重复动态参数、显式
-`:_splat` 参数、包含空白、query string 或 hash 的路径也会在这里被拒绝。
-显式 wildcard 路由最多只能包含一个 `*` 段，因为页面 hooks 只会暴露一个
-`_splat` 值。生成的 route id 也来自 URL path，并把分隔符和标点归一化为下划线，
-因此 `admin/panel.tsx` 和 `admin_panel.tsx` 都会生成 `admin_panel`，不能同时存在。
-语法错误和默认导出错误会在路由发现阶段、bundler 运行前报告。
-渲染元信息放在页面组件旁边：
+但实际规则可以分成四组：
+
+1. **组件契约**：路由文件默认导出页面组件。渲染元信息放在页面组件旁边。语法错误和
+   缺少默认导出的错误会在路由发现阶段、bundler 运行前报告。
+2. **文件名语法**：`index.tsx` 映射到当前目录根路径。动态段使用 `$param`。
+   `[id].tsx` 这类 bracket 段、`$...slug.tsx` 这类 catch-all 段，以及
+   `$slug?.tsx` 这类可选段都会被拒绝。
+3. **URL segment 安全性**：动态参数名必须是 `$` 后面的 JavaScript 标识符。
+   静态段必须小写，并且只能使用 URL-safe 小写字母、数字、`.`、`_`、`-` 或 `~`。
+   `$__proto__.tsx`、`$constructor.tsx`、`$prototype.tsx` 和 `$_splat.tsx`
+   这类保留名称会被拒绝。
+4. **只做组织**：`(marketing)` 这类 route group 是 pathless 目录，因此
+   `src/pages/(marketing)/about.tsx` 映射到 `/about`。`(marketing` 这类不完整
+   group segment 会被拒绝。
+
+路由发现只会考虑 `.tsx`、`.jsx`、`.ts` 和 `.js` 源码文件。以下 colocated
+文件会被忽略：
+
+- 声明文件；
+- test/spec 文件；
+- Storybook 的 `*.story.*` 和 `*.stories.*` 文件；
+- 隐藏 dot 路径；
+- `*.client.*` 客户端专用模块；
+- `*.server.*` 服务端专用模块；
+- 非源码文件；
+- `_` 前缀的私有路由段。
+
+非路由 helper 应放在 `_` 前缀文件/目录中，或移到 `src/pages` 外部。
+
+冲突和排序规则也是确定性的：
+
+- 只有参数名不同的同级动态路由不允许共存。同一个 URL shape 应在 `$id.tsx`
+  和 `$userId.tsx` 中选择一个。
+- 同一个 route path 不能重复动态参数名，所以 `teams/$teamId/users/$teamId.tsx`
+  会被拒绝。
+- 扁平路由文件和目录 `index` 路由文件不能声明同一个 URL path。`/users` 应在
+  `users.tsx` 和 `users/index.tsx` 中选择一种。
+- SPA 和 MPA 都按 `/` 最先、父路由早于子路由、同级静态路由早于动态路由排序。
+  因此 `users/settings.tsx` 会排在 `users/$id.tsx` 之前。
+- 同级静态路由使用与 locale 无关的 code-point 顺序：`a-b.tsx`、`a.b.tsx`、
+  `a0.tsx`、`a_c.tsx`、`aa.tsx`、`a~d.tsx` 在任何机器上都保持这个顺序。
+- 路由示例和配置应使用 `/` 分隔符。文件系统里的 `\` 分隔符会在路由解析前归一化，
+  因此不同操作系统上的路径和生成 route id 保持一致。
+
+graph 和 build plan 使用的 resolved route list 也遵循同样规则。重复 path、动态
+URL shape、route id、空动态参数、保留动态参数、重复动态参数、显式 `:_splat`
+参数、包含空白、query string 或 hash 的路径都会在这里被拒绝。显式 wildcard 路由
+最多只能包含一个 `*` 段，因为页面 hooks 只会暴露一个 `_splat` 值。
+
+生成的 route id 来自 URL path，并把分隔符和标点归一化为下划线。因此
+`admin/panel.tsx` 和 `admin_panel.tsx` 都会生成 `admin_panel`，不能同时存在。
 
 ### 路由文件名示例
 
@@ -233,13 +256,23 @@ export default function Campaign() {
 }
 ```
 
-页面文件应保持轻量：读取 params/search，导出页面级 loader 或渲染元信息，并从
-`features/` 或 `components/` 组合组件。业务逻辑放到领域模块中。渲染元信息只接受
-字面量：`render` 和 `hydrate` 是字符串字面量，`prerender` 是 `true` 或包含
-`partial`、`delivery`、`revalidate` 的对象字面量；`prerender.revalidate` 是
-`false` 或表示秒数的正整数；`rsc` 是 RSC 页面使用的布尔字面量。格式错误的
-页面模块会在 graph analysis 阶段报告文件路径和 parser message，再进入 bundler 前即可定位问题；
-读取 region metadata 时，experimental 兼容路径中的格式错误 PPR region 模块也会以同样方式报告。
+页面文件应保持轻量：
+
+- 读取 params/search；
+- 导出页面级 loader 或渲染元信息；
+- 从 `features/` 或 `components/` 组合组件；
+- 把业务逻辑放到领域模块中。
+
+渲染元信息只接受字面量：
+
+- `render` 和 `hydrate` 是字符串字面量；
+- `prerender` 是 `true`，或包含 `partial`、`delivery`、`revalidate` 的对象字面量；
+- `prerender.revalidate` 是 `false` 或表示秒数的正整数；
+- `rsc` 是 RSC 页面使用的布尔字面量。
+
+格式错误的页面模块会在 graph analysis 阶段报告文件路径和 parser message，再进入
+bundler 前即可定位问题。读取 region metadata 时，experimental 兼容路径中的格式错误
+PPR region 模块也会以同样方式报告。
 
 ## 服务端边界
 

@@ -26,64 +26,80 @@ src/
     └── posts/index.tsx    # /posts
 ```
 
-Dynamic route segments use `$param` filenames. Bracket segments such as
-`[id].tsx` or `[...slug].tsx` are rejected so the file convention stays
-unambiguous. Catch-all and optional segments are not part of the page route
-convention yet, so `$...slug.tsx`, `$slug?.tsx`, and `$.tsx` are also rejected.
-Dynamic param names must be JavaScript identifiers after `$`, such as
-`$userId.tsx` or `$team_id.tsx`, but reserved object-property names such as
-`$__proto__.tsx`, `$constructor.tsx`, and `$prototype.tsx` are rejected.
-`$_splat.tsx` is also reserved because wildcard routes expose `*` as `_splat`.
-Static route segments must be lowercase and URL-safe: lowercase letters,
-numbers, `.`, `_`, `-`, or `~`; use explicit `pages` config when a file needs
-to map to a custom or case-sensitive path. A route path must not repeat a
-dynamic param name, so `teams/$teamId/users/$teamId.tsx` is rejected.
-Dynamic sibling routes that only differ by parameter name are also rejected:
-`users/$id.tsx` and `users/$userId.tsx` both match `/users/:param`, so keep one
-canonical name or use explicit `pages` config.
+The route convention is intentionally narrow:
 
-Route group segments such as `(marketing)/about.tsx` are supported as pathless
-organization. They do not add URL segments, so that file maps to `/about`.
-Malformed group segments such as `(marketing` are rejected. Use a real URL
-segment such as `marketing/about.tsx` when the group name should appear in the
-browser path, or use explicit `pages` config when a file should map to a URL
-that does not follow the directory shape.
+- Dynamic route segments use `$param` filenames such as `$userId.tsx` or
+  `$team_id.tsx`.
+- Bracket segments such as `[id].tsx` and `[...slug].tsx` are rejected.
+- Catch-all and optional file segments are not part of the convention yet, so
+  `$...slug.tsx`, `$slug?.tsx`, and `$.tsx` are rejected.
+- Dynamic param names must be JavaScript identifiers after `$`.
+- Reserved names such as `$__proto__.tsx`, `$constructor.tsx`,
+  `$prototype.tsx`, and `$_splat.tsx` are rejected. `$_splat.tsx` is reserved
+  because wildcard routes expose `*` as `_splat`.
+- Static route segments must be lowercase and URL-safe: lowercase letters,
+  numbers, `.`, `_`, `-`, or `~`.
+
+Use explicit `pages` config when a file needs to map to a custom or
+case-sensitive path.
+
+The collision checks are strict:
+
+- A route path must not repeat a dynamic param name, so
+  `teams/$teamId/users/$teamId.tsx` is rejected.
+- Dynamic sibling routes that only differ by parameter name are rejected.
+  `users/$id.tsx` and `users/$userId.tsx` both match `/users/:param`, so keep
+  one canonical name or use explicit `pages` config.
+- Generated route IDs must be unique. evjs derives IDs from URL paths by
+  normalizing separators and punctuation to underscores, so
+  `src/pages/admin/panel.tsx` and `src/pages/admin_panel.tsx` are rejected
+  together because both produce `admin_panel`.
+
+Route group segments are for organization only:
+
+- `(marketing)/about.tsx` maps to `/about`.
+- `(marketing)` does not add a URL segment.
+- Malformed group segments such as `(marketing` are rejected.
+- Use a real URL segment such as `marketing/about.tsx` when the group name
+  should appear in the browser path.
 
 Route discovery treats `.tsx`, `.jsx`, `.ts`, and `.js` files as possible page
-modules. Declaration files (`.d.ts`), test files (`*.test.*` and `*.spec.*`),
-Storybook files (`*.story.*` and `*.stories.*`), `*.client.*` client-only
-modules, `*.server.*` server-only modules, hidden dot files/folders, and files
-without those source extensions are ignored.
+modules. It ignores:
 
-Files or folders whose route segment starts with `_` are private to `src/pages`.
-They can use source extensions, but they are ignored as URL routes. Use them for
-page-local components, helpers, or drafts that should not become URLs.
+- declaration files (`.d.ts`);
+- test files (`*.test.*` and `*.spec.*`);
+- Storybook files (`*.story.*` and `*.stories.*`);
+- `*.client.*` client-only modules;
+- `*.server.*` server-only modules;
+- hidden dot files and folders;
+- files without source extensions;
+- files or folders whose route segment starts with `_`.
 
-Route order is deterministic in both SPA and MPA mode: `/` comes first, parent
-routes come before child routes, and static siblings rank before dynamic
-siblings. For example, `src/pages/users/settings.tsx` is ordered before
-`src/pages/users/$id.tsx`. The resolved route list used by graph and build-plan
-generation is normalized with the same rule, and duplicate paths, dynamic URL
-shapes, or route IDs are rejected there too. `routing.routes` is not a public
-`defineConfig()` field; applications should use `src/pages` discovery or
-explicit `pages` config. Runtime route matching also uses specificity, so
-exact/static routes win over dynamic or wildcard routes even if an external
-manifest is not already sorted.
+Use `_`-prefixed files or folders for page-local components, helpers, and
+drafts that should not become URLs.
 
-Generated route IDs must be unique. evjs derives IDs from URL paths by
-normalizing separators and punctuation to underscores, so routes such as
-`src/pages/admin/panel.tsx` and `src/pages/admin_panel.tsx` are rejected
-together because both produce `admin_panel`. Server-rendered route-derived page
-IDs use the same rule. When generated IDs collide, rename one route file or move
-the page to explicit `pages` config with a unique page id.
+Route order is deterministic in both SPA and MPA mode:
+
+- `/` comes first.
+- Parent routes come before child routes.
+- Static siblings rank before dynamic siblings, so
+  `src/pages/users/settings.tsx` is ordered before
+  `src/pages/users/$id.tsx`.
+
+The resolved route list used by graph and build-plan generation is normalized
+with the same rule. Duplicate paths, dynamic URL shapes, and route IDs are
+rejected there too. Server-rendered route-derived page IDs use the same route ID
+rule.
+
+`routing.routes` is not a public `defineConfig()` field. Applications should
+use `src/pages` discovery or explicit `pages` config. Runtime route matching
+also uses specificity, so exact/static routes win over dynamic or wildcard
+routes even if an external manifest is not already sorted.
 
 Every discovered page file must default-export a React component. Layout route
 files can default-export a wrapper component; when they do not, they behave as
-pathless outlet routes. If a module under `src/pages` is not a route page or
-layout, put it in an underscore-prefixed file or folder, name it `*.client.*`
-for client-only code, name it `*.server.*` for server-only code, or move it
-outside `src/pages`. Syntax and default-export errors are reported during route
-discovery before the bundler runs.
+pathless outlet routes. Syntax and default-export errors are reported during
+route discovery before the bundler runs.
 
 SPA routing is enabled automatically when `src/pages` exists and the project
 does not declare explicit `app` or `pages` config. To opt in
@@ -213,15 +229,19 @@ shell explicitly with
 `routing.conventions.layout: false` when the SPA should not consume any
 external framework root layout.
 
-SPA route layouts can also live inside the route directory. Use `layout.tsx`,
-`layout.jsx`, `layout.ts`, `layout.js`, or `layout/index.*` beside the pages
-they should wrap. `src/pages/layout.tsx` wraps root-level page routes;
-`src/pages/posts/layout.tsx` wraps routes below `/posts`; and
-`src/pages/(app)/dashboard/layout.tsx` creates a layout at `/dashboard` without
-adding `(app)` to the URL. These route-directory layouts can coexist with an
-external root layout. This remains true when `routing.conventions.layout`
-points at an explicit module, or when external root layout discovery is
-disabled with `routing.conventions.layout: false`.
+SPA route layouts can also live inside the route directory:
+
+- use `layout.tsx`, `layout.jsx`, `layout.ts`, `layout.js`, or
+  `layout/index.*` beside the pages they should wrap;
+- `src/pages/layout.tsx` wraps root-level page routes;
+- `src/pages/posts/layout.tsx` wraps routes below `/posts`;
+- `src/pages/(app)/dashboard/layout.tsx` creates a layout at `/dashboard`
+  without adding `(app)` to the URL.
+
+These route-directory layouts can coexist with an external root layout. This
+remains true when `routing.conventions.layout` points at an explicit module, or
+when external root layout discovery is disabled with
+`routing.conventions.layout: false`.
 
 The layout conventions are SPA-only. MPA mode does not accept
 `routing.conventions.layout` or consume framework layouts; share visual

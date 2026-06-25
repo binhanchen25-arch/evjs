@@ -1,5 +1,5 @@
 import { Link, usePageSearch, useQuery } from "@evjs/ev/page";
-import { getUsers } from "../api/users.server";
+import { getUsers } from "../apis/users.server";
 
 const cardStyle = {
   border: "1px solid #e2e8f0",

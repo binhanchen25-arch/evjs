@@ -12,8 +12,8 @@ npm run dev
 
 | File | Purpose |
 |------|---------| 
-| `src/middleware.ts` | Global server middleware for all server requests |
-| `src/apis/api/middleware.ts` | Route-scoped middleware for `/api/**` file routes |
+| `src/middleware.ts` | Framework request middleware for all server requests |
+| `src/apis/api/middleware.ts` | API route middleware for `/api/**` file routes |
 | `src/apis/api/posts.ts` | List/create handlers for `/api/posts` |
 | `src/apis/api/posts/$id.ts` | Dynamic handlers for `/api/posts/:id` |
 | `src/apis/api/health.ts` | Health check endpoint |
@@ -26,7 +26,7 @@ npm run dev
 - Query string parsing (`?limit=N`)
 - Custom status codes (201, 204, 404)
 - Auto `OPTIONS` and `405 Method Not Allowed`
-- Global and route-scoped `middleware.ts` conventions
+- Framework request and API route `middleware.ts` conventions
 - Colocated helper files without route exports
 
 ## Try It
@@ -57,6 +57,6 @@ curl http://localhost:3000/api/health
 # Auto OPTIONS
 curl -X OPTIONS http://localhost:3000/api/posts -i
 
-# Route-scoped middleware short-circuit
+# API route middleware short-circuit
 curl -H 'x-block-api: true' http://localhost:3000/api/posts -i
 ```

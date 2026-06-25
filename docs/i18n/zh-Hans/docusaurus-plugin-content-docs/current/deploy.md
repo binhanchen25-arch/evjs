@@ -109,25 +109,34 @@ Browser
     <- Browser receives one document response
 ```
 
-在这个拓扑下，`/__evjs/ppr/<page>/<region>` 不是浏览器首屏请求，而是 edge/runtime
-层使用的内部 region resolver endpoint。direct endpoint 在 PPR base path 后只精确匹配
-两个编码后的 path segment：`<pageId>/<regionId>`，其中 `regionId` 是 opaque
-internal manifest id，不是用户编写 API。源模块通过
-`prerender.delivery = "merge"` 声明等待必要 regions 后再返回 document；通过
-`prerender.delivery = "stream"` 声明先 flush 缓存 shell，并在内部 region 请求完成后把
-patches 继续写入同一个 HTML response。
-合成后的 PPR page response 会根据 region 策略得到保守的默认 `Cache-Control`：
-任意 region 动态时使用 `no-store`；所有 regions 都声明 `{ revalidate }` 时使用最小的
-region `s-maxage`。shell 显式返回的 `Cache-Control` 会被保留。
-PPR direct `HEAD` 请求可以返回 cache headers，但不会写入 region body cache；
-部署侧需要预热 PPR region 时应使用 `GET`。
+在这个拓扑下：
+
+- `/__evjs/ppr/<page>/<region>` 不是浏览器首屏请求。
+- 它是 edge/runtime 层使用的内部 region resolver endpoint。
+- direct endpoint 在 PPR base path 后只精确匹配两个编码后的 path segment：
+  `<pageId>/<regionId>`。
+- `regionId` 是 opaque internal manifest id，不是用户编写 API。
+- `prerender.delivery = "merge"` 会等待必要 regions 后再返回 document。
+- `prerender.delivery = "stream"` 会先 flush 缓存 shell，并在内部 region 请求完成后把
+  patches 继续写入同一个 HTML response。
+
+合成后的 PPR page response 会得到保守的默认缓存策略：
+
+- 任意 region 动态时使用 `Cache-Control: no-store`；
+- 所有 regions 都声明 `{ revalidate }` 时使用最小的 region `s-maxage`；
+- shell 显式返回的 `Cache-Control` 会被保留。
+
+PPR direct `HEAD` 请求可以返回 cache headers，但不会写入 region body cache。部署侧需要
+预热 PPR region 时应使用 `GET`。
+
 拆分式 edge/origin adapter 可以提供 `framework.ppr.regionCache`，用平台 cache、
 KV store 或区域内存缓存来承载 PPR region body cache。设置
 `framework.ppr.staleWhileRevalidate` 后，仍在 stale 窗口内的过期 entry 会以
 `x-evjs-cache: STALE` 返回；如果平台暴露 `waitUntil()`，运行时会用它在后台刷新缓存。
 Cache provider 失败会被记录，并退回到 fresh render。
 
-如果浏览器和服务端在不同 origin，构建时配置 `transport.baseUrl`，让浏览器发起的 framework 请求共用同一个 server base URL。
+如果浏览器和服务端在不同 origin，构建时配置 `transport.baseUrl`，让浏览器发起的
+framework 请求共用同一个 server base URL。
 
 ## 路由优先级
 

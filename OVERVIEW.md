@@ -24,7 +24,7 @@ flowchart LR
         
         subgraph APILayer ["🔌 APIs and Endpoints"]
             SF["⚡ Server Functions (Invisible RPC bridge)"]
-            RH["🌐 Route Handlers (Public API Endpoints)"]
+            RH["🌐 Server File Routes (Public API Endpoints)"]
         end
 
         subgraph DataLayer ["🗄️ Data Layer"]
@@ -53,8 +53,8 @@ flowchart LR
     UI -.->|"Initial Request"| SSR
     UI -.->|"RSC Fetch"| RSC
     
-    RPC -->|"POST api/fn"| SF
-    FETCH -->|"GET/POST /api"| RH
+    RPC -->|"POST /__evjs/fn"| SF
+    FETCH -->|"GET/POST /api/*"| RH
 
     %% Styling
     style UI fill:#6366f1,color:#fff

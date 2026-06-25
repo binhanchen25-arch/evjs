@@ -308,26 +308,38 @@ entry 解析。
 
 公开配置只暴露 `server.basePath`；函数 endpoint 从这个 base path 派生。
 
-RSC `use client` reference extraction 会在 `BuildOutput.rsc` 中保留 default
-export、identifier export、class export、同模块 alias、namespace re-export
-名称（例如 `export * as Widgets from "./widgets"`），以及包含字符串字面量
-alias 的 re-export 名称。type-only export 会被忽略。client reference transform
-会生成内部 binding 并通过 export specifier 导出，因此 reserved word 和字符串字面量
-alias 仍是合法 JavaScript。
-`BuildOutput.rsc.clientReferences` 和 `BuildOutput.rsc.serverReferences` 使用
-提取出的 reference id 作为无首尾空白的字符串 key。这些 id 可以包含文件路径、URL
-语法、`#` 或 `:`；value object 携带无首尾空白的 `module` 和可选 `exportName`。
-只有 reference metadata 的 RSC output 可以省略 `BuildOutput.rsc.endpoint`；
-包含 RSC page output 时不能省略，因为 Flight 请求需要明确的 endpoint。缺少
-`runtime.server.rsc` 时，manifest linker 会拒绝 RSC page output。
+RSC `use client` reference extraction 会在 `BuildOutput.rsc` 中保留这些名称：
+
+- default export；
+- identifier export；
+- class export；
+- 同模块 alias；
+- namespace re-export 名称，例如 `export * as Widgets from "./widgets"`；
+- re-export 名称，包括字符串字面量 alias。
+
+type-only export 会被忽略。client reference transform 会生成内部 binding，并通过
+export specifier 导出，因此 reserved word 和字符串字面量 alias 仍是合法 JavaScript。
+
+RSC manifest 规则保持严格：
+
+- `BuildOutput.rsc.clientReferences` 和 `BuildOutput.rsc.serverReferences` 使用提取出的
+  reference id 作为无首尾空白的字符串 key。
+- reference id 可以包含文件路径、URL 语法、`#` 或 `:`。
+- value object 携带无首尾空白的 `module` 和可选 `exportName`。
+- 只有 reference metadata 的 RSC output 可以省略 `BuildOutput.rsc.endpoint`。
+- 包含 RSC page output 时不能省略 `BuildOutput.rsc.endpoint`，因为 Flight 请求需要明确的
+  endpoint。
+- 缺少 `runtime.server.rsc` 时，manifest linker 会拒绝 RSC page output。
+
 在完整 BuildOutput manifest 中，每个 RSC page renderer reference 必须解析到
-`owner.pageId` 匹配该 RSC page id 的 `rsc-page` renderer；公开 manifest
-可以省略这些 server-only renderer metadata。
+`owner.pageId` 匹配该 RSC page id 的 `rsc-page` renderer。公开 manifest 可以省略这些
+server-only renderer metadata。
+
 忽略 type-only 和 ambient declaration 后，`"use client"` 模块仍必须暴露至少一个
-runtime client reference。
-裸的 runtime `export * from "./widgets"` 会被拒绝，因为 framework manifest
-必须知道每一个 client reference export name；请改用显式 named re-export 或
-namespace re-export。
+runtime client reference。裸的 runtime `export * from "./widgets"` 会被拒绝，因为
+framework manifest 必须知道每一个 client reference export name；请改用显式
+named re-export 或 namespace re-export。
+
 格式错误的 `"use client"` 模块会在 graph analysis 阶段报告文件路径和 parser
 message，再进入 bundler transform 前即可定位问题。
 

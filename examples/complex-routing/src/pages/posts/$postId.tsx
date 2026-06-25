@@ -1,5 +1,5 @@
 import { Link, usePageParams, useQuery } from "@evjs/ev/page";
-import { getPost } from "../../api/data.server";
+import { getPost } from "../../apis/data.server";
 
 const styles = {
   tag: {
