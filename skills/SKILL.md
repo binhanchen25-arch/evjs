@@ -60,8 +60,8 @@ For detailed guides on specific topics, see the docs:
 
 **Page Routing:**
 - SPA page routes live in `src/pages` and use an optional root layout at
-  `src/layout/index.tsx`; do not create `__root.tsx`, `src/layout.tsx`, or layout
-  files inside `src/pages`.
+  `src/layout/index.tsx`; do not create `__root.tsx`, `src/layout.tsx`, or
+  root-level layout files such as `src/pages/layout.tsx`.
 - MPA page routing uses `routing: { mode: "mpa" }`; pages are independent
   router-free React entries and should use normal `<a href>` links.
 - Page components are plain default exports. Do not wrap them in `definePage`

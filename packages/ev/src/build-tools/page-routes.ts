@@ -8,8 +8,9 @@ import {
   isPageRouteGroupSegment,
   isPageRouteSourceModuleFile,
   normalizePageRouteConventionPath,
-  PAGE_ROUTE_ROOT_LAYOUT_FILES,
+  PAGE_ROUTE_ROOT_LAYOUT_FILE,
   PAGE_ROUTE_SOURCE_EXTENSION_LABEL,
+  PAGE_ROUTE_UNSUPPORTED_ROOT_LAYOUT_FILES,
   parsePageRouteFile,
   routePathFromSegments,
   routeShapeFromSegments,
@@ -319,10 +320,13 @@ function parsePageLayoutRouteFile(
   const name = segments[segments.length - 1] ?? "";
   const parent = segments[segments.length - 2] ?? "";
   if (name === "layout") {
+    if (segments.length === 1) {
+      return { segments: [], invalidLayoutSource: true };
+    }
     return { segments: segments.slice(0, -1) };
   }
   if (name === "index" && parent === "layout") {
-    return { segments: segments.slice(0, -2) };
+    return { segments: [], invalidLayoutSource: true };
   }
   if (segments.includes("layout")) {
     return { segments: [], invalidLayoutSource: true };
@@ -332,7 +336,8 @@ function parsePageLayoutRouteFile(
 
 function createInvalidPageLayoutSourceDiagnostic(): string {
   return [
-    "Layout route folders only support a layout module named layout.{ts,tsx,js,jsx} or layout/index.{ts,tsx,js,jsx}.",
+    "SPA route layouts must be nested below a route segment and named layout.{ts,tsx,js,jsx}.",
+    "Use the external root layout convention layout/index.tsx beside the route directory for the app root layout.",
     "Move helper modules under an underscore-prefixed file or folder.",
   ].join(" ");
 }
@@ -451,41 +456,38 @@ async function discoverRootLayout(
   const appDir = path.dirname(absoluteRouteDir);
   if (!isInsideCwd(cwd, appDir)) return undefined;
 
-  const candidates: Array<{ absolute: string; projectPath: string }> = [];
-  for (const layoutFile of PAGE_ROUTE_ROOT_LAYOUT_FILES) {
+  let hasUnsupportedRootLayout = false;
+  for (const layoutFile of PAGE_ROUTE_UNSUPPORTED_ROOT_LAYOUT_FILES) {
     const absolute = path.join(appDir, layoutFile);
     const stat = await statIfExists(absolute);
     if (!stat) continue;
     const projectPath = toProjectPath(cwd, absolute);
-    if (!stat.isFile()) {
-      diagnostics.push({
-        level: "error",
-        file: toDiagnosticPath(projectPath),
-        message: `Root layout module must be a file: ${projectPath}.`,
-      });
-      continue;
-    }
-    candidates.push({ absolute, projectPath });
-  }
-
-  if (candidates.length === 0) return undefined;
-  if (candidates.length > 1) {
+    hasUnsupportedRootLayout = true;
     diagnostics.push({
       level: "error",
-      file: toDiagnosticPath(candidates[0]?.projectPath ?? ""),
-      message: `Multiple root layout modules found beside the page route directory: ${candidates
-        .map((candidate) => candidate.projectPath)
-        .join(
-          ", ",
-        )}. Keep one layout module or configure routing.conventions.layout explicitly.`,
+      file: toDiagnosticPath(projectPath),
+      message: createUnsupportedRootLayoutDiagnostic(
+        projectPath,
+        toProjectPath(cwd, path.join(appDir, PAGE_ROUTE_ROOT_LAYOUT_FILE)),
+      ),
+    });
+  }
+
+  if (hasUnsupportedRootLayout) return undefined;
+
+  const absolute = path.join(appDir, PAGE_ROUTE_ROOT_LAYOUT_FILE);
+  const stat = await statIfExists(absolute);
+  if (!stat) return undefined;
+
+  const projectPath = toProjectPath(cwd, absolute);
+  if (!stat.isFile()) {
+    diagnostics.push({
+      level: "error",
+      file: toDiagnosticPath(projectPath),
+      message: `Root layout module must be a file: ${projectPath}.`,
     });
     return undefined;
   }
-
-  const rootLayout = candidates[0];
-  if (!rootLayout) return undefined;
-
-  const { absolute, projectPath } = rootLayout;
   const validRootLayout = await validateRouteModule(absolute, diagnostics, {
     file: projectPath,
     parseError: "Root layout module could not be parsed",
@@ -493,6 +495,13 @@ async function discoverRootLayout(
   });
   if (!validRootLayout) return undefined;
   return projectPath;
+}
+
+function createUnsupportedRootLayoutDiagnostic(
+  actual: string,
+  expected: string,
+): string {
+  return `Unsupported SPA root layout convention: ${actual}. Auto-discovery only supports ${expected}; rename the file or configure routing.conventions.layout explicitly.`;
 }
 
 async function findColocatedPageHtmlTemplate(

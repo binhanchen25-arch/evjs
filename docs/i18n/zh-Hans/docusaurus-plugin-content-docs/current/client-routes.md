@@ -16,12 +16,13 @@ src/
 ├── layout/
 │   └── index.tsx          # 可选 SPA 根布局
 └── pages/
-    ├── layout.tsx         # 可选 SPA route layout
     ├── index.tsx          # /
     ├── (marketing)/
     │   └── about.tsx      # /about
     ├── users/$userId.tsx  # /users/$userId
-    └── posts/index.tsx    # /posts
+    └── posts/
+        ├── layout.tsx     # 嵌套 SPA route layout
+        └── index.tsx      # /posts
 ```
 
 页面路由约定故意保持收敛：
@@ -174,33 +175,32 @@ export default function SearchPage() {
 
 ## 布局
 
-SPA 模式下，外部根布局是可选文件。它放在路由目录旁边：默认 `src/pages`
-可以使用 `src/layout.tsx`、`src/layout/index.tsx`，也可以使用对应的
-`.ts`、`.jsx` 和 `.js` 源码模块变体。自定义 `routing.dir` 为
-`src/app/pages` 时，会在 `src/app` 下使用同样的 `layout.*` 或
-`layout/index.*` 约定。默认导出会以 `children` 包裹整个生成路由树，因此用户代码不需要在应用根部引入
+SPA 模式下，外部根布局是可选文件。自动发现只有一个文件约定：
+路由目录旁边的 `layout/index.tsx`。默认 `src/pages` 使用
+`src/layout/index.tsx`；自定义 `routing.dir: "./src/app/pages"` 使用
+`src/app/layout/index.tsx`。默认导出会以 `children` 包裹整个生成路由树，因此用户代码不需要在应用根部引入
 路由 outlet 组件。
 
-自动发现的外部根布局模块只能保留一个。如果存在多个候选文件，evjs 会报告歧义，并要求只保留一个文件，
-或通过 `routing.conventions.layout: "./src/shell/AppLayout.tsx"` 显式指定外框。
-设置 `routing.conventions.layout: false` 可以让 SPA 不消费任何外部框架根布局。
+只有当应用 shell 明确放在约定路径之外时，才使用
+`routing.conventions.layout: "./src/shell/AppLayout.tsx"`。设置
+`routing.conventions.layout: false` 可以让 SPA 不消费任何外部框架根布局。
+`src/layout.tsx` 这类根布局别名会被自动发现拒绝。
 
 SPA route layout 也可以放在路由目录内部：
 
-- 使用 `layout.tsx`、`layout.jsx`、`layout.ts`、`layout.js` 或 `layout/index.*`，放在需要包裹的页面旁边；
-- `src/pages/layout.tsx` 会包裹根级页面路由；
+- 使用 `layout.tsx`、`layout.jsx`、`layout.ts` 或 `layout.js`，并放在某个路由段下；
 - `src/pages/posts/layout.tsx` 会包裹 `/posts` 下的路由；
 - `src/pages/(app)/dashboard/layout.tsx` 会在 `/dashboard` 创建 layout，且不会把 `(app)` 加入 URL。
 
-这些路由目录内的 layout 可以和外部根布局共存。即使 `routing.conventions.layout` 显式指向其他模块，或通过
+嵌套 route layout 可以和外部根布局共存。即使 `routing.conventions.layout` 显式指向其他模块，或通过
 `routing.conventions.layout: false` 关闭外部根布局发现，这条规则也仍然成立。
+`src/pages/layout.tsx` 不是根布局约定；应用 shell 使用 `src/layout/index.tsx`。
 
 Layout 约定只用于 SPA。MPA 模式不接受 `routing.conventions.layout`，也不消费框架 layout；
 需要公共视觉包裹时，在各页面里导入普通组件即可。如果只是文档外壳相同，可以复用 HTML 模板。
 
-路由目录中名为 `layout` 的 segment 保留给 `layout.{ts,tsx,js,jsx}` 或
-`layout/index.{ts,tsx,js,jsx}` 布局模块。Layout 局部 helper 应放在 `_`
-前缀文件或目录下。`Layout.tsx` 这类大写文件名仍会因为 discovered route 的小写静态段规则被拒绝。
+路由目录中名为 `layout` 的 segment 是保留名，`layout/index.*` 别名会被拒绝。
+Layout 局部 helper 应放在 `_` 前缀文件或目录下。`Layout.tsx` 这类大写文件名仍会因为 discovered route 的小写静态段规则被拒绝。
 
 ```tsx
 // src/layout/index.tsx

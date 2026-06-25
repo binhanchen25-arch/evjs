@@ -79,11 +79,10 @@ export default function UserPage() {
 路由胶水；这些内容由框架生成和托管。SPA 模式只会为 TypeScript 写入
 `src/route-types.d.ts`，脚手架应用默认忽略它。
 
-SPA 根布局发现是可选的。可以在路由目录旁边保留唯一的 `layout.*` 或
-`layout/index.*` 源码模块，例如 `src/layout.tsx` 或 `src/layout/index.tsx`；
-也可以通过 `routing.conventions.layout` 指向其他模块；如果应用不需要框架根布局，
-设置 `routing.conventions.layout: false`。SPA route layout 也可以放在路由目录内，
-命名为 `layout.*` 或 `layout/index.*`。
+SPA 根布局发现是可选的。默认路由目录旁边使用 `src/layout/index.tsx`；也可以通过
+`routing.conventions.layout` 指向其他模块；如果应用不需要框架根布局，设置
+`routing.conventions.layout: false`。嵌套 SPA route layout 可以放在某个路由段下，例如
+`src/pages/posts/layout.tsx`。
 
 ## MPA 模式
 

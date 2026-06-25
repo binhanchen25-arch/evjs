@@ -48,7 +48,7 @@ names differ:
 
 | Surface | Route discovery | Convention controls | Default files |
 |---------|-----------------|---------------------|---------------|
-| Client pages | `routing` | `routing.conventions.layout` for the SPA root layout; page-route file rules live under `routing.dir` | `./src/pages`, plus `layout.*` or `layout/index.*` beside that directory when present |
+| Client pages | `routing` | `routing.conventions.layout` for the SPA root layout; page-route file rules live under `routing.dir` | `./src/pages`, plus `layout/index.tsx` beside that directory when present |
 | Server requests | `server.routing` | `server.conventions.middleware` for framework request and API route middleware | `./src/apis`, `./src/middleware.ts`, and `./src/apis/**/middleware.ts` |
 
 Top-level `routing` remains the client/page owner, and client convention
@@ -118,14 +118,14 @@ Set `routing: false` to disable file-route discovery explicitly.
 The exported config must be an object. When enabled with options, `routing`
 must be an object; arrays and `null` are rejected.
 
-SPA mode can use a root layout module. By default evjs looks for a single
-`layout.*` or `layout/index.*` source module beside the route directory, such
-as `src/layout.tsx` or `src/layout/index.tsx` for `src/pages`. If more than one
-candidate exists, keep one file or configure `routing.conventions.layout`
-explicitly. Set `routing.conventions.layout` to a module path when a migrated
-app has its shell in another location. Explicit layout modules must be source
-modules, not declaration, test, spec, story, client-only, or server-only files.
-Set it to `false` to disable external root layout discovery:
+SPA mode can use a root layout module. By default evjs looks for
+`layout/index.tsx` beside the route directory, such as `src/layout/index.tsx`
+for `src/pages` or `src/app/layout/index.tsx` for
+`routing.dir: "./src/app/pages"`. Set `routing.conventions.layout` to a module
+path when a migrated app has its shell in another location. Explicit layout
+modules must be source modules, not declaration, test, spec, story,
+client-only, or server-only files. Set it to `false` to disable external root
+layout discovery:
 
 ```ts
 export default defineConfig({

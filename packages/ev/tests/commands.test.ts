@@ -2921,7 +2921,7 @@ describe("build", () => {
     expect(events).not.toContain("bundler.build");
   });
 
-  it("builds when the root layout is placed in the page route directory", async () => {
+  it("fails when the root layout is placed in the page route directory", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
     await fs.promises.writeFile(
@@ -2949,8 +2949,10 @@ describe("build", () => {
           bundler,
         },
       ),
-    ).resolves.toBeUndefined();
-    expect(events).toContain("bundler.build");
+    ).rejects.toThrow(
+      "SPA route layouts must be nested below a route segment and named layout.{ts,tsx,js,jsx}. Use the external root layout convention layout/index.tsx beside the route directory for the app root layout.",
+    );
+    expect(events).not.toContain("bundler.build");
   });
 
   it("builds when a nested layout is placed in the page route directory", async () => {
@@ -2992,7 +2994,7 @@ describe("build", () => {
     expect(events).toContain("bundler.build");
   });
 
-  it("builds when the root layout uses a file alias", async () => {
+  it("fails when the root layout uses a file alias", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
     await fs.promises.writeFile(
@@ -3020,8 +3022,10 @@ describe("build", () => {
           bundler,
         },
       ),
-    ).resolves.toBeUndefined();
-    expect(events).toContain("bundler.build");
+    ).rejects.toThrow(
+      "Unsupported SPA root layout convention: ./src/layout.tsx. Auto-discovery only supports ./src/layout/index.tsx; rename the file or configure routing.conventions.layout explicitly.",
+    );
+    expect(events).not.toContain("bundler.build");
   });
 
   it("orders plugin config and lifecycle hooks by dependencies", async () => {

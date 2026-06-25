@@ -18,12 +18,13 @@ src/
 ├── layout/
 │   └── index.tsx          # Optional SPA root layout
 └── pages/
-    ├── layout.tsx         # Optional SPA route layout
     ├── index.tsx          # /
     ├── (marketing)/
     │   └── about.tsx      # /about
     ├── users/$userId.tsx  # /users/$userId
-    └── posts/index.tsx    # /posts
+    └── posts/
+        ├── layout.tsx     # Nested SPA route layout
+        └── index.tsx      # /posts
 ```
 
 The route convention is intentionally narrow:
@@ -214,44 +215,42 @@ export default function SearchPage() {
 
 ## Layout
 
-For SPA mode, the external root layout is optional. It lives beside the route
-directory: the default `src/pages` can use `src/layout.tsx`,
-`src/layout/index.tsx`, or the matching `.ts`, `.jsx`, and `.js` source module
-variants. A custom `routing.dir` such as `src/app/pages` uses the same
-`layout.*` or `layout/index.*` convention under `src/app`. When present, the
-default export wraps the entire generated route tree as `children`, so user code
-does not need a router outlet component at the app root.
+For SPA mode, the external root layout is optional. Automatic discovery has one
+file convention: `layout/index.tsx` beside the route directory. The default
+`src/pages` route directory uses `src/layout/index.tsx`; a custom
+`routing.dir: "./src/app/pages"` uses `src/app/layout/index.tsx`. When present,
+the default export wraps the entire generated route tree as `children`, so user
+code does not need a router outlet component at the app root.
 
-Keep one auto-discovered external root layout module. If multiple candidates
-exist, evjs reports an ambiguity and asks you to keep one file or configure the
-shell explicitly with
-`routing.conventions.layout: "./src/shell/AppLayout.tsx"`. Set
+Use `routing.conventions.layout: "./src/shell/AppLayout.tsx"` only when the
+shell intentionally lives outside the convention path. Set
 `routing.conventions.layout: false` when the SPA should not consume any
-external framework root layout.
+external framework root layout. Root layout aliases such as `src/layout.tsx`
+are rejected by automatic discovery.
 
 SPA route layouts can also live inside the route directory:
 
-- use `layout.tsx`, `layout.jsx`, `layout.ts`, `layout.js`, or
-  `layout/index.*` beside the pages they should wrap;
-- `src/pages/layout.tsx` wraps root-level page routes;
+- use `layout.tsx`, `layout.jsx`, `layout.ts`, or `layout.js` below a route
+  segment;
 - `src/pages/posts/layout.tsx` wraps routes below `/posts`;
 - `src/pages/(app)/dashboard/layout.tsx` creates a layout at `/dashboard`
   without adding `(app)` to the URL.
 
-These route-directory layouts can coexist with an external root layout. This
-remains true when `routing.conventions.layout` points at an explicit module, or
-when external root layout discovery is disabled with
-`routing.conventions.layout: false`.
+Nested route layouts can coexist with an external root layout. This remains
+true when `routing.conventions.layout` points at an explicit module, or when
+external root layout discovery is disabled with `routing.conventions.layout:
+false`. `src/pages/layout.tsx` is not a root layout convention; use
+`src/layout/index.tsx` for the app shell.
 
 The layout conventions are SPA-only. MPA mode does not accept
 `routing.conventions.layout` or consume framework layouts; share visual
 wrappers by importing ordinary components from each page, or share the HTML
 template when only document chrome is common.
 
-A route-directory segment named `layout` is reserved for layout modules named
-`layout.{ts,tsx,js,jsx}` or `layout/index.{ts,tsx,js,jsx}`. Put layout-local
-helpers under underscore-prefixed files or folders. Uppercase filenames such as
-`Layout.tsx` still fail the lowercase static segment rule in discovered routes.
+A route-directory segment named `layout` is reserved and `layout/index.*`
+aliases are rejected. Put layout-local helpers under underscore-prefixed files
+or folders. Uppercase filenames such as `Layout.tsx` still fail the lowercase
+static segment rule in discovered routes.
 
 ```tsx
 // src/layout/index.tsx

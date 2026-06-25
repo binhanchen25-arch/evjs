@@ -20,11 +20,12 @@ my-evjs-app/
     ├── layout/
     │   └── index.tsx            # optional SPA root layout
     ├── pages/                   # page routes
-    │   ├── layout.tsx           # optional SPA route layout
     │   ├── index.tsx            # /
     │   ├── (marketing)/
     │   │   └── about.tsx        # /about
-    │   ├── dashboard.tsx        # /dashboard
+    │   ├── dashboard/
+    │   │   ├── layout.tsx       # nested SPA route layout
+    │   │   └── index.tsx        # /dashboard
     │   ├── campaign.tsx         # /campaign
     │   ├── insights.tsx         # /insights
     │   └── users/$userId.tsx    # /users/$userId
@@ -46,42 +47,17 @@ my-evjs-app/
 
 This shape covers the complete framework surface:
 
-- `ev.config.ts` customizes routing mode, server paths, plugins, or
-  explicit page outputs only when defaults are not enough.
-- `pages/` is the client route source of truth. SPA mode maps it to a
-  framework-owned app entry; MPA mode maps it to independent page entries.
-- A root layout source module is optional in SPA mode. The default `src/pages`
-  route directory looks beside it for one of `src/layout.tsx`,
-  `src/layout.ts`, `src/layout.jsx`, `src/layout.js`, or the matching
-  `src/layout/index.*` source modules. Custom `routing.dir` values use the
-  parent of that route directory. Keep exactly one auto-discovered root layout
-  module, or use `routing.conventions.layout` for a custom location. Explicit
-  layout modules must use `.ts`, `.tsx`, `.js`, or `.jsx`; declaration, test,
-  spec, story, client-only, and server-only files are not accepted. Set
-  `routing.conventions.layout: false` to disable external root layout
-  discovery.
-- `pages/**/layout.*` and `pages/**/layout/index.*` are SPA route layouts. They
-  create pathless layout routes inside the discovered route tree, so
-  `src/pages/layout.tsx` wraps the root page routes and
-  `src/pages/posts/layout.tsx` wraps children below `/posts`. MPA pages should
-  import shared components directly or share HTML templates when they need
-  common chrome.
-- `<routing-dir-parent>/route-types.d.ts` is generated in SPA mode for
-  type-safe navigation. The default `src/pages` writes
-  `src/route-types.d.ts`; `routing.dir: "./src/app/pages"` writes
-  `src/app/route-types.d.ts`. MPA mode removes stale generated route type
-  files. The generated declaration uses the generated-only
-  `@evjs/ev/internal/client/route-types` helper and augments the
-  `@evjs/ev/page` navigation types. Keep generated route types ignored and do
-  not import them from application code.
-- Rendering metadata lives with page modules.
-- `*.server.*` modules that start with `"use server";` contain server
-  functions. They have no convention directory and can live beside pages,
-  features, or server file routes.
-- `server.ts` is ordinary application organization for standalone/manual
-  `@evjs/server` code. evjs does not discover it as a file convention, and it
-  is unrelated to `server.routing`.
-- `features/` keeps domain logic out of route/page files.
+| Surface | Convention | Notes |
+| --- | --- | --- |
+| Config | `ev.config.ts` | Customize routing mode, server paths, plugins, or explicit page outputs only when defaults are not enough. |
+| Client routes | `src/pages` | Source of truth for SPA and MPA page routes. SPA mode maps it to one framework-owned app entry; MPA mode maps it to independent page entries. |
+| SPA root shell | `<routing-dir-parent>/layout/index.tsx` | The default `src/pages` route directory uses `src/layout/index.tsx`; `routing.dir: "./src/app/pages"` uses `src/app/layout/index.tsx`. Use `routing.conventions.layout` only for an intentional custom shell path, or set it to `false` to disable root layout discovery. |
+| Nested SPA layouts | `src/pages/<segment>/layout.*` | Wrap descendants below a route segment. `src/pages/layout.tsx` and `src/pages/<segment>/layout/index.*` are rejected. MPA pages import shared components or share HTML templates instead. |
+| Generated route types | `<routing-dir-parent>/route-types.d.ts` | SPA mode writes type-safe navigation declarations, such as `src/route-types.d.ts` or `src/app/route-types.d.ts`. Keep them ignored and do not import them from application code. |
+| Page metadata | Named exports in page modules | Rendering metadata lives with the page component. |
+| Server functions | `"use server";` in `*.server.*` modules | Server functions have no convention directory and can live beside pages, features, or server file routes. |
+| Manual server code | Ordinary files such as `server.ts` | Standalone/manual `@evjs/server` code is not discovered as a file convention and is unrelated to `server.routing`. |
+| Domain code | `features/`, `components/`, `lib/`, `hooks/` | Keep business logic, reusable UI, browser-safe helpers, and React hooks out of route/page files. |
 
 ## Convention Matrix
 
@@ -104,11 +80,10 @@ Quick rules:
 - Dot-prefixed files/folders, `.d.ts`, test/spec, Storybook,
   `*.client.*`, and `*.server.*` files under the route directory are ignored so
   colocated support files do not become routes.
-- SPA root layout auto-discovery accepts one `layout.*` or `layout/index.*`
-  source module beside the route directory. SPA route layouts use `layout.*` or
-  `layout/index.*` modules inside the route directory. Use
-  `routing.conventions.layout` for a custom external root layout module. MPA
-  routes do not consume framework layouts.
+- SPA root layout auto-discovery accepts only `layout/index.tsx` beside the
+  route directory. Nested SPA route layouts use `layout.*` below a route
+  segment. Use `routing.conventions.layout` for a custom external root layout
+  module. MPA routes do not consume framework layouts.
 - If an output cannot follow the directory shape, use explicit `pages` config
   instead of hand-writing `routing.routes`.
 
@@ -133,8 +108,8 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 | `src/pages/_*` and `src/pages/**/_*` | Ignored private route modules | Colocated helper components, utilities, fixtures, and page-local implementation details | URL routes, SPA root layouts, or generated files |
 | `src/pages/.*` and `src/pages/**/.*` | Ignored hidden route modules | Local scratch files or tool metadata that should stay invisible to route discovery | URL routes, generated route types, or source modules that should be imported by pages |
 | `src/pages/**/*.d.ts`, `src/pages/**/*.{test,spec,story,stories}.*`, `src/pages/**/*.{client,server}.*` | Ignored route support modules | Type declarations, tests, Storybook stories, client-only modules, and server-only modules colocated with pages | Route pages or files that should become URLs |
-| `<routing-dir-parent>/layout.{tsx,ts,jsx,js}` or `<routing-dir-parent>/layout/index.{tsx,ts,jsx,js}` | Optional external SPA root layout | One app shell around the discovered SPA route tree | MPA shared chrome, route-specific nested layouts, or multiple root layout candidates |
-| `src/pages/**/layout.{tsx,ts,jsx,js}` or `src/pages/**/layout/index.{tsx,ts,jsx,js}` | SPA route layout | Pathless layout routes that wrap child routes at the same URL prefix | MPA shared chrome or non-layout helper folders named `layout` |
+| `<routing-dir-parent>/layout/index.tsx` | Optional external SPA root layout | One app shell around the discovered SPA route tree | MPA shared chrome, route-specific nested layouts, root layout aliases such as `src/layout.tsx`, or route-directory root layouts such as `src/pages/layout.tsx` |
+| `src/pages/<segment>/**/layout.{tsx,ts,jsx,js}` | Nested SPA route layout | Pathless layout routes that wrap child routes at the same URL prefix, such as `src/pages/posts/layout.tsx` | App-wide root shells, MPA shared chrome, `src/pages/layout.tsx`, `layout/index.*` aliases, or non-layout helper folders named `layout` |
 | `<routing-dir-parent>/route-types.d.ts` | Generated SPA navigation types | Editor and type-checker support | Manual edits, imports from app code, template/scaffold source, or MPA mode |
 | `**/*.server.{ts,tsx,js,jsx}` with `"use server";` | Recommended server-function module naming | Reachable modules that export named callable server functions | Browser-only helpers, default exports, runtime re-exports, or relying on a directory name for discovery |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | Server file route discovery when `server.routing` is enabled | Request/Response route modules exporting uppercase HTTP methods | `route.ts` sentinels, `foo.get.ts` method suffix files, bracket/catch-all/optional routes, `middleware`/`middlewares`, default exports, or helper exports from route candidates |
@@ -250,7 +225,7 @@ punctuation to underscores. That means `admin/panel.tsx` and
 | `src/pages/users/$userId.tsx` | `/users/$userId` | Dynamic segment; the param name must be a JavaScript identifier. |
 | `src/pages/users/settings.tsx` | `/users/settings` | Static sibling; it ranks before `users/$userId.tsx`. |
 | `src/pages/(marketing)/about.tsx` | `/about` | Pathless route group; `(marketing)` organizes files without adding a URL segment. |
-| `src/pages/layout.tsx` | Layout route for `/` | SPA route layout that wraps root-level discovered routes. |
+| `src/pages/posts/layout.tsx` | Layout route for `/posts` | SPA route layout that wraps descendants below `/posts`. |
 | `src/pages/_helpers/format.ts` | Ignored | `_`-prefixed files and folders are private to `src/pages`. |
 | `src/pages/.draft.tsx` | Ignored | Dot-prefixed files and folders are hidden from route discovery. |
 | `src/pages/profile.test.tsx` | Ignored | Test/spec files can be colocated with a page without becoming routes. |
@@ -261,6 +236,8 @@ punctuation to underscores. That means `admin/panel.tsx` and
 | `src/pages/files/$...path.tsx` | Rejected | Catch-all segments are not part of the convention. |
 | `src/pages/users/$__proto__.tsx` | Rejected | Reserved object-property names are not safe route param names. |
 | `src/pages/docs/$_splat.tsx` | Rejected | `_splat` is reserved for wildcard route params. |
+| `src/pages/layout.tsx` | Rejected | Use `src/layout/index.tsx` for the SPA root layout. Route layouts must be nested below a route segment. |
+| `src/pages/posts/layout/index.tsx` | Rejected | Route layout directory aliases are not part of the convention; use `src/pages/posts/layout.tsx`. |
 | `src/pages/teams/$teamId/users/$teamId.tsx` | Rejected | Dynamic param names must be unique within one route path. |
 | `src/pages/users.tsx` beside `src/pages/users/index.tsx` | Rejected | Both map to `/users`; keep one page module per URL path. |
 | `src/pages/admin_panel.tsx` beside `src/pages/admin/panel.tsx` | Rejected | Both generate the same route id `admin_panel`. |

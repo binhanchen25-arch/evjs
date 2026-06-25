@@ -97,10 +97,10 @@ root layout. The default `src/pages` route directory uses
 `src/layout/index.tsx`; a custom directory such as `src/app/pages` uses
 `src/app/layout/index.tsx`. It is an exact directory-entry convention:
 `layout.tsx`, `layout.jsx`, `layout.ts`, and non-TSX `layout/index.*` files are
-not aliases. Set `routing.layout` to another module path for migrated SPA
-shells, or set `routing.layout: false` to disable SPA root layout discovery.
-MPA output does not accept or consume a framework layout file, so MPA pages
-compose shared wrappers as ordinary components.
+not aliases. Set `routing.conventions.layout` to another module path for
+migrated SPA shells, or set `routing.conventions.layout: false` to disable SPA
+root layout discovery. MPA output does not accept or consume a framework layout
+file, so MPA pages compose shared wrappers as ordinary components.
 
 The route directory is reserved for page route modules, so files or folders
 named `layout` inside it are reported as convention errors. Dynamic route

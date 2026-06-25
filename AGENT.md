@@ -88,9 +88,10 @@ There is no longer a public `@evjs/build-tools` or `@evjs/manifest` workspace pa
 3. Exposing generated TanStack route trees, `__root.tsx`, or `.evjs` route
    files to application authors. The framework owns those details.
 4. Adding extra page filename dialects. Dynamic segments use `$param`, route
-   groups use `(group)` pathless segments, layout modules use `layout.*` or
-   `layout/index.*`, and non-route support files in `src/pages` must follow the
-   ignored private/hidden/test/story/client/server conventions.
+   groups use `(group)` pathless segments, the external SPA root layout uses
+   `<routing-dir-parent>/layout/index.tsx`, nested SPA route layouts use
+   `layout.*` below a route segment, and non-route support files in `src/pages`
+   must follow the ignored private/hidden/test/story/client/server conventions.
 5. Reintroducing alternate server composition paths. `server.entry` and
    programmatic `createRoute()` source extraction are not framework routing
    inputs; use `src/apis` file routes.

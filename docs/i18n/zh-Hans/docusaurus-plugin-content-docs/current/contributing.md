@@ -35,9 +35,9 @@ npx biome check --write    # 修复 lint/格式
 3. **页面路由** —— 默认以 `src/pages` 为事实来源。路由文件使用 `.tsx`、`.jsx`、`.ts`
    或 `.js`；动态段使用 `$param`；`index` 映射到目录根路径；`(group)` 段是 pathless
    分组；`_` 前缀文件/目录是私有模块；bracket、catch-all、空动态段和可选段暂不支持
-4. **布局** —— SPA 根布局会从路由目录旁边唯一的 `layout.*` 或
-   `layout/index.*` 源码模块自动发现。SPA route layout 放在路由目录内，同样使用
-   `layout.*` 或 `layout/index.*`。MPA 路由不消费框架 layout
+4. **布局** —— SPA 根布局只会从路由目录旁边的 `layout/index.tsx` 自动发现。
+   嵌套 SPA route layout 放在某个路由段下，使用 `layout.*` 源码模块。MPA
+   路由不消费框架 layout
 5. **服务端函数** —— 必须以 `"use server";` 开头，并使用 `.server.ts` 或
    `.server.tsx` 文件名；server functions 没有目录约定
 6. **服务端函数导出** —— 只使用命名可调用导出：function declaration 或

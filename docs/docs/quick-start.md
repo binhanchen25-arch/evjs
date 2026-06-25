@@ -81,12 +81,11 @@ tree. The generated routing glue stays inside the framework; SPA mode only
 writes `src/route-types.d.ts` for TypeScript and scaffolded apps ignore it
 by default.
 
-SPA root layout discovery is optional. Use one `layout.*` or `layout/index.*`
-source module beside the route directory, such as `src/layout.tsx` or
-`src/layout/index.tsx`, set `routing.conventions.layout` to another module
+SPA root layout discovery is optional. Use `src/layout/index.tsx` beside the
+default route directory, set `routing.conventions.layout` to another module
 path, or set `routing.conventions.layout: false` when the app should not have a
-framework root layout. SPA route layouts can also live inside the route
-directory as `layout.*` or `layout/index.*` modules.
+framework root layout. Nested SPA route layouts can live below a route segment,
+such as `src/pages/posts/layout.tsx`.
 
 ## MPA Mode
 

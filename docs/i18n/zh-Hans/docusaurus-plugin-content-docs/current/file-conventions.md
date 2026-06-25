@@ -8,10 +8,8 @@
 | --- | --- | --- |
 | `src/pages/**/*.{ts,tsx,js,jsx}` | `routing` | SPA 和 MPA 的客户端页面路由发现。 |
 | 与同 basename 页面路由相邻的 `src/pages/**/*.html` | `routing` | MPA 页面专属 HTML 模板，例如 `about.tsx` 对应 `about.html`，`users/index.tsx` 对应 `users/index.html`。 |
-| `<routing-dir-parent>/layout.{ts,tsx,js,jsx}` | `routing.conventions.layout` | 存在一个匹配文件时，作为可选外部 SPA 根布局。 |
-| `<routing-dir-parent>/layout/index.{ts,tsx,js,jsx}` | `routing.conventions.layout` | 可选外部 SPA 根布局的目录形式。 |
-| `src/pages/**/layout.{ts,tsx,js,jsx}` | `routing` | 页面路由树内的 SPA route layout。 |
-| `src/pages/**/layout/index.{ts,tsx,js,jsx}` | `routing` | SPA route layout 的目录形式。 |
+| `<routing-dir-parent>/layout/index.tsx` | `routing.conventions.layout` | 按约定自动发现的可选外部 SPA 根布局。 |
+| `src/pages/<segment>/**/layout.{ts,tsx,js,jsx}` | `routing` | 页面路由树内的嵌套 SPA route layout。 |
 | `<routing-dir-parent>/route-types.d.ts` | generated | evjs 生成的 SPA 导航类型声明。 |
 | 带 `"use server";` 的 `*.server.{ts,tsx,js,jsx}` 文件 | server functions | 推荐的 server function 命名约定。 |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | `server.routing` | 启用 `server.routing` 时的服务端文件路由。 |
@@ -85,23 +83,22 @@ src/pages/(marketing)/about.tsx  -> /about
 每个被发现的页面文件都必须默认导出 React 组件。页面模块也可以导出字面量渲染元信息，例如
 `render`、`hydrate`、`prerender` 和 `rsc`。
 
-SPA route layout 使用路由树内的 `layout.*` 文件：
+SPA route layout 使用路由段下的 `layout.*` 文件：
 
 ```text
-src/pages/layout.tsx             -> 包裹根级页面路由
 src/pages/dashboard/layout.tsx   -> 包裹 /dashboard 后代路由
 ```
 
-外部 SPA 根布局可以放在路由目录旁边：
+外部 SPA 根布局只有一个自动发现约定：
 
 ```text
-src/layout.tsx
 src/layout/index.tsx
 ```
 
-如果存在多个外部根布局候选文件，需要保留一个文件，或显式配置
-`routing.conventions.layout`。设置 `routing.conventions.layout: false`
-可以关闭外部根布局发现。MPA 模式不消费框架 layout。
+`src/pages/layout.tsx`、`src/layout.tsx` 这类根布局别名，以及
+`src/pages/dashboard/layout/index.tsx` 这类 route layout 目录别名都会被约定拒绝。
+只有当应用 shell 明确放在其他位置时，才显式配置 `routing.conventions.layout`。
+设置 `routing.conventions.layout: false` 可以关闭外部根布局发现。MPA 模式不消费框架 layout。
 
 MPA 模式下，页面路由可以使用同 basename 的 colocated HTML 模板：
 

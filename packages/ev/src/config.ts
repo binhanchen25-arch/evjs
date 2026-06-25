@@ -379,10 +379,10 @@ export interface PageRoutingConventionsConfig {
   /**
    * SPA root layout convention.
    *
-   * `true` auto-discovers one `layout.*` or `layout/index.*` source module
-   * beside the route directory, `false` disables root layout discovery, and a
-   * string points at an explicit root layout module. MPA mode does not use
-   * framework layouts.
+   * `true` auto-discovers one `layout/index.tsx` source module beside the
+   * route directory, `false` disables root layout discovery, and a string
+   * points at an explicit root layout module. MPA mode does not use framework
+   * layouts.
    */
   layout?: PageRoutingLayoutConvention;
 }

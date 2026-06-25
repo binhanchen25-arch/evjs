@@ -122,16 +122,16 @@ export const PAGE_ROUTE_CONVENTION_RULES = [
     id: "root-layout",
     category: "layout",
     summary:
-      "SPA layout auto-discovery supports layout source modules beside the route directory",
-    valid: [
-      "src/layout.tsx",
-      "src/layout.jsx",
-      "src/layout/index.tsx",
-      "src/layout/index.jsx",
-      "src/pages/layout.tsx",
-      "src/pages/posts/layout/index.tsx",
-    ],
-    invalid: [],
+      "SPA root layout auto-discovery uses one layout/index.tsx module beside the route directory",
+    valid: ["src/layout/index.tsx"],
+    invalid: ["src/layout.tsx", "src/layout/index.jsx", "src/pages/layout.tsx"],
+  },
+  {
+    id: "route-layout",
+    category: "layout",
+    summary: "nested SPA route layouts use layout source modules below a route",
+    valid: ["src/pages/posts/layout.tsx"],
+    invalid: ["src/pages/layout.tsx", "src/pages/posts/layout/index.tsx"],
   },
   {
     id: "mpa-html-template",
@@ -149,20 +149,15 @@ export const PAGE_ROUTE_CONVENTION_SUMMARY = formatPageRouteConventionSummary(
   PAGE_ROUTE_CONVENTION_RULES,
 );
 export const PAGE_ROUTE_ROOT_LAYOUT_FILE = path.join("layout", "index.tsx");
-export const PAGE_ROUTE_ROOT_LAYOUT_FILES = [
+export const PAGE_ROUTE_UNSUPPORTED_ROOT_LAYOUT_FILES = [
   "layout.tsx",
   "layout.ts",
   "layout.jsx",
   "layout.js",
-  "layout/index.tsx",
   "layout/index.ts",
   "layout/index.jsx",
   "layout/index.js",
 ] as const;
-export const PAGE_ROUTE_ROOT_LAYOUT_ALIAS_FILES =
-  PAGE_ROUTE_ROOT_LAYOUT_FILES.filter(
-    (file) => file !== PAGE_ROUTE_ROOT_LAYOUT_FILE,
-  );
 
 const PAGE_ROUTE_SOURCE_EXTENSION_SET = new Set<string>(
   PAGE_ROUTE_SOURCE_EXTENSIONS,
@@ -196,6 +191,7 @@ export interface PageRouteConventionRule {
     | "client-module"
     | "server-module"
     | "root-layout"
+    | "route-layout"
     | "mpa-html-template";
   category: "route" | "ignored" | "layout" | "html";
   summary: string;

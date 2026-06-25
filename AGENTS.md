@@ -49,11 +49,12 @@ coverage in `packages/ev/tests/build-tools-page-routes.test.ts`.
    route types.
 5. Page route conventions are strict: `src/pages`, `$param` dynamic segments,
    `index` for directory roots, `(group)` pathless route groups, `_`-prefixed
-   private files, ignored colocated support files, and SPA layout source
-   modules named `layout.*` or `layout/index.*`. Keep one page file per URL
-   path, one parameter naming choice per dynamic URL shape, and unique
-   generated route IDs. Do not add alternate filename dialects unless the build
-   graph, docs, scaffolds, and generated route types are updated together.
+   private files, ignored colocated support files, external SPA root layout at
+   `<routing-dir-parent>/layout/index.tsx`, and nested SPA route layouts named
+   `layout.*` below a route segment. Keep one page file per URL path, one
+   parameter naming choice per dynamic URL shape, and unique generated route
+   IDs. Do not add alternate filename dialects unless the build graph, docs,
+   scaffolds, and generated route types are updated together.
 6. Server file route conventions are strict: `src/apis`, `$param` dynamic
    segments, `index` for directory roots, `(group)` pathless route groups,
    uppercase HTTP method exports only, ignored helper files without route

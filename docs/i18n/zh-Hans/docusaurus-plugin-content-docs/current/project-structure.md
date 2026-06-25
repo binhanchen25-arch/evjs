@@ -18,11 +18,12 @@ my-evjs-app/
     ├── layout/
     │   └── index.tsx            # 可选 SPA 根布局
     ├── pages/                   # 页面路由
-    │   ├── layout.tsx           # 可选 SPA route layout
     │   ├── index.tsx            # /
     │   ├── (marketing)/
     │   │   └── about.tsx        # /about
-    │   ├── dashboard.tsx        # /dashboard
+    │   ├── dashboard/
+    │   │   ├── layout.tsx       # 嵌套 SPA route layout
+    │   │   └── index.tsx        # /dashboard
     │   ├── campaign.tsx         # /campaign
     │   ├── insights.tsx         # /insights
     │   └── users/$userId.tsx    # /users/$userId
@@ -44,31 +45,17 @@ my-evjs-app/
 
 这棵目录覆盖完整框架能力：
 
-- `ev.config.ts` 只在默认值不够时自定义 routing 模式、服务端路径、远程应用、插件或显式页面输出。
-- `pages/` 是客户端路由事实来源。SPA 模式会映射到框架托管的 app entry；MPA 模式会映射到独立页面 entry。
-- SPA 模式可以有一个可选的外部根布局源码模块。默认 `src/pages` 会在旁边查找
-  `src/layout.tsx`、`src/layout.ts`、`src/layout.jsx`、`src/layout.js`，
-  或对应的 `src/layout/index.*` 源码模块；自定义 `routing.dir` 时使用该路由目录的父级。
-  自动发现的根布局候选只能保留一个，或者通过 `routing.conventions.layout` 指向自定义位置。
-  显式布局模块必须使用 `.ts`、`.tsx`、`.js` 或 `.jsx`；声明文件、测试/spec、
-  Storybook、client-only 和 server-only 文件都不被接受。设置
-  `routing.conventions.layout: false` 可以关闭外部根布局发现。
-- `pages/**/layout.*` 和 `pages/**/layout/index.*` 是 SPA route layout。
-  它们会在发现到的路由树中创建 pathless layout route，因此
-  `src/pages/layout.tsx` 会包裹根级页面路由，`src/pages/posts/layout.tsx`
-  会包裹 `/posts` 下的子路由。MPA 页面需要公共外框时，应直接导入普通共享组件，
-  或复用 HTML 模板。
-- `<routing-dir-parent>/route-types.d.ts` 是 SPA 模式生成的类型安全导航声明。
-  默认 `src/pages` 会写入 `src/route-types.d.ts`；`routing.dir:
-  "./src/app/pages"` 会写入 `src/app/route-types.d.ts`。MPA 模式会移除旧的生成路由类型文件。
-  生成声明使用生成专用的 `@evjs/ev/internal/client/route-types` helper，
-  并增强 `@evjs/ev/page` 导航类型。保持忽略生成的 route types，不要在应用代码里导入它们。
-- 渲染元信息放在页面模块旁边。
-- 以 `"use server";` 开头的 `*.server.*` 模块放 server functions。它们没有目录约定，
-  可以放在 pages、features 或 server file routes 旁边。
-- `server.ts` 只是 standalone/manual `@evjs/server` 代码的普通应用组织文件。evjs
-  不会把它作为文件约定发现，它也和 `server.routing` 无关。
-- `features/` 把业务逻辑从 route/page files 中移走。
+| 能力面 | 约定 | 说明 |
+| --- | --- | --- |
+| 配置 | `ev.config.ts` | 只在默认值不够时自定义 routing 模式、服务端路径、插件或显式页面输出。 |
+| 客户端路由 | `src/pages` | SPA 和 MPA 页面路由的事实来源。SPA 模式映射到一个框架托管的 app entry；MPA 模式映射到独立页面 entry。 |
+| SPA 根 shell | `<routing-dir-parent>/layout/index.tsx` | 默认 `src/pages` 使用 `src/layout/index.tsx`；`routing.dir: "./src/app/pages"` 使用 `src/app/layout/index.tsx`。只有应用 shell 明确放在自定义位置时才使用 `routing.conventions.layout`；设为 `false` 可关闭根布局发现。 |
+| 嵌套 SPA layout | `src/pages/<segment>/layout.*` | 包裹某个路由段下的后代路由。`src/pages/layout.tsx` 和 `src/pages/<segment>/layout/index.*` 都会被拒绝。MPA 页面需要公共外框时导入普通共享组件或复用 HTML 模板。 |
+| 生成路由类型 | `<routing-dir-parent>/route-types.d.ts` | SPA 模式写入类型安全导航声明，例如 `src/route-types.d.ts` 或 `src/app/route-types.d.ts`。保持忽略它们，不要在应用代码里导入。 |
+| 页面元信息 | 页面模块的 named exports | 渲染元信息和页面组件放在一起。 |
+| Server functions | `"use server";` 加 `*.server.*` 模块 | Server functions 没有目录约定，可以放在 pages、features 或 server file routes 旁边。 |
+| 手工 server 代码 | `server.ts` 等普通文件 | Standalone/manual `@evjs/server` 代码不会作为文件约定发现，也和 `server.routing` 无关。 |
+| 业务代码 | `features/`、`components/`、`lib/`、`hooks/` | 把业务逻辑、可复用 UI、浏览器安全 helper 和 React hooks 从 route/page files 中移走。 |
 
 ## 约定矩阵
 
@@ -87,9 +74,9 @@ my-evjs-app/
 - `_` 前缀文件和目录是私有 helper，不会成为 URL 路由。
 - dot 前缀文件/目录、`.d.ts`、test/spec、Storybook、`*.client.*` 和
   `*.server.*` 文件都会被路由目录忽略，因此就近放置的支撑文件不会变成路由。
-- SPA 根布局自动发现接受路由目录旁边唯一的 `layout.*` 或 `layout/index.*`
-  源码模块。SPA route layout 使用路由目录内的 `layout.*` 或 `layout/index.*`
-  模块。自定义外部根布局模块使用 `routing.conventions.layout`。MPA 路由不消费框架 layout。
+- SPA 根布局自动发现只接受路由目录旁边的 `layout/index.tsx`。嵌套 SPA
+  route layout 使用路由段下的 `layout.*` 模块。自定义外部根布局模块使用
+  `routing.conventions.layout`。MPA 路由不消费框架 layout。
 - 输出无法遵循目录形状时，使用显式 `pages` 配置，而不是手写 `routing.routes`。
 
 迁移规则保持显式，不通过新增文件名方言来兼容：
@@ -110,8 +97,8 @@ my-evjs-app/
 | `src/pages/_*` 和 `src/pages/**/_*` | 忽略的私有路由模块 | 就近放置 helper component、utility、fixture 和页面局部实现细节 | URL 路由、SPA 根布局或生成文件 |
 | `src/pages/.*` 和 `src/pages/**/.*` | 忽略的隐藏路由模块 | 本地临时文件或不应参与路由发现的工具元信息 | URL 路由、生成的 route types，或应被页面导入的源码模块 |
 | `src/pages/**/*.d.ts`、`src/pages/**/*.{test,spec,story,stories}.*`、`src/pages/**/*.{client,server}.*` | 忽略的路由支撑模块 | 与页面就近放置类型声明、测试、Storybook story、client-only 模块和 server-only 模块 | 路由页面或应该变成 URL 的文件 |
-| `<routing-dir-parent>/layout.{tsx,ts,jsx,js}` 或 `<routing-dir-parent>/layout/index.{tsx,ts,jsx,js}` | 可选外部 SPA 根布局 | 包裹已发现 SPA 路由树的一层应用 shell | MPA 公共外框、route-specific 嵌套布局或多个根布局候选 |
-| `src/pages/**/layout.{tsx,ts,jsx,js}` 或 `src/pages/**/layout/index.{tsx,ts,jsx,js}` | SPA route layout | 在同一 URL 前缀下包裹子路由的 pathless layout route | MPA 公共外框，或命名为 `layout` 的非 layout helper 目录 |
+| `<routing-dir-parent>/layout/index.tsx` | 可选外部 SPA 根布局 | 包裹已发现 SPA 路由树的一层应用 shell | MPA 公共外框、route-specific 嵌套布局、`src/layout.tsx` 这类根布局别名，或 `src/pages/layout.tsx` 这类路由目录根布局 |
+| `src/pages/<segment>/**/layout.{tsx,ts,jsx,js}` | 嵌套 SPA route layout | 在同一 URL 前缀下包裹子路由的 pathless layout route，例如 `src/pages/posts/layout.tsx` | 应用根 shell、MPA 公共外框、`src/pages/layout.tsx`、`layout/index.*` 别名，或命名为 `layout` 的非 layout helper 目录 |
 | `<routing-dir-parent>/route-types.d.ts` | SPA 导航类型生成物 | 编辑器和类型检查支持 | 手工修改、从应用代码导入、放入模板或脚手架源码，或用于 MPA 模式 |
 | 带 `"use server";` 的 `**/*.server.{ts,tsx,js,jsx}` | 推荐的 server function 模块命名 | 可达并导出命名 callable server functions 的模块 | 浏览器专用 helper、默认导出、runtime re-export，或依赖目录名触发发现 |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | 启用 `server.routing` 时的服务端文件路由发现 | 导出大写 HTTP method 的 Request/Response route 模块 | `route.ts` 哨兵、`foo.get.ts` method suffix 文件、bracket/catch-all/optional routes、`middleware`/`middlewares`、默认导出，或从 route candidate 导出 helper |
@@ -217,7 +204,7 @@ URL shape、route id、空动态参数、保留动态参数、重复动态参数
 | `src/pages/users/$userId.tsx` | `/users/$userId` | 动态段；参数名必须是 JavaScript 标识符。 |
 | `src/pages/users/settings.tsx` | `/users/settings` | 静态同级路由；排序早于 `users/$userId.tsx`。 |
 | `src/pages/(marketing)/about.tsx` | `/about` | Pathless route group；`(marketing)` 只组织文件，不增加 URL segment。 |
-| `src/pages/layout.tsx` | `/` 的 layout route | SPA route layout，会包裹根级发现路由。 |
+| `src/pages/posts/layout.tsx` | `/posts` 的 layout route | SPA route layout，会包裹 `/posts` 下的后代路由。 |
 | `src/pages/_helpers/format.ts` | 忽略 | `_` 前缀文件和目录在 `src/pages` 内是私有模块。 |
 | `src/pages/.draft.tsx` | 忽略 | dot 前缀文件和目录不会参与路由发现。 |
 | `src/pages/profile.test.tsx` | 忽略 | test/spec 文件可以和页面就近放置，不会成为路由。 |
@@ -228,6 +215,8 @@ URL shape、route id、空动态参数、保留动态参数、重复动态参数
 | `src/pages/files/$...path.tsx` | 拒绝 | catch-all 段暂不属于约定。 |
 | `src/pages/users/$__proto__.tsx` | 拒绝 | 保留对象属性名不是安全的路由参数名。 |
 | `src/pages/docs/$_splat.tsx` | 拒绝 | `_splat` 是 wildcard route params 的保留名称。 |
+| `src/pages/layout.tsx` | 拒绝 | SPA 根布局使用 `src/layout/index.tsx`。Route layout 必须嵌套在某个路由段下。 |
+| `src/pages/posts/layout/index.tsx` | 拒绝 | Route layout 目录别名不是约定的一部分；使用 `src/pages/posts/layout.tsx`。 |
 | `src/pages/teams/$teamId/users/$teamId.tsx` | 拒绝 | 同一个 route path 内的动态参数名必须唯一。 |
 | `src/pages/users.tsx` 和 `src/pages/users/index.tsx` 并存 | 拒绝 | 两者都映射到 `/users`；一个 URL path 只保留一个页面模块。 |
 | `src/pages/admin_panel.tsx` 和 `src/pages/admin/panel.tsx` 并存 | 拒绝 | 两者都会生成同一个 route id `admin_panel`。 |
