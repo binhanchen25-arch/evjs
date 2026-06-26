@@ -1,4 +1,4 @@
-import { getOperationsSnapshot } from "../domain/operations";
+import { getOperationsSnapshot } from "@/domain/operations";
 import InsightsBadge from "./InsightsBadge";
 import RenderModePage from "./RenderModePage";
 

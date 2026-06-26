@@ -64,6 +64,8 @@ describe("discoverPageRoutes", () => {
       "server-module",
       "root-layout",
       "route-layout",
+      "error-boundary",
+      "not-found-boundary",
       "mpa-html-template",
     ]);
     expect(PAGE_ROUTE_CONVENTION_RULES.map((rule) => rule.category)).toEqual([
@@ -83,6 +85,8 @@ describe("discoverPageRoutes", () => {
       "ignored",
       "layout",
       "layout",
+      "boundary",
+      "boundary",
       "html",
     ]);
     expect(PAGE_ROUTE_CONVENTION_RULES).toEqual(
@@ -174,6 +178,24 @@ describe("discoverPageRoutes", () => {
           ]),
         }),
         expect.objectContaining({
+          id: "error-boundary",
+          category: "boundary",
+          valid: expect.arrayContaining([
+            "src/pages/error.tsx",
+            "src/pages/posts/error.tsx",
+          ]),
+          invalid: expect.arrayContaining(["src/pages/error/index.tsx"]),
+        }),
+        expect.objectContaining({
+          id: "not-found-boundary",
+          category: "boundary",
+          valid: expect.arrayContaining([
+            "src/pages/not-found.tsx",
+            "src/pages/posts/not-found.tsx",
+          ]),
+          invalid: expect.arrayContaining(["src/pages/not-found/index.tsx"]),
+        }),
+        expect.objectContaining({
           id: "mpa-html-template",
           category: "html",
           valid: expect.arrayContaining([
@@ -184,7 +206,7 @@ describe("discoverPageRoutes", () => {
       ]),
     );
     expect(PAGE_ROUTE_CONVENTION_SUMMARY).toBe(
-      "Page route files use index files for directory roots, $param filenames for dynamic segments, one page file per URL path, one dynamic param name per URL shape, unique generated route ids, route groups for pathless organization, and lowercase URL-safe static segments; ignored colocated modules include _-prefixed private modules, dot-prefixed hidden modules, declaration files, test/spec modules, Storybook modules, client-only *.client.* modules, and server-only *.server.* modules; SPA root layout auto-discovery uses one layout/index.tsx module beside the route directory; nested SPA route layouts use layout source modules below a route; MPA page routes can use colocated HTML templates with the same basename",
+      "Page route files use index files for directory roots, $param filenames for dynamic segments, one page file per URL path, one dynamic param name per URL shape, unique generated route ids, route groups for pathless organization, and lowercase URL-safe static segments; ignored colocated modules include _-prefixed private modules, dot-prefixed hidden modules, declaration files, test/spec modules, Storybook modules, client-only *.client.* modules, and server-only *.server.* modules; SPA root layout auto-discovery uses one layout/index.tsx module beside the route directory; nested SPA route layouts use layout source modules below a route; SPA error boundaries use error source modules scoped by directory; SPA not-found boundaries use not-found source modules scoped by directory; MPA page routes can use colocated HTML templates with the same basename",
     );
     expect(isPageRouteSourceModuleFile("index.tsx")).toBe(true);
     expect(isPageRouteSourceModuleFile("index.d.ts")).toBe(false);
@@ -216,6 +238,15 @@ describe("discoverPageRoutes", () => {
     expect(parsePageRouteFile("about.spec.tsx")).toBeUndefined();
     expect(parsePageRouteFile("about.story.tsx")).toBeUndefined();
     expect(parsePageRouteFile("about.stories.tsx")).toBeUndefined();
+    expect(parsePageRouteFile("global.ts")?.segments).toEqual(["global"]);
+    expect(parsePageRouteFile("error.tsx")).toBeUndefined();
+    expect(parsePageRouteFile("posts/error.tsx")).toBeUndefined();
+    expect(parsePageRouteFile("not-found.tsx")).toBeUndefined();
+    expect(parsePageRouteFile("posts/not-found.tsx")).toBeUndefined();
+    expect(parsePageRouteFile("posts/global.tsx")?.segments).toEqual([
+      "posts",
+      "global",
+    ]);
     expect(parsePageRouteFile("_helpers/format.ts")).toBeUndefined();
     expect(parsePageRouteFile(".draft.tsx")).toBeUndefined();
     expect(parsePageRouteFile(".hidden/secret.tsx")).toBeUndefined();
@@ -501,6 +532,9 @@ describe("discoverPageRoutes", () => {
       expect(doc).toContain("src/pages/users.tsx");
       expect(doc).toContain("src/pages/users/index.tsx");
       expect(doc).toContain("src/pages/layout.tsx");
+      expect(doc).toContain("src/pages/error.tsx");
+      expect(doc).toContain("src/pages/not-found.tsx");
+      expect(doc).toContain("src/pages/dashboard/error.tsx");
       expect(doc).toContain("src/pages/.draft.tsx");
       expect(doc).toContain("src/pages/ClientCard.client.tsx");
       expect(doc).toContain("src/pages/users.server.ts");
@@ -521,9 +555,13 @@ describe("discoverPageRoutes", () => {
       "one parameter naming choice per dynamic URL shape",
     );
     expect(englishDoc).toContain("unique generated route IDs");
+    expect(englishDoc).toContain("`@/components/Button` resolves to");
+    expect(englishDoc).toContain("Scoped SPA error boundary");
     expect(chineseDoc).toContain("每个 URL path 只保留一个页面模块");
     expect(chineseDoc).toContain("每个 dynamic URL shape 只保留一种参数命名");
     expect(chineseDoc).toContain("生成的 route ID 必须唯一");
+    expect(chineseDoc).toContain("`@/components/Button` 解析到");
+    expect(chineseDoc).toContain("作用域 SPA error boundary");
     expect(englishClientRoutesDoc).toContain(
       "`routing.routes` is not a public",
     );
@@ -625,6 +663,169 @@ describe("discoverPageRoutes", () => {
       },
     ]);
     expect(discovery.diagnostics).toEqual([]);
+  });
+
+  it("discovers SPA error and not-found convention modules", async () => {
+    const cwd = await createFixture({
+      "src/pages/error.tsx":
+        "export default function RootError() { return null; }",
+      "src/pages/not-found.tsx":
+        "export default function RootNotFound() { return null; }",
+      "src/pages/index.tsx": "export default function Home() { return null; }",
+      "src/pages/posts/error.tsx":
+        "export default function PostsError() { return null; }",
+      "src/pages/posts/index.tsx":
+        "export default function Posts() { return null; }",
+      "src/pages/posts/$id/not-found.tsx":
+        "export default function PostNotFound() { return null; }",
+      "src/pages/posts/$id.tsx":
+        "export default function Post() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "spa",
+    });
+
+    expect(discovery.routes).toEqual([
+      {
+        id: "index",
+        path: "/",
+        module: "./src/pages/index.tsx",
+        errorModule: "./src/pages/error.tsx",
+        notFoundModule: "./src/pages/not-found.tsx",
+      },
+      {
+        id: "posts",
+        path: "/posts",
+        module: "./src/pages/posts/index.tsx",
+        errorModule: "./src/pages/posts/error.tsx",
+        notFoundModule: "./src/pages/not-found.tsx",
+      },
+      {
+        id: "posts_id",
+        path: "/posts/$id",
+        module: "./src/pages/posts/$id.tsx",
+        errorModule: "./src/pages/posts/error.tsx",
+        notFoundModule: "./src/pages/posts/$id/not-found.tsx",
+      },
+    ]);
+    expect(discovery.diagnostics).toEqual([]);
+  });
+
+  it("keeps MPA error, not-found, and global files as page routes", async () => {
+    const cwd = await createFixture({
+      "src/pages/global.tsx":
+        "export default function GlobalPage() { return null; }",
+      "src/pages/error.tsx":
+        "export default function ErrorPage() { return null; }",
+      "src/pages/not-found.tsx":
+        "export default function NotFoundPage() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "mpa",
+    });
+
+    expect(discovery.routes.map((route) => route.path)).toEqual([
+      "/error",
+      "/global",
+      "/not-found",
+    ]);
+    expect(discovery.diagnostics).toEqual([]);
+  });
+
+  it("keeps SPA error and not-found files as page routes when conventions are disabled", async () => {
+    const cwd = await createFixture({
+      "src/pages/error.tsx":
+        "export default function ErrorPage() { return null; }",
+      "src/pages/not-found.tsx":
+        "export default function NotFoundPage() { return null; }",
+      "src/pages/index.tsx": "export default function Home() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "spa",
+      spaConventions: false,
+    });
+
+    expect(discovery.routes.map((route) => route.path)).toEqual([
+      "/",
+      "/error",
+      "/not-found",
+    ]);
+    expect(discovery.diagnostics).toEqual([]);
+  });
+
+  it("reports SPA convention modules without required default exports", async () => {
+    const cwd = await createFixture({
+      "src/pages/error.tsx": "export function ErrorBoundary() { return null; }",
+      "src/pages/not-found.tsx":
+        "export function NotFoundBoundary() { return null; }",
+      "src/pages/index.tsx": "export default function Home() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "spa",
+    });
+
+    expect(discovery.routes).toEqual([
+      {
+        id: "index",
+        path: "/",
+        module: "./src/pages/index.tsx",
+      },
+    ]);
+    expect(discovery.diagnostics).toEqual([
+      {
+        level: "error",
+        file: "src/pages/error.tsx",
+        message:
+          "SPA error boundary modules must default-export a React component.",
+      },
+      {
+        level: "error",
+        file: "src/pages/not-found.tsx",
+        message:
+          "SPA not-found boundary modules must default-export a React component.",
+      },
+    ]);
+  });
+
+  it("reports duplicate scoped SPA boundary convention modules", async () => {
+    const cwd = await createFixture({
+      "src/pages/posts/error.ts":
+        "export default function PostsErrorTs() { return null; }",
+      "src/pages/posts/error.tsx":
+        "export default function PostsErrorTsx() { return null; }",
+      "src/pages/posts/index.tsx":
+        "export default function Posts() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "spa",
+    });
+
+    expect(discovery.routes).toEqual([
+      {
+        id: "posts",
+        path: "/posts",
+        module: "./src/pages/posts/index.tsx",
+        errorModule: "./src/pages/posts/error.ts",
+      },
+    ]);
+    expect(discovery.diagnostics).toEqual([
+      {
+        level: "error",
+        file: "src/pages/posts/error.tsx",
+        message:
+          'Duplicate SPA error boundary convention for route segment scope "posts". ./src/pages/posts/error.ts already owns this scope. Keep one error.* module per route directory.',
+      },
+    ]);
   });
 
   it("discovers the root layout beside a custom page route directory", async () => {

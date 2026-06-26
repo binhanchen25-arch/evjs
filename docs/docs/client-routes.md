@@ -18,6 +18,8 @@ src/
 ├── layout/
 │   └── index.tsx          # Optional SPA root layout
 └── pages/
+    ├── error.tsx           # Optional root SPA error boundary
+    ├── not-found.tsx       # Optional root SPA not-found boundary
     ├── index.tsx          # /
     ├── (marketing)/
     │   └── about.tsx      # /about
@@ -190,6 +192,12 @@ page logic, such as `loader`, `beforeLoad`, `validateSearch`,
 `pendingComponent`, `errorComponent`, and `notFoundComponent`. evjs attaches
 those exports to the evjs-managed route. In MPA mode these lifecycle hooks
 are ignored; use normal component/data logic in the page.
+
+SPA mode also recognizes dedicated route convention modules:
+
+- `error.*` and `not-found.*` modules default-export fallback components for
+  their route directory scope and descendants.
+- In MPA mode `error.*` and `not-found.*` filenames remain ordinary page routes.
 
 ```tsx
 // src/pages/search.tsx

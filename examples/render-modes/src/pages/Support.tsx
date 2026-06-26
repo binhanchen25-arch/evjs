@@ -1,4 +1,4 @@
-import { supportTickets } from "../domain/operations";
+import { supportTickets } from "@/domain/operations";
 import RenderModePage from "./RenderModePage";
 
 export default function Support() {

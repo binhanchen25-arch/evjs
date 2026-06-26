@@ -1,4 +1,4 @@
-import { getOperationsSnapshot } from "../domain/operations";
+import { getOperationsSnapshot } from "@/domain/operations";
 import RenderModePage from "./RenderModePage";
 
 export const render = "ssr";

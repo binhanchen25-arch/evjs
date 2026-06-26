@@ -77,7 +77,12 @@ describe("createAppGraph and createBuildPlan", () => {
   it("creates a framework-managed SPA entry from page routes", async () => {
     const cwd = await createFixture({
       "src/layout/index.tsx": "export default function Root() { return null; }",
+      "src/pages/error.tsx": "export default function Error() { return null; }",
+      "src/pages/not-found.tsx":
+        "export default function NotFound() { return null; }",
       "src/pages/index.tsx": "export default function Home() { return null; }",
+      "src/pages/users/error.tsx":
+        "export default function UserError() { return null; }",
       "src/pages/users/$userId.tsx": `
         export function validateSearch(search: Record<string, unknown>) {
           return { tab: String(search.tab ?? "all") };
@@ -100,11 +105,15 @@ describe("createAppGraph and createBuildPlan", () => {
             id: "index",
             path: "/",
             module: "./src/pages/index.tsx",
+            errorModule: "./src/pages/error.tsx",
+            notFoundModule: "./src/pages/not-found.tsx",
           },
           {
             id: "users_userId",
             path: "/users/$userId",
             module: "./src/pages/users/$userId.tsx",
+            errorModule: "./src/pages/users/error.tsx",
+            notFoundModule: "./src/pages/not-found.tsx",
           },
         ],
       },
@@ -126,14 +135,23 @@ describe("createAppGraph and createBuildPlan", () => {
         path: "/",
         appId: "default",
         module: "./src/pages/index.tsx",
+        errorModule: "./src/pages/error.tsx",
+        notFoundModule: "./src/pages/not-found.tsx",
       },
       {
         id: "users_userId",
         path: "/users/$userId",
         appId: "default",
         module: "./src/pages/users/$userId.tsx",
+        errorModule: "./src/pages/users/error.tsx",
+        notFoundModule: "./src/pages/not-found.tsx",
       },
     ]);
+    expect(plan.resolve).toEqual({
+      alias: {
+        "@": "./src",
+      },
+    });
     expect(plan.entries).toContainEqual({
       name: "main",
       import: "evjs:pages-app",
@@ -150,11 +168,15 @@ describe("createAppGraph and createBuildPlan", () => {
             id: "index",
             path: "/",
             module: "./src/pages/index.tsx",
+            errorModule: "./src/pages/error.tsx",
+            notFoundModule: "./src/pages/not-found.tsx",
           },
           {
             id: "users_userId",
             path: "/users/$userId",
             module: "./src/pages/users/$userId.tsx",
+            errorModule: "./src/pages/users/error.tsx",
+            notFoundModule: "./src/pages/not-found.tsx",
           },
         ],
       },
@@ -162,9 +184,12 @@ describe("createAppGraph and createBuildPlan", () => {
     expect(relativeFileDependencies(cwd, analysis.fileDependencies)).toEqual([
       "src/layout/index.tsx",
       "src/pages",
+      "src/pages/error.tsx",
       "src/pages/index.tsx",
+      "src/pages/not-found.tsx",
       "src/pages/users",
       "src/pages/users/$userId.tsx",
+      "src/pages/users/error.tsx",
     ]);
   });
 

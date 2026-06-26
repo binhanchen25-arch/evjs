@@ -164,6 +164,7 @@ export async function createUtoopackConfig(
       clean: true,
     },
     resolve: {
+      alias: createResolveAlias(cwd, plan),
       extensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs"],
     },
     ...(frameworkRules.length > 0
@@ -244,6 +245,23 @@ function createPagesEntryRule(
     ],
     type: "ecmascript",
   };
+}
+
+function createResolveAlias(
+  cwd: string,
+  plan: BuildPlan,
+): NonNullable<ConfigComplete["resolve"]>["alias"] {
+  return Object.fromEntries(
+    Object.entries(plan.resolve?.alias ?? {}).map(([name, target]) => [
+      name,
+      resolveAliasTarget(cwd, target),
+    ]),
+  );
+}
+
+function resolveAliasTarget(cwd: string, target: string): string {
+  if (path.isAbsolute(target)) return target;
+  return target.startsWith(".") ? path.resolve(cwd, target) : target;
 }
 
 function createServerRoutesEntryRule(
@@ -391,6 +409,8 @@ function createPagesLoaderOptions(
       module: route.module,
       ...(route.parentId ? { parentId: route.parentId } : {}),
       ...(route.kind ? { kind: route.kind } : {}),
+      ...(route.errorModule ? { errorModule: route.errorModule } : {}),
+      ...(route.notFoundModule ? { notFoundModule: route.notFoundModule } : {}),
     })),
     ...(metadata.rootModule ? { rootModule: metadata.rootModule } : {}),
   };

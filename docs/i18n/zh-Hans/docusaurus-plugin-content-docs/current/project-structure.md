@@ -10,14 +10,16 @@ my-evjs-app/
 ├── index.html                   # 共享 HTML 模板，包含 <div id="app">
 ├── package.json
 ├── .gitignore                   # 忽略 evjs 生成产物
+├── tsconfig.json                # 包含 @/* -> ./src/* path alias
 ├── public/                      # 原样复制的静态文件
-├── tsconfig.json
 └── src/
     ├── styles.css               # 全局 CSS / Tailwind 入口
     ├── middleware.ts            # 全局服务端中间件
     ├── layout/
     │   └── index.tsx            # 可选 SPA 根布局
     ├── pages/                   # 页面路由
+    │   ├── error.tsx            # 可选根 SPA error boundary
+    │   ├── not-found.tsx        # 可选根 SPA not-found boundary
     │   ├── index.tsx            # /
     │   ├── (marketing)/
     │   │   └── about.tsx        # /about
@@ -48,9 +50,11 @@ my-evjs-app/
 | 能力面 | 约定 | 说明 |
 | --- | --- | --- |
 | 配置 | `ev.config.ts` | 只在默认值不够时自定义 routing 模式、服务端路径、插件或显式页面输出。 |
+| 导入别名 | `tsconfig.json` `paths["@/*"]` | `@/components/Button` 解析到 `src/components/Button`；evjs 会自动配置 bundler alias，模板会配置 TypeScript 以支持编辑器和类型检查。 |
 | 客户端路由 | `src/pages` | SPA 和 MPA 页面路由的事实来源。SPA 模式映射到一个 evjs 管理的 app entry；MPA 模式映射到独立页面 entry。 |
 | SPA 根 shell | `<routing-dir-parent>/layout/index.tsx` | 默认 `src/pages` 使用 `src/layout/index.tsx`；`routing.dir: "./src/app/pages"` 使用 `src/app/layout/index.tsx`。只有应用 shell 明确放在自定义位置时才使用 `routing.conventions.layout`；设为 `false` 可关闭根布局发现。 |
 | 嵌套 SPA 路由布局 | `src/pages/<segment>/layout.*` | 包裹某个路由段下的后代路由。`src/pages/layout.tsx` 和 `src/pages/<segment>/layout/index.*` 都会被拒绝。MPA 页面需要公共外框时导入普通共享组件或复用 HTML 模板。 |
+| SPA route 边界 | `src/pages/**/error.*`、`src/pages/**/not-found.*` | 按目录作用域生效的 SPA error 和 not-found boundaries。MPA 页面会把这些文件名当作普通路由。 |
 | 生成路由类型 | `<routing-dir-parent>/route-types.d.ts` | SPA 模式写入类型安全导航声明，例如 `src/route-types.d.ts` 或 `src/app/route-types.d.ts`。保持忽略它们，不要在应用代码里导入。 |
 | 页面元信息 | 页面模块的 named exports | 渲染元信息和页面组件放在一起。 |
 | 服务端函数 | `"use server";` 加 `*.server.*` 模块 | 服务端函数没有目录约定，可以放在 pages、features 或服务端文件路由旁边。 |
@@ -79,6 +83,9 @@ my-evjs-app/
 - SPA 根布局自动发现只接受路由目录旁边的 `layout/index.tsx`。嵌套 SPA
   route layout 使用路由段下的 `layout.*` 模块。自定义外部根布局模块使用
   `routing.conventions.layout`。MPA 路由不消费框架 layout。
+- SPA 模式下保留 `src/pages/error.tsx`、`src/pages/not-found.tsx`，以及
+  `src/pages/dashboard/error.tsx` 这类作用域文件；`error.*` 和 `not-found.*`
+  按路由目录作用域继承。
 - 输出无法遵循目录形状时，使用显式 `pages` 配置，而不是手写 `routing.routes`。
 
 迁移规则保持显式，不通过新增文件名方言来兼容：
@@ -101,6 +108,8 @@ my-evjs-app/
 | `src/pages/**/*.d.ts`、`src/pages/**/*.{test,spec,story,stories}.*`、`src/pages/**/*.{client,server}.*` | 忽略的路由支撑模块 | 与页面就近放置类型声明、测试、Storybook story、client-only 模块和 server-only 模块 | 路由页面或应该变成 URL 的文件 |
 | `<routing-dir-parent>/layout/index.tsx` | 可选外部 SPA 根布局 | 包裹已发现 SPA 路由树的一层应用 shell | MPA 公共外框、route-specific 嵌套布局、`src/layout.tsx` 这类根布局别名，或 `src/pages/layout.tsx` 这类路由目录根布局 |
 | `src/pages/<segment>/**/layout.{tsx,ts,jsx,js}` | 嵌套 SPA route layout | 在同一 URL 前缀下包裹子路由的 pathless layout route，例如 `src/pages/posts/layout.tsx` | 应用根 shell、MPA 公共外框、`src/pages/layout.tsx`、`layout/index.*` 别名，或命名为 `layout` 的非 layout helper 目录 |
+| `src/pages/**/error.{ts,tsx,js,jsx}` | 作用域 SPA error boundary | 该路由目录作用域及后代路由发生错误时的 React fallback 组件 | URL 路由、MPA 行为、服务端错误，或 helper 模块 |
+| `src/pages/**/not-found.{ts,tsx,js,jsx}` | 作用域 SPA not-found boundary | 该路由目录作用域及后代路由调用 `notFound()` 时的 React fallback 组件 | URL 路由、MPA 行为、服务端 404 响应，或 helper 模块 |
 | `<routing-dir-parent>/route-types.d.ts` | SPA 导航类型生成物 | 编辑器和类型检查支持 | 手工修改、从应用代码导入、放入模板或脚手架源码，或用于 MPA 模式 |
 | 带 `"use server";` 的 `**/*.server.{ts,tsx,js,jsx}` | 推荐的服务端函数模块命名 | 可达并导出命名可调用服务端函数的模块 | 浏览器专用 helper、默认导出、运行时再导出，或依赖目录名触发发现 |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | 启用 `server.routing` 时的服务端文件路由发现 | 导出大写 HTTP method 的 Request/Response 路由模块 | `route.ts` 哨兵、`foo.get.ts` method suffix 文件、bracket/catch-all/optional routes、`middleware`/`middlewares`、默认导出，或从路由候选文件导出 helper |

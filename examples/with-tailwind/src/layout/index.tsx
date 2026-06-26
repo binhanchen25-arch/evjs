@@ -1,6 +1,6 @@
 import { Link } from "@evjs/ev/page";
+import "@/styles.css";
 import type { ReactNode } from "react";
-import "../styles.css";
 
 export default function Root({ children }: { children?: ReactNode }) {
   return (

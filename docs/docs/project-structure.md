@@ -12,14 +12,16 @@ my-evjs-app/
 ├── index.html                   # shared HTML template with <div id="app">
 ├── package.json
 ├── .gitignore                   # ignores evjs generated artifacts
+├── tsconfig.json                # includes @/* -> ./src/* path alias
 ├── public/                      # copied static files
-├── tsconfig.json
 └── src/
     ├── styles.css               # global CSS / Tailwind entry
     ├── middleware.ts            # global server middleware
     ├── layout/
     │   └── index.tsx            # optional SPA root layout
     ├── pages/                   # page routes
+    │   ├── error.tsx            # optional root SPA error boundary
+    │   ├── not-found.tsx        # optional root SPA not-found boundary
     │   ├── index.tsx            # /
     │   ├── (marketing)/
     │   │   └── about.tsx        # /about
@@ -50,9 +52,11 @@ This shape covers the complete framework surface:
 | Surface | Convention | Notes |
 | --- | --- | --- |
 | Config | `ev.config.ts` | Customize routing mode, server paths, plugins, or explicit page outputs only when defaults are not enough. |
+| Import alias | `tsconfig.json` `paths["@/*"]` | `@/components/Button` resolves to `src/components/Button`; evjs configures the bundler alias automatically and templates configure TypeScript for editor/type-checker support. |
 | Client routes | `src/pages` | Source of truth for SPA and MPA page routes. SPA mode maps it to one framework-owned app entry; MPA mode maps it to independent page entries. |
 | SPA root shell | `<routing-dir-parent>/layout/index.tsx` | The default `src/pages` route directory uses `src/layout/index.tsx`; `routing.dir: "./src/app/pages"` uses `src/app/layout/index.tsx`. Use `routing.conventions.layout` only for an intentional custom shell path, or set it to `false` to disable root layout discovery. |
 | Nested SPA layouts | `src/pages/<segment>/layout.*` | Wrap descendants below a route segment. `src/pages/layout.tsx` and `src/pages/<segment>/layout/index.*` are rejected. MPA pages import shared components or share HTML templates instead. |
+| SPA route boundaries | `src/pages/**/error.*`, `src/pages/**/not-found.*` | Scoped SPA error and not-found boundaries. MPA pages treat these filenames as ordinary routes. |
 | Generated route types | `<routing-dir-parent>/route-types.d.ts` | SPA mode writes type-safe navigation declarations, such as `src/route-types.d.ts` or `src/app/route-types.d.ts`. Keep them ignored and do not import them from application code. |
 | Page metadata | Named exports in page modules | Rendering metadata lives with the page component. |
 | Server functions | `"use server";` in `*.server.*` modules | Server functions have no convention directory and can live beside pages, features, or server file routes. |
@@ -86,6 +90,9 @@ Quick rules:
   route directory. Nested SPA route layouts use `layout.*` below a route
   segment. Use `routing.conventions.layout` for a custom external root layout
   module. MPA routes do not consume framework layouts.
+- SPA `src/pages/error.tsx`, `src/pages/not-found.tsx`, and scoped files such
+  as `src/pages/dashboard/error.tsx` are reserved in SPA mode. `error.*` and
+  `not-found.*` inherit by route directory scope.
 - If an output cannot follow the directory shape, use explicit `pages` config
   instead of hand-writing `routing.routes`.
 
@@ -112,6 +119,8 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 | `src/pages/**/*.d.ts`, `src/pages/**/*.{test,spec,story,stories}.*`, `src/pages/**/*.{client,server}.*` | Ignored route support modules | Type declarations, tests, Storybook stories, client-only modules, and server-only modules colocated with pages | Route pages or files that should become URLs |
 | `<routing-dir-parent>/layout/index.tsx` | Optional external SPA root layout | One app shell around the discovered SPA route tree | MPA shared chrome, route-specific nested layouts, root layout aliases such as `src/layout.tsx`, or route-directory root layouts such as `src/pages/layout.tsx` |
 | `src/pages/<segment>/**/layout.{tsx,ts,jsx,js}` | Nested SPA route layout | Pathless layout routes that wrap child routes at the same URL prefix, such as `src/pages/posts/layout.tsx` | App-wide root shells, MPA shared chrome, `src/pages/layout.tsx`, `layout/index.*` aliases, or non-layout helper folders named `layout` |
+| `src/pages/**/error.{ts,tsx,js,jsx}` | Scoped SPA error boundary | React component fallback for errors in that route directory scope and descendants | URL routes, MPA behavior, server errors, or helper modules |
+| `src/pages/**/not-found.{ts,tsx,js,jsx}` | Scoped SPA not-found boundary | React component fallback for `notFound()` in that route directory scope and descendants | URL routes, MPA behavior, server 404 responses, or helper modules |
 | `<routing-dir-parent>/route-types.d.ts` | Generated SPA navigation types | Editor and type-checker support | Manual edits, imports from app code, template/scaffold source, or MPA mode |
 | `**/*.server.{ts,tsx,js,jsx}` with `"use server";` | Recommended server-function module naming | Reachable modules that export named callable server functions | Browser-only helpers, default exports, runtime re-exports, or relying on a directory name for discovery |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | Server file route discovery when `server.routing` is enabled | Request/Response route modules exporting uppercase HTTP methods | `route.ts` sentinels, `foo.get.ts` method suffix files, bracket/catch-all/optional routes, `middleware`/`middlewares`, default exports, or helper exports from route candidates |

@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import path from "node:path";
 import type { AppGraph, ResolvedConfig } from "@evjs/ev";
 import { createBuildPlan } from "@evjs/ev/build-tools";
 import { describe, expect, it } from "vitest";
@@ -51,6 +52,8 @@ describe("createWebpackConfigs", () => {
                   id: "index",
                   path: "/",
                   module: "./src/pages/index.tsx",
+                  errorModule: "./src/pages/error.tsx",
+                  notFoundModule: "./src/pages/not-found.tsx",
                 },
               ],
             },
@@ -60,6 +63,9 @@ describe("createWebpackConfigs", () => {
     );
     expect(configs[0]?.output?.publicPath).toBe("auto");
     expect(configs[0]?.output?.crossOriginLoading).toBe("anonymous");
+    expect(configs[0]?.resolve?.alias).toMatchObject({
+      "@": path.resolve(process.cwd(), "src"),
+    });
   });
 
   it("sets crossorigin for dynamically loaded browser chunks", async () => {
@@ -261,6 +267,8 @@ describe("createWebpackConfigs", () => {
               id: "index",
               path: "/",
               module: "./src/pages/index.tsx",
+              errorModule: "./src/pages/error.tsx",
+              notFoundModule: "./src/pages/not-found.tsx",
             },
           ],
         };
@@ -272,6 +280,12 @@ describe("createWebpackConfigs", () => {
 
     expect(source).toContain("@evjs/ev/internal/client");
     expect(source).toContain("createPagesApp");
+    expect(source).toContain("src/pages/error.tsx");
+    expect(source).toContain("src/pages/not-found.tsx");
+    expect(source).not.toContain("globalModule:");
+    expect(source).not.toContain("globalNotFoundModule");
+    expect(source).toContain("routeErrorModule0.default");
+    expect(source).toContain("routeNotFoundModule0.default");
     expect(source).toContain("src/layout/index.tsx");
     expect(source).toContain("src/pages/index.tsx");
     expect(source).not.toContain("evjs-page-route");
@@ -414,6 +428,8 @@ function createResolvedConfig(): ResolvedConfig<WebpackConfig> {
           id: "index",
           path: "/",
           module: "./src/pages/index.tsx",
+          errorModule: "./src/pages/error.tsx",
+          notFoundModule: "./src/pages/not-found.tsx",
         },
       ],
     },

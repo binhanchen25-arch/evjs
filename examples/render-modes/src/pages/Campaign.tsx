@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { campaignMetrics, campaignSegments } from "../domain/operations";
+import { campaignMetrics, campaignSegments } from "@/domain/operations";
 import RenderModePage from "./RenderModePage";
 
 const OfferRegion = lazy(() => import("./OfferRegion"));

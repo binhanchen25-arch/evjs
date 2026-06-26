@@ -92,7 +92,9 @@ function createGeneratedRouteTree(options: CreatePagesAppOptions): AnyRoute {
       : outlet;
   }
 
-  const rootRoute = createPageRootRoute({ component: RootRoute });
+  const rootRoute = createPageRootRoute({
+    component: RootRoute,
+  });
   const definitions = normalizePageDefinitions(options.routes);
   const childrenByParentId = groupPageDefinitionsByParentId(definitions);
   const routes = (childrenByParentId.get(undefined) ?? []).map((definition) =>
@@ -241,30 +243,7 @@ function assertCreatePagesAppOptions(
         `[evjs] Page route ${routeDefinition.path} default export must be a React component.`,
       );
     }
-    assertOptionalFunction(
-      routeDefinition.module.beforeLoad,
-      `${routePath}.module.beforeLoad`,
-    );
-    assertOptionalFunction(
-      routeDefinition.module.loader,
-      `${routePath}.module.loader`,
-    );
-    assertOptionalFunction(
-      routeDefinition.module.validateSearch,
-      `${routePath}.module.validateSearch`,
-    );
-    assertOptionalReactComponent(
-      routeDefinition.module.pendingComponent,
-      `${routePath}.module.pendingComponent`,
-    );
-    assertOptionalReactComponent(
-      routeDefinition.module.errorComponent,
-      `${routePath}.module.errorComponent`,
-    );
-    assertOptionalReactComponent(
-      routeDefinition.module.notFoundComponent,
-      `${routePath}.module.notFoundComponent`,
-    );
+    assertPageModuleOptions(routeDefinition.module, `${routePath}.module`);
     normalizedRoutes.push({
       id: routeId,
       path: definitionPath,
@@ -518,6 +497,25 @@ function assertOptionalReactComponent(value: unknown, path: string): void {
       `[evjs] createPagesApp() ${path} must be a React component.`,
     );
   }
+}
+
+function assertPageModuleOptions(
+  mod: Partial<PageModule> | undefined,
+  path: string,
+): void {
+  if (!mod) return;
+  assertOptionalFunction(mod.beforeLoad, `${path}.beforeLoad`);
+  assertOptionalFunction(mod.loader, `${path}.loader`);
+  assertOptionalFunction(mod.validateSearch, `${path}.validateSearch`);
+  assertOptionalReactComponent(
+    mod.pendingComponent,
+    `${path}.pendingComponent`,
+  );
+  assertOptionalReactComponent(mod.errorComponent, `${path}.errorComponent`);
+  assertOptionalReactComponent(
+    mod.notFoundComponent,
+    `${path}.notFoundComponent`,
+  );
 }
 
 function pickRouteOptions(mod: PageModule): Partial<PageModuleRouteOptions> {

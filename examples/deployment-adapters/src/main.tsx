@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { getMerchantOperationsSnapshot } from "./apis/operators.server";
-import type { OperationsSnapshot } from "./domain/operations";
-import "./styles.css";
+import { getMerchantOperationsSnapshot } from "@/apis/operators.server";
+import type { OperationsSnapshot } from "@/domain/operations";
+import "@/styles.css";
 
 interface HealthPayload {
   ok: boolean;

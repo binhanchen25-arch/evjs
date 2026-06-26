@@ -1075,6 +1075,50 @@ describe("build", () => {
     expect(events).toContain("root:none");
   });
 
+  it("preserves SPA error and not-found pages with routing.conventions false", async () => {
+    const cwd = await createProject();
+    await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/index.tsx"),
+      "export default function Home() { return null; }",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/error.tsx"),
+      "export default function ErrorPage() { return null; }",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/not-found.tsx"),
+      "export default function NotFoundPage() { return null; }",
+      "utf-8",
+    );
+    const events: string[] = [];
+    const bundler = createMockBundler(events, {
+      onBuildPlan(plan) {
+        const metadata = plan.entries.find(
+          (entry) => entry.metadata?.type === "pages-app",
+        )?.metadata;
+        recordPagesAppRoutes("routes", metadata, events);
+      },
+    });
+
+    await build(
+      {
+        output: { client: "dist" },
+        routing: {
+          conventions: false,
+        },
+      },
+      {
+        cwd,
+        bundler,
+      },
+    );
+
+    expect(events).toContain("routes:/,/error,/not-found");
+  });
+
   it("builds MPA pages without a router or generated route files", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });

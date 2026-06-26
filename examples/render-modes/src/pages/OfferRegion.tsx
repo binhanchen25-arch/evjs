@@ -1,4 +1,4 @@
-import { campaignMetrics, inventoryReservations } from "../domain/operations";
+import { campaignMetrics, inventoryReservations } from "@/domain/operations";
 
 export const cache = { revalidate: 30 } as const;
 

@@ -32,6 +32,7 @@ export interface DiscoverPageRoutesOptions {
   dir: string;
   mode?: "spa" | "mpa";
   rootLayout?: boolean | string;
+  spaConventions?: boolean;
   required?: boolean;
 }
 
@@ -71,14 +72,65 @@ export async function discoverPageRoutes(
   const { files } = await collectPageRouteTree(cwd, absoluteDir);
   const routeCandidates: PageRouteCandidate[] = [];
   const layoutCandidatesBySegments = new Map<string, PageRouteCandidate>();
+  const errorModulesBySegments = new Map<string, PageRouteConventionModule>();
+  const notFoundModulesBySegments = new Map<
+    string,
+    PageRouteConventionModule
+  >();
   const routeByPath = new Map<string, string>();
   const routeByShape = new Map<string, { file: string; path: string }>();
   const routeById = new Map<string, { file: string; path: string }>();
   let hasRouteCandidate = false;
+  const spaConventions =
+    options.mode !== "mpa" && options.spaConventions !== false;
 
   for (const file of files) {
     const sourceRel = toProjectPath(cwd, file);
     const routeRel = toPosixPath(path.relative(absoluteDir, file));
+    const conventionFile = spaConventions
+      ? parsePageRouteConventionFile(routeRel)
+      : undefined;
+    if (conventionFile) {
+      const segmentViolation = findPageRouteSegmentConventionViolation(
+        conventionFile.segments,
+      );
+      if (segmentViolation) {
+        diagnostics.push({
+          level: "error",
+          file: toDiagnosticPath(sourceRel),
+          message: formatPageRouteSegmentConventionViolation(segmentViolation),
+        });
+        continue;
+      }
+
+      const validConventionModule = await validatePageRouteConventionModule(
+        file,
+        conventionFile.kind,
+        diagnostics,
+        sourceRel,
+      );
+      if (!validConventionModule) continue;
+
+      const map =
+        conventionFile.kind === "error"
+          ? errorModulesBySegments
+          : notFoundModulesBySegments;
+      const previous = map.get(routeSegmentKey(conventionFile.segments));
+      if (previous) {
+        diagnostics.push({
+          level: "error",
+          file: toDiagnosticPath(sourceRel),
+          message: `Duplicate SPA ${formatPageRouteConventionKind(conventionFile.kind)} convention for ${formatPageRouteConventionScope(conventionFile.segments)}. ${previous.module} already owns this scope. Keep one ${conventionFile.kind === "error" ? "error" : "not-found"}.* module per route directory.`,
+        });
+        continue;
+      }
+      map.set(routeSegmentKey(conventionFile.segments), {
+        module: sourceRel,
+        segments: conventionFile.segments,
+      });
+      continue;
+    }
+
     const layoutFile = parsePageLayoutRouteFile(routeRel);
     if (layoutFile?.invalidLayoutSource) {
       diagnostics.push({
@@ -137,7 +189,9 @@ export async function discoverPageRoutes(
       continue;
     }
 
-    const routeFile = parsePageRouteFile(routeRel);
+    const routeFile = parsePageRouteFile(routeRel, {
+      spaConventions,
+    });
     if (!routeFile) continue;
     hasRouteCandidate = true;
 
@@ -215,6 +269,16 @@ export async function discoverPageRoutes(
     });
   }
 
+  for (const candidate of routeCandidates) {
+    const scopedConventions = findScopedPageRouteConventions(
+      candidate.segments,
+      errorModulesBySegments,
+      notFoundModulesBySegments,
+    );
+    candidate.errorModule ??= scopedConventions.errorModule;
+    candidate.notFoundModule ??= scopedConventions.notFoundModule;
+  }
+
   let rootModule: string | undefined;
   if (hasRouteCandidate && options.rootLayout !== false) {
     rootModule =
@@ -237,6 +301,10 @@ export async function discoverPageRoutes(
           ...(route.html ? { html: route.html } : {}),
           ...(parentId ? { parentId } : {}),
           ...(route.kind === "layout" ? { kind: route.kind } : {}),
+          ...(route.errorModule ? { errorModule: route.errorModule } : {}),
+          ...(route.notFoundModule
+            ? { notFoundModule: route.notFoundModule }
+            : {}),
         };
       }),
     ),
@@ -303,6 +371,40 @@ interface PageLayoutRouteFileConvention {
   invalidLayoutSource?: boolean;
 }
 
+interface PageRouteConventionFile {
+  kind: "error" | "not-found";
+  segments: string[];
+}
+
+interface PageRouteConventionModule {
+  module: string;
+  segments: string[];
+}
+
+function parsePageRouteConventionFile(
+  routeRel: string,
+): PageRouteConventionFile | undefined {
+  const normalizedRouteRel = normalizePageRouteConventionPath(routeRel);
+  if (!isPageRouteSourceModuleFile(path.posix.basename(normalizedRouteRel))) {
+    return undefined;
+  }
+
+  const extension = path.posix.extname(normalizedRouteRel);
+  const withoutExt = normalizedRouteRel.slice(0, -extension.length);
+  const segments = withoutExt.split("/").filter(Boolean);
+  if (segments.length === 0) return undefined;
+  if (segments.some(isIgnoredPageRouteSegment)) return undefined;
+
+  const name = segments[segments.length - 1] ?? "";
+  if (name === "error") {
+    return { kind: "error", segments: segments.slice(0, -1) };
+  }
+  if (name === "not-found") {
+    return { kind: "not-found", segments: segments.slice(0, -1) };
+  }
+  return undefined;
+}
+
 function parsePageLayoutRouteFile(
   routeRel: string,
 ): PageLayoutRouteFileConvention | undefined {
@@ -318,6 +420,7 @@ function parsePageLayoutRouteFile(
   if (segments.some(isIgnoredPageRouteSegment)) return undefined;
 
   const name = segments[segments.length - 1] ?? "";
+  if (name === "error" || name === "not-found") return undefined;
   const parent = segments[segments.length - 2] ?? "";
   if (name === "layout") {
     if (segments.length === 1) {
@@ -393,6 +496,77 @@ function createPageRouteDefaultExportDiagnostic(): string {
 
 function createRootLayoutDefaultExportDiagnostic(): string {
   return "Root layout must default-export a React component.";
+}
+
+function createPageRouteErrorBoundaryDefaultExportDiagnostic(): string {
+  return "SPA error boundary modules must default-export a React component.";
+}
+
+function createPageRouteNotFoundBoundaryDefaultExportDiagnostic(): string {
+  return "SPA not-found boundary modules must default-export a React component.";
+}
+
+async function validatePageRouteConventionModule(
+  absolute: string,
+  kind: PageRouteConventionFile["kind"],
+  diagnostics: PageRouteDiscoveryDiagnostic[],
+  sourceRel: string,
+): Promise<boolean> {
+  return validateRouteModule(absolute, diagnostics, {
+    file: sourceRel,
+    parseError:
+      kind === "error"
+        ? "SPA error boundary module could not be parsed"
+        : "SPA not-found boundary module could not be parsed",
+    missingDefaultExport:
+      kind === "error"
+        ? createPageRouteErrorBoundaryDefaultExportDiagnostic()
+        : createPageRouteNotFoundBoundaryDefaultExportDiagnostic(),
+  });
+}
+
+function findScopedPageRouteConventions(
+  segments: string[],
+  errorModulesBySegments: Map<string, PageRouteConventionModule>,
+  notFoundModulesBySegments: Map<string, PageRouteConventionModule>,
+): { errorModule?: string; notFoundModule?: string } {
+  return {
+    ...findNearestPageRouteConventionModule(segments, errorModulesBySegments, {
+      key: "errorModule",
+    }),
+    ...findNearestPageRouteConventionModule(
+      segments,
+      notFoundModulesBySegments,
+      { key: "notFoundModule" },
+    ),
+  };
+}
+
+function findNearestPageRouteConventionModule<TKey extends string>(
+  segments: string[],
+  modulesBySegments: Map<string, PageRouteConventionModule>,
+  options: { key: TKey },
+): Partial<Record<TKey, string>> {
+  for (let length = segments.length; length >= 0; length--) {
+    const match = modulesBySegments.get(
+      routeSegmentKey(segments.slice(0, length)),
+    );
+    if (match) {
+      return { [options.key]: match.module } as Partial<Record<TKey, string>>;
+    }
+  }
+  return {};
+}
+
+function formatPageRouteConventionKind(
+  kind: PageRouteConventionFile["kind"],
+): string {
+  return kind === "error" ? "error boundary" : "not-found boundary";
+}
+
+function formatPageRouteConventionScope(segments: string[]): string {
+  if (segments.length === 0) return "the root route scope";
+  return `route segment scope "${segments.join("/")}"`;
 }
 
 async function discoverExplicitRootLayout(

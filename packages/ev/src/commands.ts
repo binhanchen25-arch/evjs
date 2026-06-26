@@ -358,6 +358,7 @@ async function withPageRoutingDefaults<TBundlerCfg>(
     mode: base.mode,
     rootLayout:
       base.mode === "spa" ? (base.conventions?.layout ?? false) : false,
+    spaConventions: base.mode === "spa" && base.conventions !== undefined,
     required: requested,
   });
   options.onDiscovery?.(base, discovery);

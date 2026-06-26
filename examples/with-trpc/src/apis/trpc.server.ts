@@ -1,6 +1,6 @@
 "use server";
 import { callTRPCProcedure } from "@trpc/server";
-import { appRouter } from "../trpc";
+import { appRouter } from "@/trpc";
 
 /**
  * A Server Function that dispatches into the tRPC router.

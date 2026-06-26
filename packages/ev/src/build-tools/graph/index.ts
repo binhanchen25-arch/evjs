@@ -307,6 +307,10 @@ export async function createAppGraph(
             module: route.module,
             ...(route.parentId ? { parentId: route.parentId } : {}),
             ...(route.kind ? { kind: route.kind } : {}),
+            ...(route.errorModule ? { errorModule: route.errorModule } : {}),
+            ...(route.notFoundModule
+              ? { notFoundModule: route.notFoundModule }
+              : {}),
             ...(defaultAppId ? { appId: defaultAppId } : {}),
           },
           sourceCache,
@@ -335,6 +339,8 @@ export async function createAppGraph(
       ...(appId ? { appId } : {}),
       ...(pageId ? { pageId } : {}),
       ...(route.module ? { module: route.module } : {}),
+      ...(route.errorModule ? { errorModule: route.errorModule } : {}),
+      ...(route.notFoundModule ? { notFoundModule: route.notFoundModule } : {}),
       ...(route.render ? { render: route.render } : {}),
       ...(route.hydrate ? { hydrate: route.hydrate } : {}),
       ...(route.runtime ? { runtime: route.runtime } : {}),
@@ -1346,6 +1352,22 @@ async function collectFrameworkSourceFiles(
       cwd,
       route.module,
       `Page route "${route.id}" module`,
+      diagnostics,
+      explicitDependencyRoots,
+    );
+    await addConfiguredSource(
+      roots,
+      cwd,
+      route.errorModule,
+      `Page route "${route.id}" error boundary module`,
+      diagnostics,
+      explicitDependencyRoots,
+    );
+    await addConfiguredSource(
+      roots,
+      cwd,
+      route.notFoundModule,
+      `Page route "${route.id}" not-found boundary module`,
       diagnostics,
       explicitDependencyRoots,
     );

@@ -28,6 +28,9 @@ import { SERVER_ROUTES_ENTRY_IMPORT } from "../server-routes-entry.js";
 import { sanitizePageId } from "../utils.js";
 
 const DEFAULT_PUBLIC_PATH: RuntimePlan["publicPath"] = "auto";
+const DEFAULT_RESOLVE_ALIAS = {
+  "@": "./src",
+} as const satisfies NonNullable<BuildPlan["resolve"]>["alias"];
 
 export interface BuildPlanConfig {
   entry: string;
@@ -123,6 +126,11 @@ export function createBuildPlan(
     output: {
       clientDir: config.output.client,
       serverDir: config.output.server,
+    },
+    resolve: {
+      alias: {
+        ...DEFAULT_RESOLVE_ALIAS,
+      },
     },
     entries,
     html,
@@ -265,6 +273,10 @@ function createPagesAppRoutes(graph: AppGraph, appId: string): PageRouteNode[] {
           module: route.module,
           ...(route.parentId ? { parentId: route.parentId } : {}),
           ...(route.kind ? { kind: route.kind } : {}),
+          ...(route.errorModule ? { errorModule: route.errorModule } : {}),
+          ...(route.notFoundModule
+            ? { notFoundModule: route.notFoundModule }
+            : {}),
         },
       ];
     }),
@@ -495,7 +507,7 @@ function isMpaFileRoutePage(
   if (config.routing?.mode !== "mpa") return false;
   return config.routing.routes.some(
     (route) =>
-      route.id === page.routeId &&
+      route.id === (page.routeId ?? page.id) &&
       route.path === page.path &&
       route.module === page.component,
   );

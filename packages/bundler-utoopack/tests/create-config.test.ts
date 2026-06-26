@@ -61,6 +61,9 @@ describe("createUtoopackConfig", () => {
     ]);
     expect(utoopackConfig.output?.publicPath).toBe("auto");
     expect(utoopackConfig.output?.crossOriginLoading).toBe("anonymous");
+    expect(utoopackConfig.resolve?.alias?.["@"]).toBe(
+      path.resolve(process.cwd(), "src"),
+    );
     expect(utoopackConfig.devServer?.port).toBe(41234);
     expect(utoopackConfig.devServer?.https).toBe(true);
     expect(utoopackConfig.devServer?.proxy).toContainEqual(
@@ -324,6 +327,8 @@ describe("createUtoopackConfig", () => {
             id: "index",
             path: "/",
             module: "./src/pages/index.tsx",
+            errorModule: "./src/pages/error.tsx",
+            notFoundModule: "./src/pages/not-found.tsx",
           },
         ],
       },
@@ -379,6 +384,8 @@ describe("createUtoopackConfig", () => {
                     id: "index",
                     path: "/",
                     module: "./src/pages/index.tsx",
+                    errorModule: "./src/pages/error.tsx",
+                    notFoundModule: "./src/pages/not-found.tsx",
                   },
                 ],
               },
@@ -673,6 +680,7 @@ describe("createUtoopackConfig", () => {
         };
       },
       resourcePath: "/workspace/src/pages/about.tsx",
+      rootContext: "/workspace",
     });
 
     expect(source).toContain("@evjs/ev/internal/client/react-page");
@@ -694,6 +702,8 @@ describe("createUtoopackConfig", () => {
               id: "index",
               path: "/",
               module: "./src/pages/index.tsx",
+              errorModule: "./src/pages/error.tsx",
+              notFoundModule: "./src/pages/not-found.tsx",
             },
           ],
         };
@@ -705,6 +715,12 @@ describe("createUtoopackConfig", () => {
 
     expect(source).toContain("@evjs/ev/internal/client");
     expect(source).toContain("createPagesApp");
+    expect(source).toContain("src/pages/error.tsx");
+    expect(source).toContain("src/pages/not-found.tsx");
+    expect(source).not.toContain("globalModule:");
+    expect(source).not.toContain("globalNotFoundModule");
+    expect(source).toContain("routeErrorModule0.default");
+    expect(source).toContain("routeNotFoundModule0.default");
     expect(source).toContain("src/layout/index.tsx");
     expect(source).toContain("src/pages/index.tsx");
     expect(source).not.toContain("evjs-page-route");

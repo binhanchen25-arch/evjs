@@ -1,5 +1,5 @@
 import { useQuery } from "@evjs/ev/page";
-import { getPluginMessage } from "../apis/plugin.server";
+import { getPluginMessage } from "@/apis/plugin.server";
 
 export default function Home() {
   const { data, isLoading } = useQuery(getPluginMessage);

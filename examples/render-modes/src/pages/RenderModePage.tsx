@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import "../styles.css";
+import "@/styles.css";
 
 type RenderMode = "csr" | "ssr" | "ssg" | "ppr" | "rsc";
 

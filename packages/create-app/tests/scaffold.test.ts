@@ -111,6 +111,22 @@ describe("create-app scaffolding", () => {
     }
   });
 
+  it("template tsconfig enables the default source import alias", () => {
+    const templates = listTemplateNames();
+
+    for (const template of templates) {
+      const tsconfig = JSON.parse(
+        fs.readFileSync(
+          path.join(templatesDir, template, "tsconfig.json"),
+          "utf-8",
+        ),
+      );
+
+      expect(tsconfig.compilerOptions?.baseUrl).toBeUndefined();
+      expect(tsconfig.compilerOptions?.paths?.["@/*"]).toEqual(["./src/*"]);
+    }
+  });
+
   it("copy filter excludes build and generated framework artifacts", async () => {
     expect(shouldCopyTemplatePath("/some/path/node_modules")).toBe(false);
     expect(shouldCopyTemplatePath("/some/path/dist")).toBe(false);

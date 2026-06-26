@@ -2,7 +2,7 @@ import {
   getOperationsSnapshot,
   policyLanes,
   settlementBatches,
-} from "../domain/operations";
+} from "@/domain/operations";
 import RenderModePage from "./RenderModePage";
 
 export const render = "ssg";

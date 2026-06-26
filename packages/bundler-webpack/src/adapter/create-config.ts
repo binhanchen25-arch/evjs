@@ -96,6 +96,7 @@ export async function createWebpackConfigs(
         name: "client",
         outputPath: outputPaths.clientDir,
         publicPath: plan.runtime.publicPath,
+        resolveAlias: plan.resolve?.alias,
         functionEndpoint: config.server.runtime.fn,
         crossOriginLoading: config.output.crossOriginLoading,
         rscClientReferences: getRscClientReferenceModules(cwd, graph),
@@ -121,6 +122,7 @@ export async function createWebpackConfigs(
         name: "server",
         outputPath: outputPaths.serverDir,
         publicPath: plan.runtime.publicPath,
+        resolveAlias: plan.resolve?.alias,
         functionEndpoint: config.server.runtime.fn,
         crossOriginLoading: undefined,
         rscClientReferences: getRscClientReferenceModules(cwd, graph),
@@ -141,6 +143,7 @@ export async function createWebpackConfigs(
         name: "server-rsc",
         outputPath: outputPaths.serverDir,
         publicPath: plan.runtime.publicPath,
+        resolveAlias: plan.resolve?.alias,
         functionEndpoint: config.server.runtime.fn,
         crossOriginLoading: undefined,
         rscClientReferences: getRscClientReferenceModules(cwd, graph),
@@ -184,6 +187,7 @@ function createWebpackConfig(options: {
   name: string;
   outputPath: string;
   publicPath: PublicPathOutput;
+  resolveAlias?: NonNullable<BuildPlan["resolve"]>["alias"];
   functionEndpoint: string;
   crossOriginLoading:
     | ResolvedConfig["output"]["crossOriginLoading"]
@@ -241,14 +245,15 @@ function createWebpackConfig(options: {
     },
     resolve: {
       extensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs", ".json"],
-      ...(options.reactServerConditions
-        ? {
-            alias: {
+      alias: createResolveAlias(options.cwd, {
+        ...(options.resolveAlias ?? {}),
+        ...(options.reactServerConditions
+          ? {
               "@evjs/client$": clientRscPageContextEntry,
               "@evjs/ev/page$": evPageRscEntry,
-            },
-          }
-        : {}),
+            }
+          : {}),
+      }),
       ...(options.reactServerConditions
         ? {
             conditionNames: [
@@ -333,6 +338,23 @@ function createWebpackConfig(options: {
       runtimeChunk: false,
     },
   };
+}
+
+function createResolveAlias(
+  cwd: string,
+  alias: Record<string, string>,
+): NonNullable<Configuration["resolve"]>["alias"] {
+  return Object.fromEntries(
+    Object.entries(alias).map(([name, target]) => [
+      name,
+      resolveAliasTarget(cwd, target),
+    ]),
+  );
+}
+
+function resolveAliasTarget(cwd: string, target: string): string {
+  if (path.isAbsolute(target)) return target;
+  return target.startsWith(".") ? path.resolve(cwd, target) : target;
 }
 
 function createRscPlugins(options: {

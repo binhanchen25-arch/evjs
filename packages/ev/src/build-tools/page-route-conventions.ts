@@ -134,6 +134,22 @@ export const PAGE_ROUTE_CONVENTION_RULES = [
     invalid: ["src/pages/layout.tsx", "src/pages/posts/layout/index.tsx"],
   },
   {
+    id: "error-boundary",
+    category: "boundary",
+    summary:
+      "SPA error boundaries use error source modules scoped by directory",
+    valid: ["src/pages/error.tsx", "src/pages/posts/error.tsx"],
+    invalid: ["src/pages/error/index.tsx"],
+  },
+  {
+    id: "not-found-boundary",
+    category: "boundary",
+    summary:
+      "SPA not-found boundaries use not-found source modules scoped by directory",
+    valid: ["src/pages/not-found.tsx", "src/pages/posts/not-found.tsx"],
+    invalid: ["src/pages/not-found/index.tsx"],
+  },
+  {
     id: "mpa-html-template",
     category: "html",
     summary:
@@ -192,8 +208,10 @@ export interface PageRouteConventionRule {
     | "server-module"
     | "root-layout"
     | "route-layout"
+    | "error-boundary"
+    | "not-found-boundary"
     | "mpa-html-template";
-  category: "route" | "ignored" | "layout" | "html";
+  category: "route" | "ignored" | "layout" | "boundary" | "html";
   summary: string;
   valid: readonly string[];
   invalid: readonly string[];
@@ -222,6 +240,9 @@ function formatPageRouteConventionSummary(
   const layoutRules = rules
     .filter((rule) => rule.category === "layout")
     .map((rule) => rule.summary);
+  const boundaryRules = rules
+    .filter((rule) => rule.category === "boundary")
+    .map((rule) => rule.summary);
   const htmlRules = rules
     .filter((rule) => rule.category === "html")
     .map((rule) => rule.summary);
@@ -235,6 +256,7 @@ function formatPageRouteConventionSummary(
     );
   }
   sections.push(...layoutRules);
+  sections.push(...boundaryRules);
   sections.push(...htmlRules);
   return sections.join("; ");
 }
@@ -257,6 +279,7 @@ export function normalizePageRouteConventionPath(routeRel: string): string {
 
 export function parsePageRouteFile(
   routeRel: string,
+  options: { spaConventions?: boolean } = {},
 ): PageRouteFileConvention | undefined {
   const normalizedRouteRel = normalizePageRouteConventionPath(routeRel);
   if (!isPageRouteSourceModuleFile(path.posix.basename(normalizedRouteRel))) {
@@ -270,8 +293,18 @@ export function parsePageRouteFile(
   if (segments.some(isIgnoredPageRouteSegment)) return undefined;
 
   const name = segments[segments.length - 1] ?? "";
+  if (
+    options.spaConventions !== false &&
+    isPageRouteConventionModuleName(name)
+  ) {
+    return undefined;
+  }
   const routeSegments = name === "index" ? segments.slice(0, -1) : segments;
   return { segments: routeSegments };
+}
+
+export function isPageRouteConventionModuleName(name: string): boolean {
+  return name === "error" || name === "not-found";
 }
 
 export function isPrivatePageRouteSegment(segment: string): boolean {

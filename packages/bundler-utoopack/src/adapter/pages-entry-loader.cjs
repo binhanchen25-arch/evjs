@@ -19,6 +19,14 @@ module.exports = function pagesEntryLoader() {
       (route, index) =>
         `import * as routeModule${index} from ${JSON.stringify(toLoaderRelativeRequest(route.module, loaderContext))};`,
     ),
+    ...routes.flatMap((route, index) => [
+      route.errorModule
+        ? `import * as routeErrorModule${index} from ${JSON.stringify(toLoaderRelativeRequest(route.errorModule, loaderContext))};`
+        : "",
+      route.notFoundModule
+        ? `import * as routeNotFoundModule${index} from ${JSON.stringify(toLoaderRelativeRequest(route.notFoundModule, loaderContext))};`
+        : "",
+    ]),
   ].filter(Boolean);
 
   const routeDefinitions = routes.map((route, index) => {
@@ -27,7 +35,7 @@ module.exports = function pagesEntryLoader() {
       `path: ${JSON.stringify(route.path)}`,
       route.parentId ? `parentId: ${JSON.stringify(route.parentId)}` : "",
       route.kind ? `kind: ${JSON.stringify(route.kind)}` : "",
-      `module: routeModule${index}`,
+      `module: ${createRouteModuleExpression(route, index)}`,
     ].filter(Boolean);
     return `{ ${properties.join(", ")} }`;
   });
@@ -45,6 +53,22 @@ module.exports = function pagesEntryLoader() {
     ``,
   ].join("\n");
 };
+
+function createRouteModuleExpression(route, index) {
+  const properties = [];
+  if (route.errorModule) {
+    properties.push(
+      `errorComponent: routeErrorModule${index}.default ?? routeErrorModule${index}.errorComponent`,
+    );
+  }
+  if (route.notFoundModule) {
+    properties.push(
+      `notFoundComponent: routeNotFoundModule${index}.default ?? routeNotFoundModule${index}.notFoundComponent`,
+    );
+  }
+  if (properties.length === 0) return `routeModule${index}`;
+  return `{ ${properties.join(", ")}, ...routeModule${index} }`;
+}
 
 function toLoaderRelativeRequest(specifier, loaderContext) {
   if (!specifier.startsWith(".")) return specifier;

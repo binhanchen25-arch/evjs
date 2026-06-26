@@ -10,6 +10,8 @@
 | 与同 basename 页面路由相邻的 `src/pages/**/*.html` | `routing` | MPA 页面专属 HTML 模板，例如 `about.tsx` 对应 `about.html`，`users/index.tsx` 对应 `users/index.html`。 |
 | `<routing-dir-parent>/layout/index.tsx` | `routing.conventions.layout` | 按约定自动发现的可选外部 SPA 根布局。 |
 | `src/pages/<segment>/**/layout.{ts,tsx,js,jsx}` | `routing` | 页面路由树内的嵌套 SPA route layout。 |
+| `src/pages/**/error.{ts,tsx,js,jsx}` | `routing` | 离当前路由目录作用域最近的 SPA error boundary。 |
+| `src/pages/**/not-found.{ts,tsx,js,jsx}` | `routing` | 离当前路由目录作用域最近的 SPA not-found boundary。 |
 | `<routing-dir-parent>/route-types.d.ts` | generated | evjs 生成的 SPA 导航类型声明。 |
 | 带 `"use server";` 的 `*.server.{ts,tsx,js,jsx}` 文件 | server functions | 推荐的 server function 命名约定。 |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | `server.routing` | 启用 `server.routing` 时的服务端文件路由。 |
@@ -99,6 +101,18 @@ src/layout/index.tsx
 `src/pages/dashboard/layout/index.tsx` 这类 route layout 目录别名都会被约定拒绝。
 只有当应用 shell 明确放在其他位置时，才显式配置 `routing.conventions.layout`。
 设置 `routing.conventions.layout: false` 可以关闭外部根布局发现。MPA 模式不消费框架 layout。
+
+SPA route 边界使用专用约定文件：
+
+```text
+src/pages/error.tsx             -> 根 error boundary
+src/pages/not-found.tsx         -> 根 not-found boundary
+src/pages/dashboard/error.tsx   -> /dashboard 作用域 error boundary
+```
+
+`error.*` 和 `not-found.*` 按目录作用域生效，并被后代 page 和 layout routes
+继承，直到出现更近的边界文件。Boundary 模块必须默认导出 React 组件。这些 SPA
+router conventions 在 MPA 模式下不会被消费，相关文件名仍然是普通页面路由。
 
 MPA 模式下，页面路由可以使用同 basename 的 colocated HTML 模板：
 

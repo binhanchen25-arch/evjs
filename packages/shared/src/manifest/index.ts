@@ -109,6 +109,8 @@ export interface RouteNode {
   pageId?: string;
   appId?: string;
   module?: string;
+  errorModule?: string;
+  notFoundModule?: string;
   render?: RenderMode;
   hydrate?: HydrationMode;
   runtime?: ServerRuntime;
@@ -169,10 +171,15 @@ export interface BuildPlan {
     clientDir: string;
     serverDir: string;
   };
+  resolve?: ResolvePlan;
   entries: BuildEntry[];
   html: HtmlPlan[];
   server: ServerBuildPlan;
   runtime: RuntimePlan;
+}
+
+export interface ResolvePlan {
+  alias?: Record<string, string>;
 }
 
 export interface BuildEntry {
@@ -249,6 +256,8 @@ export interface PageRouteNode {
   html?: string;
   parentId?: string;
   kind?: PageRouteKind;
+  errorModule?: string;
+  notFoundModule?: string;
 }
 
 export type PageRouteKind = "page" | "layout";
@@ -482,6 +491,10 @@ export interface ExtractedRoute {
   kind?: PageRouteKind;
   /** Static page/component module declared for this route. */
   module?: string;
+  /** Scoped route error component module discovered from file conventions. */
+  errorModule?: string;
+  /** Scoped not-found component module discovered from file conventions. */
+  notFoundModule?: string;
   /** Render mode declared by the route target module. */
   render?: RenderMode;
   /** Hydration mode declared by the route target module. */
@@ -535,6 +548,8 @@ export function resolveRoutes(routes: ExtractedRoute[]): Array<{
   parentId?: string;
   kind?: PageRouteKind;
   module?: string;
+  errorModule?: string;
+  notFoundModule?: string;
   render?: RenderMode;
   hydrate?: HydrationMode;
   componentModel?: ComponentModel;
@@ -585,6 +600,8 @@ export function resolveRoutes(routes: ExtractedRoute[]): Array<{
     parentId?: string;
     kind?: PageRouteKind;
     module?: string;
+    errorModule?: string;
+    notFoundModule?: string;
     render?: RenderMode;
     hydrate?: HydrationMode;
     componentModel?: ComponentModel;
@@ -620,6 +637,8 @@ export function resolveRoutes(routes: ExtractedRoute[]): Array<{
         parentId: r.parentId,
         kind: r.kind,
         module: r.module,
+        errorModule: r.errorModule,
+        notFoundModule: r.notFoundModule,
         render: r.render,
         hydrate: r.hydrate,
         componentModel: r.componentModel,

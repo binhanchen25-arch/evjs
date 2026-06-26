@@ -1,6 +1,6 @@
 import { initTransport } from "@evjs/ev/transport";
 import { useEffect, useState } from "react";
-import { createUser, getUsers } from "../apis/users.server";
+import { createUser, getUsers } from "@/apis/users.server";
 
 // ── WebSocket Adapter ──
 
