@@ -1,21 +1,10 @@
 # 部署
 
-evjs 生产构建包含静态资源、framework server bundle，以及框架 manifest。
+生产部署从 `ev build` 开始。默认情况下，evjs 会把浏览器文件写到 `dist/client`；
+当应用使用服务端能力时，还会把服务端文件写到 `dist/server`。
 
-```txt
-dist/
-├── client/
-│   └── manifest.json
-├── server/
-│   └── manifest.json
-└── build-output.json
-```
-
-部署 adapter 应消费 `BuildOutput`，并从中派生平台特定路由或资源 manifest。
-运行在构建流水线里的 adapter 会直接收到这个对象；构建后的工具可以从
-`dist/build-output.json` 读取同一份完整模型。`dist/server/manifest.json` 只是派生出的
-server bundle metadata 视图，不能替代 `BuildOutput`。public manifest 路径跟随
-`output.client`。
+如果希望 evjs 生成平台专属文件，例如 Node server 入口、静态托管 redirects 或 edge
+worker，可以使用部署 adapter。
 
 ## 生产构建
 
@@ -24,160 +13,81 @@ npm run build
 # 通常执行：ev build
 ```
 
-重要输出：
-
-- `dist/client/manifest.json`：浏览器安全的 apps、pages、routes、assets 和 runtime paths；
-- `dist/server/manifest.json`：派生出的 server bundle metadata；
-- `dist/build-output.json`：面向工具和调试的私有完整 BuildOutput handoff；
-- `dist/client/`：浏览器资源和 HTML；
-- `dist/server/`：启用 `server` 时的框架服务端 bundle。
-
-如果页面 HTML 没有内嵌 `__EVJS_MANIFEST__`，浏览器 runtime 会从
-`manifestUrl`、`data-evjs-manifest` 或 `/manifest.json` 获取框架 manifest。
-部署时应把该响应作为成功的 JSON 返回，并使用
-`Content-Type: application/json`，允许附带可选 content-type 参数。
-
-## 能力模型
-
-部署应由框架能力决定，而不是由产物来自哪个 bundler 决定。Deployment adapter 应从
-manifest 中识别这些 runtime requirements：
-
-| 能力 | 公开入口 | 所需 runtime | 说明 |
-| --- | --- | --- | --- |
-| 静态资源 | `dist/client/*` | CDN/静态文件服务 | 按文件名缓存即可。 |
-| CSR app routes | app HTML fallback | 静态或服务端 | 不使用服务端能力时，静态 rewrite 足够。 |
-| MPA entry pages | page HTML file | 静态或服务端 | 用户自控 client entry 或 SSG/static HTML 页面可静态托管。 |
-| SSG pages | page HTML file | 静态或服务端 | 若不依赖动态服务端 API，可静态托管。 |
-| SSR pages | page route | 需要服务端能力 | route 必须到达 framework server bundle。 |
-| PPR pages | page route | 服务端能力或 edge+origin | 浏览器请求 page route；region resolution 可本进程或 server-to-server。 |
-| RSC pages | page route + `runtime.server.rsc` | 需要服务端能力 | document route 与 Flight endpoint 必须共享兼容 manifest/assets。 |
-| Server functions | `runtime.server.fn` | 需要服务端能力 | 通常与 SSR/RSC/PPR 和 server routes 共用同一个 origin/base path，除非用 `transport.baseUrl` 拆分浏览器请求。 |
-| Server routes | 声明的 route path | 需要服务端能力 | methods 与 405 行为属于 `@evjs/server`；客户端 helper 应与其它 framework server 请求共用 `transport.baseUrl`。 |
-
-由此得到四类实际部署拓扑：
-
-1. **Static-only**：CSR、MPA client entries、SSG/static HTML 页面 和静态资源。不包含 server functions、SSR、PPR、RSC 或 server routes。
-2. **Unified Node**：一个 Node 进程提供 `dist/client`、framework endpoints、
-   SSR/PPR/RSC document routes、server functions 和 server routes。
-3. **Unified Edge Worker**：一个 edge worker 从 binding 提供资源，并把 framework
-   请求交给 edge-compatible server bundle。
-4. **Edge + Origin/FaaS split**：CDN/edge 负责资源和缓存 shell；内源 origin/FaaS
-   负责 server functions、SSR/RSC rendering 和 PPR dynamic regions。
-
-长期 adapter contract 是：
+典型产物：
 
 ```txt
-BuildOutput
-  -> classify required capabilities
-  -> map public asset root
-  -> map framework endpoints
-  -> map document routes
-  -> map server routes
-  -> emit platform routing/artifacts
+dist/
+├── client/
+│   ├── manifest.json
+│   └── ...
+├── server/
+│   ├── manifest.json
+│   └── ...
+└── build-output.json
 ```
 
-Adapter 不应从文件名或 bundler stats 反推这些能力。
+重要路径：
 
-## Runtime 路径
+- `dist/client/`：浏览器资源和生成的 HTML。
+- `dist/client/manifest.json`：浏览器安全的路由、资源和运行时元信息。
+- `dist/server/`：应用使用服务端函数、服务端文件路由、SSR、PPR 或 RSC 时生成的服务端 bundle 和服务端元信息。
+- `dist/build-output.json`：面向工具和部署 adapter 的完整构建元信息。应用代码不应导入或修改它。
 
-框架服务端 endpoint 从 `server.basePath` 派生：
+如果页面 HTML 没有内嵌 manifest，浏览器 runtime 会从配置的 manifest URL 或
+`/manifest.json` 获取它。部署时应把该响应作为 JSON 返回，并设置
+`Content-Type: application/json`。
+
+## 选择部署目标
+
+| 目标 | 适用场景 | Adapter |
+| --- | --- | --- |
+| 静态托管 | 应用只需要浏览器资源、CSR、MPA client page，或完全静态/SSG 页面。 | `staticDeploymentAdapter()` |
+| Node.js | 一个 Node 进程负责资源和全部服务端能力。 | `nodeDeploymentAdapter()` |
+| Edge worker | 平台提供 `fetch()` worker 和静态资源 binding。 | `edgeDeploymentAdapter()` |
+| CDN + origin 拆分 | 静态资源在 CDN，服务端能力部署在另一个 origin。 | 使用具备服务端能力的 adapter，并配置平台路由。 |
+
+当应用使用服务端函数、服务端文件路由、SSR、PPR 或 RSC 时，不要只部署 `dist/client`。
+这些能力需要具备服务端能力的部署目标。
+
+## 运行时路径
+
+服务端运行时路径从 `server.basePath` 派生：
 
 ```txt
 /__evjs/fn       服务端函数
-/__evjs/ppr      存在 PPR 页面时的 region direct/debug endpoint
-/__evjs/rsc      启用 server.rsc 时的 Flight endpoint
+/__evjs/ppr      存在 PPR 页面时的 PPR 支持端点
+/__evjs/rsc      存在 RSC 页面时的 RSC Flight 端点
 ```
 
-RSC Flight response 默认使用 `Cache-Control: no-store`；renderer 显式返回的
-cache headers 会被保留。
+多数应用可以保留默认的 `server.basePath`。只有当宿主平台占用了 `/__evjs`，或反向代理要求其他前缀时，才需要修改它。
 
-PPR 文档请求通过页面 route 服务；PPR endpoint 主要用于 direct/debug 访问和 fallback
-adapter，不是默认浏览器首屏协议。
+PPR 文档请求仍然通过页面 route。PPR 支持端点用于框架/runtime 协作和直接调试，不是用户编写的 API route。
 
-如果生产部署把 PPR shell 缓存在 edge，而 dynamic regions 部署在内源 FaaS/origin，
-浏览器侧协议仍然应该保持为页面 route：
+当浏览器资源和服务端运行时位于不同 origin 时，在构建时设置 `transport.baseUrl`：
 
-```txt
-Browser
-  GET /campaign
-    -> Edge/CDN
-       load cached shell
-       read manifest PPR region metadata
-       server-to-server GET /__evjs/ppr/campaign/region_a1b2c3d4e5f6
-         -> Internal FaaS/origin renders region fragment
-       merge 或 stream region 到同一个 /campaign response
-    <- Browser receives one document response
+```ts
+import { defineConfig } from "@evjs/ev";
+
+export default defineConfig({
+  transport: {
+    baseUrl: "https://api.example.com",
+  },
+});
 ```
-
-在这个拓扑下：
-
-- `/__evjs/ppr/<page>/<region>` 不是浏览器首屏请求。
-- 它是 edge/runtime 层使用的内部 region resolver endpoint。
-- direct endpoint 在 PPR base path 后只精确匹配两个编码后的 path segment：
-  `<pageId>/<regionId>`。
-- `regionId` 是 opaque internal manifest id，不是用户编写 API。
-- `prerender.delivery = "merge"` 会等待必要 regions 后再返回 document。
-- `prerender.delivery = "stream"` 会先 flush 缓存 shell，并在内部 region 请求完成后把
-  patches 继续写入同一个 HTML response。
-
-合成后的 PPR page response 会得到保守的默认缓存策略：
-
-- 任意 region 动态时使用 `Cache-Control: no-store`；
-- 所有 regions 都声明 `{ revalidate }` 时使用最小的 region `s-maxage`；
-- shell 显式返回的 `Cache-Control` 会被保留。
-
-PPR direct `HEAD` 请求可以返回 cache headers，但不会写入 region body cache。部署侧需要
-预热 PPR region 时应使用 `GET`。
-
-拆分式 edge/origin adapter 可以提供 `framework.ppr.regionCache`，用平台 cache、
-KV store 或区域内存缓存来承载 PPR region body cache。设置
-`framework.ppr.staleWhileRevalidate` 后，仍在 stale 窗口内的过期 entry 会以
-`x-evjs-cache: STALE` 返回；如果平台暴露 `waitUntil()`，运行时会用它在后台刷新缓存。
-Cache provider 失败会被记录，并退回到 fresh render。
-
-如果浏览器和服务端在不同 origin，构建时配置 `transport.baseUrl`，让浏览器发起的
-framework 请求共用同一个 server base URL。
-
-## 路由优先级
-
-具备服务端能力的 adapter 应按这个顺序处理路由：
-
-```txt
-1. dist/client 中的 immutable/static assets
-2. framework endpoints: runtime.server.fn, runtime.server.ppr, runtime.server.rsc
-3. BuildOutput.server.routes 中的显式 server routes
-4. framework document routes: SSR, PPR, RSC，以及 server-rendered SSG fallback
-5. CSR navigation 的 app/page HTML fallback
-6. 404
-```
-
-Static-only adapter 只应为无需服务端即可运行的能力生成 redirects。如果 `BuildOutput`
-包含 SSR、PPR、RSC、server functions 或 server routes，static adapter 仍可以输出
-静态资源和 metadata，但不能声明整个应用仅靠静态托管即可完整运行。此时
-`deployment.static.json` 会记录 `metadata.static.complete = false` 以及不支持的能力，
-`_redirects` 也不会输出全局 catch-all fallback，避免把需要服务端的路由误导到
-`index.html`。
-`rendering.prerender = "full"` 是构建 metadata，本身不等于静态交付保证；
-static-only routing 只使用 manifest 中 `rendering.html = "static"` 的页面，例如
-`render = "ssg"` 页面。
 
 ## 内置 Adapter
 
 `@evjs/ev` 内置三类部署 adapter：
 
-- `nodeDeploymentAdapter()`：输出 Node server 入口和 deployment metadata。
-- `staticDeploymentAdapter()`：输出 deployment metadata 以及静态托管可用的 `_redirects`。
-- `edgeDeploymentAdapter()`：输出 deployment metadata 以及 edge worker module；worker
-  将框架请求转发给服务端 bundle，将静态资源交给 asset binding。
+- `nodeDeploymentAdapter()`：输出 Node server 入口和部署元信息。
+- `staticDeploymentAdapter()`：输出静态托管元信息和 `_redirects`。
+- `edgeDeploymentAdapter()`：输出 edge worker 入口和部署元信息。
 
-三类 adapter 都从 `BuildOutput` 派生，不读取 bundler stats 或 bundler config。
-对于 `/assets/` 这类 root-relative 且非根的 `publicPath`，生成的 Node 和 edge
-module 会在从 `dist/client` 或 asset binding 解析文件前剥离该 URL 前缀。绝对
-CDN public path 不会被改写，因为这类资源请求应在 CDN 终止。
+Adapter 基于 evjs 构建结果工作，不应从文件名或 bundler stats 反推框架能力。
 
 ## Node.js
 
-普通 Node 服务可以直接使用内置 Node 部署 adapter：
+普通 Node 服务可以使用 Node adapter 接管生产请求路径：
 
 ```ts
 // ev.config.ts
@@ -202,15 +112,12 @@ dist/
 node dist/server.mjs
 ```
 
-生成的 server 会把框架服务端 bundle 挂在 `server.basePath`，挂载
-SSR/PPR/RSC 文档路由和显式 server routes，提供 `dist/client` 静态资源，
-并对客户端路由回退到 app HTML。
-
-如果需要完全自定义，应把它视为 standalone/manual server runtime 场景：显式声明 `@evjs/server`，挂载产出的 `{ fetch }` handler；如果 `server.basePath` 不是 `/__evjs`，请同步调整挂载路径。
+生成的 server 会提供 `dist/client`，处理服务端函数和服务端文件路由，挂载
+SSR/PPR/RSC 文档路由，并对客户端导航回退到应用 HTML。默认从 `PORT` 读取端口。
 
 ## 静态托管
 
-只需要静态路由 metadata 时，可以使用 static adapter：
+当应用兼容静态托管时，可以使用 static adapter：
 
 ```ts
 import { defineConfig, staticDeploymentAdapter } from "@evjs/ev";
@@ -220,20 +127,19 @@ export default defineConfig({
 });
 ```
 
-adapter 会输出：
+adapter 会把静态托管文件写入 public output 目录：
 
 ```txt
-dist/
+dist/client/
 ├── deployment.static.json
 └── _redirects
 ```
 
-生成的 redirects 会把静态/SSG 页面映射到对应 HTML，把 app route 映射到 app HTML
-fallback。Router-free MPA pages 只生成精确 route rewrite，不会创建全局 catch-all。
-只有构建产物完全兼容静态托管且存在 app-owned HTML fallback 时，才会输出全局 `/*`
-fallback。SSR、PPR、RSC、server functions 和显式 server routes 仍然需要具备服务端能力的
-adapter，并会列在 `deployment.static.json` 的
-`metadata.static.unsupportedCapabilities` 中。
+生成的 redirects 会把静态或 SSG 页面映射到对应 HTML，并把 app route 映射到应用 HTML
+fallback。无路由器 MPA 页面使用精确 rewrite，不会创建全局 catch-all。
+
+如果构建中包含 SSR、PPR、RSC、服务端函数或服务端文件路由，static adapter 仍会输出资源和元信息，
+但会在 `deployment.static.json` 中标记静态产物不完整。这种情况下，应用还需要一条具备服务端能力的部署路径。
 
 ## Edge Runtime
 
@@ -251,7 +157,7 @@ export default defineConfig({
 });
 ```
 
-adapter 会输出：
+执行 `ev build` 后会生成：
 
 ```txt
 dist/
@@ -259,10 +165,12 @@ dist/
 └── worker.mjs
 ```
 
-生成的 worker 会从 `dist/server` 导入服务端 bundle，将 framework 请求和
-SSR/PPR/RSC 文档请求转发给该 bundle，并通过配置的 binding 提供浏览器资源。
+生成的 worker 会把服务端运行时请求和服务端渲染页面请求转发给服务端 bundle，并通过配置的
+asset binding 提供浏览器资源。
 
 ## Docker
+
+Docker 部署可以使用 Node adapter，并运行生成的 `dist/server.mjs`：
 
 ```dockerfile
 FROM node:22-alpine AS builder
@@ -281,10 +189,10 @@ EXPOSE 3000
 CMD ["node", "dist/server.mjs"]
 ```
 
-## 部署插件
+## 自定义部署插件
 
-部署插件应使用 `buildOutput()` 或 `buildEnd({ output })`。平台专属文件可以
-从 `createDeploymentArtifact()` 派生：
+部署插件可以使用 `buildEnd({ output })` 输出平台文件。需要可复用的元信息结构时，可以从
+`createDeploymentArtifact()` 开始：
 
 ```ts
 import { createDeploymentArtifact } from "@evjs/ev";
@@ -294,17 +202,12 @@ export function deployAdapter() {
     name: "deploy-adapter",
     setup() {
       return {
-        buildOutput(output) {
-          output.deployment = {
-            platform: "custom",
-            publicPath: output.publicPath,
-            server: output.runtime.server,
-          };
-        },
         buildEnd({ output }) {
-          emitPlatformFiles(createDeploymentArtifact(output, {
+          const artifact = createDeploymentArtifact(output, {
             platform: "custom",
-          }));
+          });
+
+          emitPlatformFiles(artifact);
         },
       };
     },
@@ -312,5 +215,5 @@ export function deployAdapter() {
 }
 ```
 
-构建后的工具可以读取 `dist/build-output.json`。运行在 `ev build` 过程中的 adapter
-会在内存里收到同一份 `BuildOutput`，并可以内嵌所需 runtime 数据。
+自定义 adapter 应聚焦平台路由、资源服务、进程或 worker 启动逻辑。应用代码应继续使用 evjs
+文件约定，而不是直接读取部署元信息。

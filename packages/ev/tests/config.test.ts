@@ -4,7 +4,7 @@ import { CONFIG_DEFAULTS, defineConfig, resolveConfig } from "../src/config.js";
 
 describe("defineConfig", () => {
   it("returns the config object unchanged", () => {
-    const config = { entry: "./src/custom.tsx" };
+    const config = { html: "./index.html" };
     expect(defineConfig(config)).toBe(config);
   });
 
@@ -176,10 +176,19 @@ describe("resolveConfig", () => {
     expect(() =>
       resolveConfig({
         // @ts-expect-error runtime config loading can still produce unknown keys.
+        entry: "./src/main.tsx",
+      }),
+    ).toThrow(
+      "[evjs] config.entry is not a public config field. Use app.entry for a manually bootstrapped SPA, routing for file routes, or pages for explicit page outputs.",
+    );
+
+    expect(() =>
+      resolveConfig({
+        // @ts-expect-error runtime config loading can still produce unknown keys.
         vite: {},
       }),
     ).toThrow(
-      "[evjs] config.vite is not supported. Use entry, html, output, dev, server, transport, app, routing, bundler, plugins, or pages.",
+      "[evjs] config.vite is not supported. Use html, output, dev, server, transport, app, routing, bundler, plugins, or pages.",
     );
   });
 
@@ -467,7 +476,7 @@ describe("resolveConfig", () => {
         },
       }),
     ).toThrow(
-      "[evjs] routing.entry is not a public config field. Use top-level entry or app entries for SPA applications; MPA routing creates one page entry per route file.",
+      "[evjs] routing.entry is not a public config field. SPA routing creates its own page app entry; use app.entry only for a manually bootstrapped SPA.",
     );
 
     expect(() =>
@@ -502,10 +511,9 @@ describe("resolveConfig", () => {
 
   it("respects user overrides for top-level fields", () => {
     const resolved = resolveConfig({
-      entry: "./src/custom.tsx",
       html: "./public/index.html",
     });
-    expect(resolved.entry).toBe("./src/custom.tsx");
+    expect(resolved.entry).toBe("./src/main.tsx");
     expect(resolved.html).toBe("./public/index.html");
   });
 
@@ -1468,9 +1476,9 @@ describe("resolveConfig", () => {
   it("rejects invalid single app declarations", () => {
     expect(() =>
       resolveConfig({
-        entry: "",
+        app: "",
       }),
-    ).toThrow("[evjs] entry must be a non-empty string.");
+    ).toThrow("[evjs] app must be a non-empty string.");
 
     expect(() =>
       resolveConfig({
@@ -1778,10 +1786,10 @@ describe("resolveConfig", () => {
   });
 
   it("does not share state between calls", () => {
-    const a = resolveConfig({ entry: "./a.tsx" });
-    const b = resolveConfig({ entry: "./b.tsx" });
-    expect(a.entry).toBe("./a.tsx");
-    expect(b.entry).toBe("./b.tsx");
+    const a = resolveConfig({ html: "./a.html" });
+    const b = resolveConfig({ html: "./b.html" });
+    expect(a.html).toBe("./a.html");
+    expect(b.html).toBe("./b.html");
   });
 
   it("resolves MPA page string shorthand as component modules", () => {

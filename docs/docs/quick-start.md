@@ -56,7 +56,7 @@ my-app/
 │   │   ├── users.server.ts # "use server" functions
 │   │   └── api/
 │   │       └── health.ts   # /api/health
-│   └── middleware.ts       # Framework request middleware
+│   └── middleware.ts       # Global server middleware
 ├── package.json
 └── tsconfig.json
 ```

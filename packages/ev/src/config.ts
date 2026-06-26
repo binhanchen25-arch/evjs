@@ -148,8 +148,6 @@ export interface ResolvedConfig<TBundlerCfg = DefaultBundlerConfig> {
  * evjs framework configuration.
  */
 export interface Config<TBundlerCfg = DefaultBundlerConfig> {
-  /** Client entry point. Default: "./src/main.tsx". */
-  entry?: string;
   /** HTML template path. Default: "./index.html". */
   html?: string;
 
@@ -202,8 +200,8 @@ export interface Config<TBundlerCfg = DefaultBundlerConfig> {
    * Define multiple independent page outputs. A string page is shorthand for a
    * React component module managed by the evjs page runtime. Use `{ entry }`
    * only when the page owns its own bootstrap.
-   * When set, the build produces one HTML file per page and the single-entry
-   * `entry` / `html` fields are ignored.
+   * When set, the build produces one HTML file per page. Top-level `html` is
+   * used as the default page template when a page does not provide one.
    *
    * @example
    * ```ts
@@ -434,7 +432,6 @@ export const CONFIG_DEFAULTS = {
 const MPA_LAYOUT_UNSUPPORTED_MESSAGE =
   "[evjs] routing.conventions.layout is only supported in SPA mode. MPA pages should import shared shell components directly or use shared HTML templates.";
 const PUBLIC_ROOT_CONFIG_KEYS = new Set([
-  "entry",
   "html",
   "output",
   "dev",
@@ -552,10 +549,7 @@ export function resolveConfig<TBundlerCfg = DefaultBundlerConfig>(
   );
   validateOutputConfigKeys(outputConfig);
 
-  const entry =
-    config.entry === undefined
-      ? CONFIG_DEFAULTS.entry
-      : assertNonEmptyString(config.entry, "entry");
+  const entry = CONFIG_DEFAULTS.entry;
   const defaultHtml =
     config.html === undefined
       ? CONFIG_DEFAULTS.html
@@ -828,8 +822,11 @@ function validateRootConfigKeys(config: Record<string, unknown>): void {
     config,
     PUBLIC_ROOT_CONFIG_KEYS,
     "config",
-    "entry, html, output, dev, server, transport, app, routing, bundler, plugins, or pages",
+    "html, output, dev, server, transport, app, routing, bundler, plugins, or pages",
     (key) => {
+      if (key === "entry") {
+        return "[evjs] config.entry is not a public config field. Use app.entry for a manually bootstrapped SPA, routing for file routes, or pages for explicit page outputs.";
+      }
       if (key === "apps") {
         return "[evjs] config.apps is resolved framework metadata and cannot be configured. Use app for one explicit SPA, routing for file routes, or pages for explicit page outputs.";
       }
@@ -1060,7 +1057,7 @@ function validatePageRoutingConfigKeys(routing: PageRoutingConfig): void {
     "mode, dir, html, mount, or conventions",
     (key) => {
       if (key === "entry") {
-        return "[evjs] routing.entry is not a public config field. Use top-level entry or app entries for SPA applications; MPA routing creates one page entry per route file.";
+        return "[evjs] routing.entry is not a public config field. SPA routing creates its own page app entry; use app.entry only for a manually bootstrapped SPA.";
       }
       if (key === "routes") {
         return "[evjs] routing.routes is not a public config field. evjs discovers page routes from routing.dir; use pages for explicit non-conventional page declarations.";

@@ -3,7 +3,7 @@
 Server functions let you write backend logic alongside your frontend code and
 call it from React components with local-call ergonomics over a typed server
 boundary. The call shape looks like a normal async function, but the framework
-still serializes arguments, dispatches the request through the framework server,
+still serializes arguments, dispatches the request through the server runtime,
 and returns a serialized result or structured error. While not strictly
 required, we recommend suffixing server function files with `.server.ts`. The
 build system transforms them into RPC calls automatically.
@@ -30,9 +30,8 @@ export const deleteUser = async (id: string) => {
 ### Rules
 
 - File must start with `"use server";` directive
-- Malformed `"use server"` modules fail with
-  `Server function module could not be parsed:` plus the parser message.
-  Graph analysis includes the file path before server-function transforms run.
+- Malformed `"use server"` modules fail before bundling and include the file path
+  plus the parser message when evjs can resolve it.
 - Only **named callable exports** are transformed: `export function`,
   `export async function`, `export const name = () => {}`,
   `export const name = async () => {}`, or same-module aliases such as
@@ -63,10 +62,9 @@ export const deleteUser = async (id: string) => {
   files. Server functions have no convention directory.
 - No default exports, runtime re-exports from other modules, or exported
   non-function runtime values such as constants
-- Reachable `"use server"` modules are transformed into client references and
-  server registrations. "Reachable" means imported by the app, page, server
-  file-route, or server middleware convention graph; unrelated files outside
-  the graph are ignored.
+- Reachable `"use server"` modules are made callable from the browser.
+  "Reachable" means imported by app code, page modules, server file routes, or
+  server middleware; unrelated files are ignored.
 
 ## Request Context Helpers
 
@@ -100,7 +98,9 @@ at module scope, during build, or from client code throws this diagnostic:
 
 ## Query Patterns
 
-evjs provides type-safe `useQuery` and `useSuspenseQuery` that accept server functions directly. Server function stubs also carry `.queryKey()`, `.fnId`, `.fnName`, and fixed-signature `.fnArity` metadata for cache invalidation and introspection.
+evjs provides type-safe `useQuery` and `useSuspenseQuery` that accept server
+functions directly. Use the cache helpers when a loader, prefetch, or mutation
+needs the same query key.
 
 ### Direct Usage (Recommended)
 
@@ -133,30 +133,25 @@ loader: ({ context }) =>
   context.queryClient.ensureQueryData(getFnQueryOptions(getUsers));
 ```
 
-The function overloads require compiler-generated server function stubs because
-the server boundary needs a stable function id, a request endpoint, and query
-key metadata. Passing a plain async function to `useQuery(fn)`,
+The function overloads require a compiled server function reference. Passing a
+plain async function to `useQuery(fn)`,
 `useSuspenseQuery(fn)`, `useMutation(fn)`, `getFnQueryKey(fn)`, or
 `getFnQueryOptions(fn)` throws an `[evjs]` diagnostic that names the rejected
 function. Use the TanStack object form for non-server functions, for example
 `useQuery({ queryKey, queryFn })`.
 
-### Server Function Metadata
+### Cache Helpers
 
-Every registered server function stub carries these properties at runtime:
+Use `getFnQueryKey()` and `getFnQueryOptions()` instead of reading server
+function internals:
 
 ```ts
-getFnQueryKey(getUsers)         // → ["<fnId>"]
-getFnQueryKey(getUsers, someArg)// → ["<fnId>", someArg]
-getUsers.fnId               // → "<hash>" (stable SHA-256)
-getUsers.fnName             // → "getUsers"
-getUsers.fnArity            // → fixed declared parameter count, when available
+getFnQueryKey(getUsers);
+getFnQueryKey(getUser, userId);
+getFnQueryOptions(getUsers);
 ```
 
 - **`getFnQueryKey(fn, ...args)`** — Build a TanStack Query key. Use for `invalidateQueries`, `setQueryData`, etc.
-- **`.fnId`** — The stable internal function ID (read-only).
-- **`.fnName`** — The human-readable export name (read-only).
-- **`.fnArity`** — The fixed declared parameter count (read-only). It is omitted for optional, default, or rest-parameter signatures because those functions accept a flexible argument shape. `useMutation()` uses this metadata when present to serialize variables.
 - **`getFnQueryOptions(fn, ...args)`** — Returns `{ queryKey, queryFn }` for loaders, prefetch, and `useInfiniteQuery`.
 
 ### Mutation Arguments
@@ -173,15 +168,15 @@ mutate(["admin", "editor"]);
 mutate(["Alice", "alice@example.com"]);
 ```
 
-For fixed signatures, the generated stub includes `.fnArity`:
+For fixed signatures, evjs can serialize mutation variables by parameter count:
 
 ```ts
-export async function refresh() {}                   // fnArity = 0
-export async function saveRoles(roles: string[]) {}  // fnArity = 1
-export async function createUser(name: string, email: string) {} // fnArity = 2
+export async function refresh() {}
+export async function saveRoles(roles: string[]) {}
+export async function createUser(name: string, email: string) {}
 ```
 
-For flexible signatures, `.fnArity` is omitted:
+Flexible signatures use the fallback argument shape:
 
 ```ts
 export async function search(query: string, options = {}) {}
@@ -189,10 +184,10 @@ export async function maybeUser(id?: string) {}
 export const saveTags = async (...tags: string[]) => {};
 ```
 
-When `.fnArity` is omitted, `useMutation()` uses the flexible fallback:
-omitted variables become `[]`, array variables are treated as the full argument
-list, and non-array variables become one argument. If an array should be one
-argument, declare exactly one required parameter, as in `saveRoles()` above.
+With flexible signatures, omitted variables become `[]`, array variables are
+treated as the full argument list, and non-array variables become one argument.
+If an array should be one argument, declare exactly one required parameter, as in
+`saveRoles()` above.
 
 When you call `useMutation(serverFn, options)`, do not provide `mutationFn`;
 evjs derives it from the server function. Use the standard TanStack
@@ -226,20 +221,19 @@ initTransport({
 });
 ```
 
-`baseUrl`, `credentials`, and `headers` configure the built-in server-function
-HTTP adapter. The function path itself is framework runtime metadata derived
-from `server.basePath`, so application code normally only changes `baseUrl`
-when the server runtime is hosted on another origin:
+`baseUrl`, `credentials`, and `headers` configure the built-in HTTP adapter.
+Application code normally only changes `baseUrl` when the server runtime is
+hosted on another origin:
 
-- `baseUrl`: absolute HTTP(S) origin or base URL for framework server calls;
+- `baseUrl`: absolute HTTP(S) origin or base URL for server runtime calls;
   it must not contain leading or trailing whitespace.
 - `credentials`: fetch credentials policy, for example `"include"`.
 - `headers`: static headers or a function evaluated for each call.
 
-For framework builds, prefer `transport.baseUrl` in `ev.config.ts` when the
-browser talks to a framework server on another origin. That build-time value is
-published in the manifest and shared by browser-initiated framework requests
-such as server functions, RSC Flight, and client helpers for server routes.
+For evjs builds, prefer `transport.baseUrl` in `ev.config.ts` when the
+browser talks to the server runtime on another origin. That value is shared by
+browser-initiated requests such as server functions, RSC Flight, and client
+helpers for server routes.
 The built-in adapter owns `Content-Type: application/json`; use `headers` only
 for additional headers such as auth, tracing, or CSRF tokens.
 
@@ -247,41 +241,8 @@ Fetch `mode` is not configurable. Server function requests rely on the browser's
 default CORS behavior; cross-origin cookies should be controlled with
 `credentials` and matching server CORS headers.
 
-The default HTTP adapter has these request rules:
-
-- It sends POST JSON shaped as `{ fnId, args }`.
-- `fnId` is the exact generated server function ID.
-- `args` is always an array.
-- Requests must use `Content-Type: application/json`; missing or different
-  media types receive a structured `415` response.
-- Other HTTP methods receive a structured `405` response with `Allow: POST`.
-- Missing, non-string, empty, or leading/trailing-whitespace `fnId` values and
-  non-array `args` values are rejected with `400` before dispatch.
-- Request bodies larger than 1 MiB are rejected with a structured `413` JSON
-  error using the same `{ error, fnId, status }` envelope.
-
-Custom transports should keep the same logical contract even when they do not
-use HTTP.
-
-The default adapter also has strict response rules:
-
-- Network or abort failures become `ServerFunctionError` with `status: 0` and
-  the original error in `cause`.
-- Structured error envelopes are only recognized from exact
-  `application/json` responses, with optional content-type parameters.
-- For non-JSON error responses, the adapter uses the trimmed response body as
-  the error message and falls back to `statusText` when the body is empty or
-  only whitespace.
-- Successful HTTP responses must also use `Content-Type: application/json`
-  before the default adapter parses the `{ result }` payload.
-
-Fetch shims and test doubles used with the default adapter must return
-Response-like objects:
-
-- successful responses need boolean `ok`, `headers.get("Content-Type")`, and
-  `json()`;
-- error responses also need numeric `status`, string `statusText`, and
-  `text()`.
+The built-in adapter owns the JSON request/response details. Network failures
+and server-side structured errors are surfaced as `ServerFunctionError`.
 
 ### Custom Adapter (e.g., WebSocket)
 
@@ -356,43 +317,20 @@ try {
 }
 ```
 
-## Build Pipeline
+## Build Behavior
 
-At build time, the `"use server"` directive triggers two separate transforms:
+During `ev dev` and `ev build`, evjs finds reachable `"use server"` modules,
+validates their exports, and makes those functions callable from browser code.
+You do not need to write an endpoint, client proxy, or server-side wiring code.
 
-```mermaid
-flowchart TD
-    SRC[".server.ts file"] --> DETECT{"'use server' detected?"}
-    DETECT -->|Yes| CLIENT["Client Transform"]
-    DETECT -->|Yes| SERVER["Server Transform"]
-    DETECT -->|No| SKIP["Skip (normal module)"]
-
-    CLIENT --> STUBS["internal client reference stubs"]
-    SERVER --> REGISTER["registerServerReference()"]
-    SERVER --> MANIFEST["manifest.json entry"]
-```
-
-- **Graph analysis**: follows app, page, server file-route, and server
-  middleware convention import graphs, then validates and records reachable
-  `"use server"` modules.
-- **Client build**: function bodies → internal client reference stubs. Fixed
-  signatures include arity metadata; optional, default, and rest-parameter
-  signatures omit it.
-- **Server build**: original bodies preserved + `registerServerReference()` injected
-- Function IDs are stable SHA-256 hashes from `filePath + exportName`
-
-At runtime, duplicate function IDs fail registration instead of overwriting an
-earlier implementation. This catches hash collisions or accidental duplicate
-server-function metadata during server startup.
-
-Unsupported exports are reported during graph analysis before the bundler runs.
+Unsupported exports are reported before the bundler runs.
 For example, `export default`, `export const VERSION = "1"`, and
 `export declare function getUser()` are not server functions.
 Runtime re-exports such as `export { getUser } from "./other"` are also
 unsupported.
 
-Reachable server modules are included in the framework server output. Remove an
-import when a server function should stay outside the application graph.
+Reachable server modules are included in the server runtime for the app. Remove
+an import when a server function should stay outside the application.
 
 ## Key Points
 
@@ -403,6 +341,5 @@ import when a server function should stay outside the application graph.
 | Mutation | `useMutation(fn)` or `useMutation(fn, { onSuccess })` |
 | Cache invalidation | `getFnQueryKey(fn, ...args)` |
 | Loader / prefetch | `getFnQueryOptions(fn, ...args)` → `{ queryKey, queryFn }` |
-| Function metadata | `fn.fnId`, `fn.fnName`, `fn.fnArity` when the signature is fixed |
 | Arguments | Spread: `useQuery(getUser, id)` not `useQuery(getUser, [id])` |
 | Server errors | `ServerError` on server → `ServerFunctionError` on client |

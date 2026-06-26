@@ -1,6 +1,8 @@
 # Plugins
 
-evjs plugins extend stable framework stages and, when needed, mutate the selected bundler config. App graph and build plan creation are internal framework steps; plugins work with config, bundler config, `BuildOutput`, HTML documents, and build results.
+evjs plugins extend supported framework stages and, when needed, mutate the
+selected bundler config. Most plugins work with config, bundler config, HTML
+documents, and final build results.
 
 ## Quick Example
 
@@ -63,7 +65,8 @@ ignored by evjs so plugins can keep package-local metadata fields.
 
 ## Config Hook
 
-Use `config()` for framework configuration that must be visible before defaults, graph analysis, dev proxy setup, or runtime path derivation.
+Use `config()` for framework configuration that must be visible before defaults,
+route discovery, dev proxy setup, or runtime path derivation.
 Return a config object, or return `undefined` after mutating the received
 object in place. `null`, arrays, and other return values are rejected. The
 resulting config is validated by the same resolver as user config before
@@ -117,12 +120,9 @@ flowchart LR
   A["config hooks"] --> B["resolve config"]
   B --> C["setup hooks"]
   C --> E["buildStart"]
-  E --> F["create AppGraph"]
-  F --> H["create BuildPlan"]
-  H --> J["bundlerConfig hooks"]
+  E --> J["bundlerConfig hooks"]
   J --> K["bundler build"]
-  K --> L["link BuildOutput"]
-  L --> M["buildOutput hooks"]
+  K --> M["buildOutput hooks"]
   M --> N["transformHtml per document"]
   N --> O["buildEnd"]
   O --> P["dispose"]
@@ -130,9 +130,9 @@ flowchart LR
 
 | Hook | Purpose |
 |------|---------|
-| `buildStart(ctx)` | Build setup before framework analysis |
+| `buildStart(ctx)` | Build setup before route discovery and bundling |
 | `bundlerConfig(config, ctx)` | Mutate selected bundler config |
-| `buildOutput(output, ctx)` | Add deployment/runtime metadata to the single framework output |
+| `buildOutput(output, ctx)` | Add deployment/runtime metadata to the build output |
 | `transformHtml(doc, ctx)` | Mutate one HTML document at a time; receives the current manifest result fields |
 | `buildEnd({ output, isRebuild })` | Emit final artifacts after build |
 | `dispose(ctx)` | Cleanup |
@@ -161,7 +161,7 @@ Context fields include:
 - `ctx.appId` or `ctx.pageId`;
 - `ctx.fileName` and `ctx.template`;
 - `ctx.assets`;
-- `ctx.output`: the full `BuildOutput`;
+- `ctx.output`: the current build output;
 - `ctx.buildId` and `ctx.publicPath`.
 
 The document type is `HtmlDocument`, a bundler-agnostic subset of standard DOM APIs:
@@ -172,8 +172,8 @@ import type { HtmlDocument } from "@evjs/ev";
 
 ## Build Result
 
-`buildEnd()` receives a build result with the linked framework output and
-narrower manifest views:
+`buildEnd()` receives the final build output plus narrower client and server
+manifest views:
 
 ```ts
 setup() {
@@ -181,7 +181,6 @@ setup() {
     buildEnd({ output, clientManifest, serverManifest, isRebuild }) {
       console.log("Apps:", Object.keys(output.apps));
       console.log("Pages:", Object.keys(output.pages));
-      console.log("Functions:", Object.keys(output.server.functions));
       console.log("Client JS:", clientManifest.assets.js);
       console.log("Server entry:", serverManifest.entry);
       console.log("Rebuild:", isRebuild);
@@ -190,10 +189,10 @@ setup() {
 }
 ```
 
-Deployment plugins should read routes, functions, assets, and runtime
-paths from `output`. Plugins that only need client or server bundle summaries can
-use `clientManifest` and `serverManifest`. HTML hooks receive the same result
-fields plus document-specific fields such as `ctx.kind`, `ctx.fileName`, and
+Deployment plugins should read routes, functions, assets, and runtime paths from
+`output`. Plugins that only need client or server bundle summaries can use
+`clientManifest` and `serverManifest`. HTML hooks receive the same result fields
+plus document-specific fields such as `ctx.kind`, `ctx.fileName`, and
 `ctx.assets`.
 
 ## Bundler Config

@@ -47,11 +47,11 @@ describe("merge", () => {
     const config: Config = {};
 
     const result = merge(config, {
-      entry: "./src/main.tsx",
+      html: "./index.html",
     });
 
     expect(result).toBe(config);
-    expect(config.entry).toBe("./src/main.tsx");
+    expect(config.html).toBe("./index.html");
   });
 
   it("type-checks Config patches", () => {

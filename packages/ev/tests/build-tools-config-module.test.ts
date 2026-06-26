@@ -22,7 +22,6 @@ describe("loadConfigFile", () => {
         import { defineConfig, type Config } from "@evjs/ev";
 
         const config: Config = {
-          entry: "./src/app.tsx",
           routing: { mode: "spa" },
         };
 
@@ -35,7 +34,6 @@ describe("loadConfigFile", () => {
     });
 
     expect(config).toMatchObject({
-      entry: "./src/app.tsx",
       routing: { mode: "spa" },
     });
     expect(
@@ -49,27 +47,27 @@ describe("loadConfigFile", () => {
   it("loads TypeScript config helper imports and observes helper edits", async () => {
     const cwd = await createFixture({
       "package.json": JSON.stringify({ name: "typed-config-helpers" }),
-      "settings.ts": `export const entry = "./src/first.tsx";`,
+      "settings.ts": `export const html = "./first.html";`,
       "ev.config.ts": `
         import { defineConfig } from "@evjs/ev";
-        import { entry } from "./settings";
+        import { html } from "./settings";
 
-        export default defineConfig({ entry });
+        export default defineConfig({ html });
       `,
     });
     const configPath = path.join(cwd, "ev.config.ts");
 
     await expect(loadConfigFile(configPath)).resolves.toMatchObject({
-      entry: "./src/first.tsx",
+      html: "./first.html",
     });
 
     await fs.writeFile(
       path.join(cwd, "settings.ts"),
-      `export const entry = "./src/second.tsx";`,
+      `export const html = "./second.html";`,
     );
 
     await expect(loadConfigFile(configPath)).resolves.toMatchObject({
-      entry: "./src/second.tsx",
+      html: "./second.html",
     });
   });
 
@@ -78,7 +76,7 @@ describe("loadConfigFile", () => {
       {
         "ev.config.ts": `
           import { defineConfig } from "@evjs/ev";
-          export default defineConfig({ entry: "./src/isolated.tsx" });
+          export default defineConfig({ routing: { mode: "spa" } });
         `,
       },
       os.tmpdir(),
@@ -87,28 +85,25 @@ describe("loadConfigFile", () => {
     await expect(
       loadConfigFile(path.join(cwd, "ev.config.ts")),
     ).resolves.toMatchObject({
-      entry: "./src/isolated.tsx",
+      routing: { mode: "spa" },
     });
   });
 
   it("reloads JavaScript ESM config files without native ESM cache staleness", async () => {
     const cwd = await createFixture({
       "package.json": JSON.stringify({ type: "module" }),
-      "ev.config.mjs": `export default { entry: "./src/first.tsx" };`,
+      "ev.config.mjs": `export default { html: "./first.html" };`,
     });
     const configPath = path.join(cwd, "ev.config.mjs");
 
     await expect(loadConfigFile(configPath)).resolves.toMatchObject({
-      entry: "./src/first.tsx",
+      html: "./first.html",
     });
 
-    await fs.writeFile(
-      configPath,
-      `export default { entry: "./src/second.tsx" };`,
-    );
+    await fs.writeFile(configPath, `export default { html: "./second.html" };`);
 
     await expect(loadConfigFile(configPath)).resolves.toMatchObject({
-      entry: "./src/second.tsx",
+      html: "./second.html",
     });
   });
 });

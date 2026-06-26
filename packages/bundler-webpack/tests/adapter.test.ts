@@ -496,7 +496,6 @@ describe("webpackAdapter build", () => {
       `,
       });
       const baseConfig = resolveConfig<WebpackConfig>({
-        entry: "./src/main.ts",
         routing: true,
       });
       const routing = requireRouting(baseConfig.routing);
@@ -637,7 +636,6 @@ describe("webpackAdapter build", () => {
       `,
       });
       const baseConfig = resolveConfig<WebpackConfig>({
-        entry: "./src/main.ts",
         routing: true,
       });
       const routing = requireRouting(baseConfig.routing);
@@ -1020,7 +1018,6 @@ describe("webpackAdapter dev", () => {
     const config = resolveConfig<WebpackConfig>({
       output: { client: "dist" },
       dev: { port },
-      entry: "./src/main.tsx",
       html: "./index.html",
     });
     const analysis = await createAppGraph(config, cwd);

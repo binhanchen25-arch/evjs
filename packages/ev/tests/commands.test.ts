@@ -2381,7 +2381,7 @@ describe("build", () => {
     expect(events).not.toContain("bundler.build");
   });
 
-  it("fails on missing custom top-level entries before running the bundler", async () => {
+  it("fails on missing app entries before running the bundler", async () => {
     const cwd = await createProject();
     const events: string[] = [];
     const bundler = createMockBundler(events);
@@ -2390,7 +2390,9 @@ describe("build", () => {
       build(
         {
           output: { client: "dist" },
-          entry: "./src/missing-main.tsx",
+          app: {
+            entry: "./src/missing-main.tsx",
+          },
         },
         {
           cwd,

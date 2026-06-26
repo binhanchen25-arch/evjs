@@ -1,12 +1,12 @@
 # 客户端路由
 
 evjs 以 `src/pages` 作为客户端路由的唯一事实来源。应用页面写在
-页面文件中；框架会发现这些文件，并按配置生成一个框架托管的 SPA，
+页面文件中；框架会发现这些文件，并按配置生成一个 evjs 管理的 SPA，
 或生成多个不带路由器的 MPA 页面。evjs 不会写入临时 runtime 路由文件；SPA
 模式只会生成类似 `src/route-types.d.ts` 的类型声明，让 TypeScript 从页面树推导导航 path。
 
 完整文件名、忽略文件和 layout 规则见
-[文件约定](./file-conventions.md)。
+[文件约定](./file-conventions)。
 
 ## 目录结构
 
@@ -78,13 +78,12 @@ SPA 和 MPA 模式使用相同的确定性路由顺序：
 - 同级静态路由排在动态路由之前，因此 `src/pages/users/settings.tsx` 会排在
   `src/pages/users/$id.tsx` 之前。
 
-graph 和 build plan 使用的 resolved route list 也按同样规则归一化。重复的 path、
-动态 URL shape 和 route id 也会在这里被拒绝。server-rendered route-derived page id
-也使用同样的 route id 规则。
+evjs 在生成构建产物前会使用同样的归一化规则。重复的 path、动态 URL shape 和
+route id 都会被拒绝。
 
 `routing.routes` 不是公开的 `defineConfig()` 字段；应用应使用 `src/pages`
 发现或显式 `pages` 配置。运行时路由匹配也会按 specificity 选择结果，因此精确/静态路由会优先于
-动态或 wildcard 路由，即使外部 manifest 尚未排序。
+动态路由。
 
 每个被发现的页面文件都必须默认导出 React 组件。Layout route 文件可以默认导出一层外框组件；
 如果没有默认导出，它会作为 pathless outlet route 工作。语法错误和默认导出错误会在
@@ -130,7 +129,7 @@ HTML 模板，例如 `src/pages/about.tsx` 对应 `src/pages/about.html`，
 ## 页面
 
 每个页面模块默认导出 React 组件。页面逻辑需要当前 route 参数、search 参数或
-loader data 时，使用 page hooks；生成的路由胶水由框架托管。
+loader data 时，使用 page hooks；生成的路由胶水由 evjs 管理。
 
 ```tsx
 // src/pages/users/$userId.tsx
@@ -148,14 +147,11 @@ export default function UserPage() {
 SPA 和 MPA 模式都使用 page hooks 读取路由数据。这样页面模块不需要引入框架
 wrapper 类型，也不需要额外写 props 注解。evjs 不会把 `params`、`search`
 或 `loaderData` 作为页面组件 props 传入。文件路由从 `$param` 段派生参数；
-底层显式 manifest route 也可以使用 `:param` 段，wildcard `*` 段会暴露为
-`_splat`。空参数名、保留对象属性名、显式 `:_splat` 参数和重复参数名在这里同样会被拒绝。
-一个 route path 最多只能包含一个 wildcard 段，因为 hooks 只会暴露一个 `_splat` 值。
-同一套 hooks 会暴露这些参数名。
+显式 `pages` 配置可以使用 `:param` 段。空参数名、保留对象属性名和重复参数名都会被拒绝。
 
 SPA 模式下，页面模块可以导出与页面逻辑相关的页面生命周期，例如
 `loader`、`beforeLoad`、`validateSearch`、`pendingComponent`、`errorComponent`
-和 `notFoundComponent`。evjs 会把这些导出挂到框架托管的 route 上。MPA 模式不处理
+和 `notFoundComponent`。evjs 会把这些导出挂到 evjs 管理的 route 上。MPA 模式不处理
 这些生命周期，页面按普通 React 组件和数据逻辑编写。
 
 ```tsx
@@ -228,12 +224,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 等 helper 使用的 route register；应用代码不需要导入它，
 也不需要手写 framework router bootstrap。
 
-生成文件会从 `@evjs/ev/internal/client/route-types` 导入类型 helper。
-这是生成专用的 internal subpath；不要在应用源码中导入这个 internal helper。
-
-该声明文件会保留每个路由的字面量 ID 和 path，用于导航类型推导。内部生成的
-TypeScript 标识符会自动去重，因此 `admin-panel` 和 `admin_panel` 这类合法
-route id 不会生成非法或重复的声明。
+该声明文件会保留每个路由的字面量 path，用于导航类型推导。保持忽略这个生成文件，
+让 evjs 自动更新它。
 
 确保生成的声明文件在 `tsconfig.json` 的 `include` 范围内。默认
 `include: ["src"]` 适用于 `src/pages`，也适用于 `src/app/pages` 这类
@@ -266,12 +258,12 @@ export default function CampaignPage() {
 }
 ```
 
-构建图会从页面模块读取这些元信息，并关联到发现到的文件路由。`render` 和
-`hydrate` 必须是字符串字面量，`prerender` 必须是 `true`，或包含 `partial`、
-`delivery`、`revalidate` 的对象字面量；`prerender.revalidate` 必须是 `false`
-或表示秒数的正整数；`rsc` 必须是布尔字面量。Full prerendering（`prerender = true`
-或非 partial prerender 对象）必须声明 `render = "ssg"` 或 `render = "ssr"`；
-partial prerendering 必须声明 `render = "ssr"`。
+evjs 会在构建时读取这些元信息。`render` 和 `hydrate` 必须是字符串字面量，
+`prerender` 必须是 `true`，或包含 `partial`、`delivery`、`revalidate`
+的对象字面量；`prerender.revalidate` 必须是 `false` 或表示秒数的正整数；
+`rsc` 必须是布尔字面量。Full prerendering（`prerender = true` 或非 partial
+prerender 对象）必须声明 `render = "ssg"` 或 `render = "ssr"`；partial
+prerendering 必须声明 `render = "ssr"`。
 
 只有 RSC 页面才使用 `export const rsc = true`，且这类页面也必须声明
 `render = "ssr"`，并省略 `hydrate` 或声明 `hydrate = "none"`。RSC 页面暂不能同时使用

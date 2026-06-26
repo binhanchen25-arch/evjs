@@ -6,7 +6,7 @@ describe("defineConfig", () => {
   it("returns the config object unchanged", () => {
     const config: Config = {
       server: { routing: true },
-      entry: "./src/app.tsx",
+      app: { entry: "./src/app.tsx" },
     };
     expect(defineConfig(config)).toBe(config);
   });
@@ -23,7 +23,7 @@ describe("defineConfig", () => {
       dev: { port: 4000 },
     };
     const config: Config = {
-      entry: "./src/main.tsx",
+      app: { entry: "./src/main.tsx" },
       html: "./public/index.html",
       dev: {
         port: 5000,

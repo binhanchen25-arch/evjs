@@ -3,14 +3,15 @@
 > **ev** = **Ev**aluation · **Ev**olution — evaluate across runtimes, evolve with AI tooling.
 
 evjs is a zero-config React fullstack framework with page-based client routes,
-server functions, route handlers, SSR, PPR, RSC integration points, and deployment-oriented output.
+server functions, route handlers, SSR, PPR, RSC integration points, and
+deployment-oriented output.
 
 The framework keeps a clear split between:
 
 - **application code**: React pages, server functions, and server routes;
-- **framework semantics**: `AppGraph`, `BuildPlan`, and `BuildOutput`;
-- **bundlers**: Utoopack by default, webpack as the validation adapter for newer framework capabilities;
-- **runtime/server/deploy adapters**: consume the framework manifest instead of reading bundler stats.
+- **file conventions**: `src/pages`, `src/apis`, middleware, and server-only modules;
+- **bundlers**: Utoopack by default, with webpack available as a validation adapter;
+- **deployment output**: browser assets, optional server bundles, and deployment metadata.
 
 SPA page routes keep navigation, loader, search, and params semantics inside
 the framework. MPA page routes use the page runtime without adding a router.
@@ -18,13 +19,13 @@ the framework. MPA page routes use the page runtime without adding a router.
 ## Features
 
 - **Zero-config page routes** — `ev dev` / `ev build` discover `src/pages` unless the project declares explicit `app` or `pages` config.
-- **SPA and MPA modes** — `routing.mode: "spa"` builds one framework-owned app; `"mpa"` builds independent router-free pages.
-- **Framework pages** — page modules can declare CSR/SSR/SSG/PPR/RSC rendering metadata next to the component.
-- **Server functions** — `"use server"` modules become browser-callable RPC stubs.
-- **Server routes** — standard Web `Request`/`Response` route handlers discovered from `src/apis`.
-- **Unified server boundary** — `@evjs/server` handles server functions, server routes, SSR, PPR, and RSC requests.
-- **Plugin system** — config, bundler, output, HTML, and build lifecycle hooks.
-- **Deployment output** — one public-safe framework manifest plus adapter-generated platform artifacts.
+- **SPA and MPA modes** — `routing.mode: "spa"` builds one app; `"mpa"` builds independent router-free pages.
+- **Render modes** — page modules can declare CSR, SSR, SSG, PPR, or RSC behavior next to the component.
+- **Server functions** — `"use server"` modules become browser-callable functions.
+- **Server routes** — standard Web `Request`/`Response` route handlers are discovered from `src/apis`.
+- **Unified server runtime** — server functions, server routes, SSR, PPR, and RSC share the same server boundary.
+- **Plugin system** — config, bundler, HTML, build output, and build lifecycle hooks.
+- **Deployment output** — static assets plus optional Node, static-host, or edge deployment artifacts.
 
 ## Full-Stack Architecture
 
@@ -32,11 +33,11 @@ the framework. MPA page routes use the page runtime without adding a router.
 flowchart LR
     subgraph Browser ["Browser"]
         UI["React app/page runtime"]
-        RPC["Server function transport"]
+        RPC["Server function call"]
         RSCClient["RSC client runtime"]
     end
 
-    subgraph Server ["@evjs/server"]
+    subgraph Server ["Server runtime"]
         subgraph Rendering ["Rendering"]
             SSR["SSR"]
             PPR["PPR shell/regions"]
@@ -54,17 +55,19 @@ flowchart LR
         end
     end
 
-    subgraph Build ["Build output"]
-        MANIFEST["dist/client + dist/server manifests"]
-        ASSETS["dist/client assets"]
-        SERVERBUNDLE["dist/server bundle"]
+    subgraph Output ["Build output"]
+        ASSETS["Browser assets"]
+        HTML["HTML documents"]
+        SERVERBUNDLE["Server bundle"]
+        DEPLOY["Deployment metadata"]
     end
 
-    UI --> MANIFEST
+    UI --> ASSETS
+    UI --> HTML
     UI --> RPC
     UI -.->|"document request"| SSR
     UI -.->|"document request"| PPR
-    RSCClient -.->|"runtime.server.rsc"| RSC
+    RSCClient -.->|"RSC request"| RSC
 
     SSR -->|Read| DB
     SSR -->|Read| KV
@@ -77,17 +80,16 @@ flowchart LR
     RH -->|Read/Write| DB
     RH -->|Read/Write| KV
 
-    RPC -->|"POST runtime.server.fn"| SF
-    UI -->|"GET/POST /api/*"| RH
-    MANIFEST --> UI
-    MANIFEST --> Server
-    ASSETS --> UI
+    RPC --> SF
+    UI -->|"HTTP request"| RH
     SERVERBUNDLE --> Server
+    DEPLOY --> Server
 ```
 
-## Current Architecture In One Sentence
+## How It Fits Together
 
-evjs discovers page routes and explicit server/page metadata into an `AppGraph`,
-derives a bundler-independent `BuildPlan`, links bundler facts into a single
-`BuildOutput`, and lets runtime, server, and deployment adapters consume
-that output while plugins extend the supported lifecycle stages.
+evjs discovers page routes from `src/pages`, server file routes from `src/apis`,
+and server functions from reachable `"use server"` modules. `ev build` then
+emits browser files and, when the app uses server capabilities, a server bundle
+that deployment adapters can run on Node, static hosts, edge workers, or a
+split CDN/origin setup.

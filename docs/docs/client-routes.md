@@ -8,7 +8,7 @@ temporary runtime route files; SPA mode only emits a type declaration such as
 page tree.
 
 For the complete filename, ignored-file, and layout rules, see
-[File Conventions](./file-conventions.md).
+[File Conventions](./file-conventions).
 
 ## Project Structure
 
@@ -87,15 +87,12 @@ Route order is deterministic in both SPA and MPA mode:
   `src/pages/users/settings.tsx` is ordered before
   `src/pages/users/$id.tsx`.
 
-The resolved route list used by graph and build-plan generation is normalized
-with the same rule. Duplicate paths, dynamic URL shapes, and route IDs are
-rejected there too. Server-rendered route-derived page IDs use the same route ID
-rule.
+evjs applies the same normalization before build output is generated. Duplicate
+paths, dynamic URL shapes, and route IDs are rejected there too.
 
-`routing.routes` is not a public `defineConfig()` field. Applications should
-use `src/pages` discovery or explicit `pages` config. Runtime route matching
-also uses specificity, so exact/static routes win over dynamic or wildcard
-routes even if an external manifest is not already sorted.
+`routing.routes` is not a public `defineConfig()` field. Applications should use
+`src/pages` discovery or explicit `pages` config. Runtime route matching also
+uses specificity, so exact/static routes win over dynamic routes.
 
 Every discovered page file must default-export a React component. Layout route
 files can default-export a wrapper component; when they do not, they behave as
@@ -163,12 +160,8 @@ export default function UserPage() {
 Use page hooks for route data in both SPA and MPA mode. They keep page modules
 free of framework wrapper types and avoid prop annotations. evjs does not pass
 `params`, `search`, or `loaderData` as page component props. File routes derive
-params from `$param` segments; lower-level explicit manifest routes can also use
-`:param` segments, and wildcard `*` segments are exposed as `_splat`. Empty
-param names, reserved object-property names, explicit `:_splat` params, and
-duplicate param names are rejected there too. A route path can contain at most
-one wildcard segment because there is only one `_splat` value. The same hooks
-expose those names.
+params from `$param` segments; explicit `pages` config can use `:param` segments.
+Reserved, empty, and duplicate param names are rejected.
 
 In SPA projects with generated route types, page hooks can take a literal route
 path for route-specific inference without importing the generated declaration:
@@ -195,7 +188,7 @@ export default function PostPage() {
 In SPA mode, page modules may export page lifecycle hooks that are useful for
 page logic, such as `loader`, `beforeLoad`, `validateSearch`,
 `pendingComponent`, `errorComponent`, and `notFoundComponent`. evjs attaches
-those exports to the framework-managed route. In MPA mode these lifecycle hooks
+those exports to the evjs-managed route. In MPA mode these lifecycle hooks
 are ignored; use normal component/data logic in the page.
 
 ```tsx
@@ -281,14 +274,8 @@ parent. That file augments the `@evjs/ev/page` route register used by
 It is type-only; application code should not import it or write framework
 router bootstraps manually.
 
-The generated file imports its type helper from
-`@evjs/ev/internal/client/route-types`, a generated-only internal subpath. Do not
-import that internal helper from application source.
-
-The declaration preserves each route's literal ID and path for navigation
-types. Its internal TypeScript identifiers are de-duplicated automatically, so
-valid route IDs such as `admin-panel` and `admin_panel` cannot generate invalid
-or duplicate declarations.
+The declaration preserves each route's literal path for navigation types. Keep
+the generated file in source control ignores and let evjs update it.
 
 Make sure the generated declaration is inside your `tsconfig.json` `include`.
 The default `include: ["src"]` works for `src/pages` and custom directories
@@ -321,14 +308,13 @@ export default function CampaignPage() {
 }
 ```
 
-The build graph reads that metadata from the page module and links it to the
-discovered route. `render` and `hydrate` must be string literals, `prerender`
-must be `true` or an object literal with `partial`, `delivery`, or
-`revalidate`, `prerender.revalidate` must be `false` or a positive integer
-number of seconds, and `rsc` must be a boolean literal. Full prerendering
-(`prerender = true` or non-partial prerender objects) must declare
-`render = "ssg"` or `render = "ssr"`. Partial prerendering must declare
-`render = "ssr"`.
+evjs reads that metadata from the page module during build. `render` and
+`hydrate` must be string literals, `prerender` must be `true` or an object
+literal with `partial`, `delivery`, or `revalidate`, `prerender.revalidate` must
+be `false` or a positive integer number of seconds, and `rsc` must be a boolean
+literal. Full prerendering (`prerender = true` or non-partial prerender objects)
+must declare `render = "ssg"` or `render = "ssr"`. Partial prerendering must
+declare `render = "ssr"`.
 
 Use `export const rsc = true` only for RSC pages that also declare
 `render = "ssr"` and omit `hydrate` or declare `hydrate = "none"`. RSC pages

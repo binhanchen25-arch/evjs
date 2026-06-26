@@ -7,7 +7,7 @@ Server routes 让你完全控制 HTTP methods、headers 和标准 Web
 evjs framework routing 也不会分析编程式 route 声明。
 
 完整的服务端文件路由和 middleware 文件名规则见
-[文件约定](./file-conventions.md)。
+[文件约定](./file-conventions)。
 
 ## 文件路由
 
@@ -92,8 +92,8 @@ export const GET = async (_req, ctx) => {
 evjs 有两个 server middleware 作用域。Middleware 文件 default-export 一个
 Hono-compatible middleware 函数，不包含 matcher 配置。
 
-Framework request middleware 位于 `src/middleware.ts`，会在所有
-framework-managed server requests 之前运行：server file routes、server functions、
+全局服务端中间件位于 `src/middleware.ts`，会在所有
+服务端运行时请求之前运行：server file routes、server functions、
 SSR、PPR 和 RSC framework handling：
 
 ```ts
@@ -118,7 +118,7 @@ src/apis/api/admin/middleware.ts  -> api/admin/** 下的路由
 src/apis/(admin)/middleware.ts    -> (admin)/** 下的路由
 ```
 
-执行顺序是 framework request middleware、从父目录到子目录的 API route middleware、
+执行顺序是全局服务端中间件、从父目录到子目录的 API route middleware、
 最后是 HTTP method handler。Route group 不增加 URL segment，但参与文件系统作用域划分。
 `src/apis/api/middleware.ts` 覆盖 `src/apis/api/index.ts`、`src/apis/api/users.ts`
 以及 `src/apis/api/**` 下的嵌套文件；不覆盖 flat sibling `src/apis/api.ts`。

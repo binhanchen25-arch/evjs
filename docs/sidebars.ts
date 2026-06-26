@@ -11,7 +11,6 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "Core Concepts",
       items: [
-        "architecture",
         "project-structure",
         "file-conventions",
         "client-routes",
@@ -23,7 +22,7 @@ const sidebars: SidebarsConfig = {
     {
       type: "category",
       label: "Reference",
-      items: ["config", "dev", "build", "deploy"],
+      items: ["architecture", "config", "dev", "build", "deploy"],
     },
     {
       type: "category",

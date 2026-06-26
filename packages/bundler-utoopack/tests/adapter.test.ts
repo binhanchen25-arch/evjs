@@ -227,7 +227,6 @@ describe("utoopackAdapter dev", () => {
     const cwd = await makeProject();
     const config = resolveConfig<ConfigComplete>({
       output: { client: "dist" },
-      entry: "./src/main.tsx",
       html: "./index.html",
     });
 
@@ -310,7 +309,6 @@ describe("utoopackAdapter dev", () => {
     const cwd = await makeProject();
     const config = resolveConfig<ConfigComplete>({
       output: { client: "custom-dist", server: "custom-dist/server" },
-      entry: "./src/main.tsx",
       html: "./index.html",
     });
     const buildContext = await createBuildContext(config, cwd, {
@@ -483,7 +481,6 @@ describe("utoopackAdapter dev", () => {
     const cwd = await makeProject();
     const config = resolveConfig<ConfigComplete>({
       output: { client: "dist" },
-      entry: "./src/main.tsx",
       html: "./index.html",
     });
     const buildContext = await createBuildContext(config, cwd);
@@ -502,7 +499,6 @@ describe("utoopackAdapter dev", () => {
 
     try {
       const nextConfig = resolveConfig<ConfigComplete>({
-        entry: "./src/main.tsx",
         html: "./index.html",
       });
       const nextAnalysis = await createAppGraph(nextConfig, cwd);
@@ -527,7 +523,6 @@ describe("utoopackAdapter dev", () => {
     const cwd = await makeProject();
     const onServerBundleReady = vi.fn();
     const config = resolveConfig<ConfigComplete>({
-      entry: "./src/main.tsx",
       html: "./index.html",
     });
     const buildContext = await createBuildContext(config, cwd);

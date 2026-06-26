@@ -13,7 +13,7 @@
 | `<routing-dir-parent>/route-types.d.ts` | generated | evjs 生成的 SPA 导航类型声明。 |
 | 带 `"use server";` 的 `*.server.{ts,tsx,js,jsx}` 文件 | server functions | 推荐的 server function 命名约定。 |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | `server.routing` | 启用 `server.routing` 时的服务端文件路由。 |
-| `src/middleware.{ts,tsx,js,jsx}` | `server.conventions.middleware` | 启用 server conventions 时的 framework request middleware。 |
+| `src/middleware.{ts,tsx,js,jsx}` | `server.conventions.middleware` | 启用 server conventions 时的全局服务端中间件。 |
 | `src/apis/**/middleware.{ts,tsx,js,jsx}` | `server.conventions.middleware` | server file routes 的 API route middleware。 |
 
 默认客户端路由目录是 `./src/pages`。默认服务端文件路由目录是
@@ -135,7 +135,7 @@ export async function listUsers() {
 - 模块必须导出至少一个命名 callable function；
 - 不支持默认导出、runtime re-export、generator、async generator，以及导出的非函数 runtime 值；
 - type-only export 会被 runtime transform 忽略；
-- 可达的 server function 会被转换为 client reference 和 framework server output 中的 server registration。
+- 可达的 server function 可以通过内置传输层在浏览器代码中调用；应用代码不需要手写 endpoint 或 proxy 文件。
 
 ## 服务端文件路由
 
@@ -186,7 +186,7 @@ Server route candidate 只能导出大写 HTTP methods。共享 helper 应移到
 evjs 有两个 server middleware 作用域。Middleware 文件 default-export 一个
 Hono-compatible middleware 函数，不能导出命名值或 matcher 配置。
 
-Framework request middleware 会包裹 framework-managed server requests，包括 server
+全局服务端中间件会包裹服务端运行时请求，包括 server
 file routes、server functions、SSR、PPR 和 RSC：
 
 ```ts
@@ -201,7 +201,7 @@ const middleware: MiddlewareHandler = async (ctx, next) => {
 export default middleware;
 ```
 
-Framework request middleware：
+全局服务端中间件：
 
 ```text
 src/middleware.ts
@@ -218,7 +218,7 @@ src/apis/(admin)/middleware.ts
 
 执行顺序是：
 
-1. framework request middleware；
+1. 全局服务端中间件；
 2. 从父目录到子目录的 API route middleware；
 3. HTTP method handler。
 

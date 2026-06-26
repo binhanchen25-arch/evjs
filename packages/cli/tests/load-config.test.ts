@@ -25,16 +25,16 @@ describe("loadConfig", () => {
 
   it("loads the first supported config file discovered in priority order", async () => {
     const cwd = await createFixture({
-      "ev.config.js": `export default { entry: "./src/from-js.tsx" };`,
+      "ev.config.js": `export default { app: { entry: "./src/from-js.tsx" } };`,
       "ev.config.ts": `
         import { defineConfig } from "@evjs/ev";
-        export default defineConfig({ entry: "./src/from-ts.tsx" });
+        export default defineConfig({ app: { entry: "./src/from-ts.tsx" } });
       `,
     });
 
     expect(path.basename(resolveConfigPath(cwd) ?? "")).toBe("ev.config.ts");
     await expect(loadConfig(cwd)).resolves.toMatchObject({
-      entry: "./src/from-ts.tsx",
+      app: { entry: "./src/from-ts.tsx" },
     });
   });
 });

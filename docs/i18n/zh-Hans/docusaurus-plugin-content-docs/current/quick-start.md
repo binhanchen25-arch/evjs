@@ -55,7 +55,7 @@ my-app/
 │   │   ├── users.server.ts # "use server" 函数
 │   │   └── api/
 │   │       └── health.ts   # /api/health
-│   └── middleware.ts       # Framework request middleware
+│   └── middleware.ts       # 全局服务端中间件
 ├── package.json
 └── tsconfig.json
 ```

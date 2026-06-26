@@ -1,8 +1,7 @@
 # 配置
 
-evjs 默认零配置。多数应用只需要在 `ev.config.ts` 中选择 SPA 或 MPA
-文件路由，并配置服务端/runtime 能力。只有页面文件约定无法描述目标输出时，才使用更底层的
-app 和 page 输出配置。
+evjs 默认零配置。多数应用只需要添加 `ev.config.ts` 来选择 SPA/MPA 路由、
+启用服务端文件路由，或调整部署相关路径。
 
 ```ts
 import { defineConfig } from "@evjs/ev";
@@ -14,69 +13,88 @@ export default defineConfig({
 });
 ```
 
-## 默认值
+## 默认值与适用范围
 
-| 配置 | 默认值 |
-|------|--------|
-| `entry` | `./src/main.tsx` |
-| `html` | `./index.html` |
-| `output.crossOriginLoading` | `"anonymous"` |
+| 配置 | 默认值 / 行为 |
+| --- | --- |
+| `html` | 显式 app 或约定式页面路由共用的模板默认是 `./index.html`。MPA route 也可以使用就近的 `.html` 模板。 |
+| `dev.port` | `3000` |
+| `dev.https` | `false` |
+| `server.dev.port` | `3001` |
+| `server.dev.https` | `false` |
+| `server.basePath` | `/__evjs` |
 | `routing.mode` | `spa` |
 | `routing.dir` | 启用 `routing` 时为 `./src/pages` |
-| `routing.conventions.layout` | SPA 模式下为 `true`，存在时从 `routing.dir` 旁边自动发现根布局 |
+| `routing.mount` | `#app` |
 | `server.routing.dir` | 启用 `server.routing` 时为 `./src/apis` |
-| `server.conventions.middleware` | 启用 server conventions 时为 `true` |
-| `dev.port` | `3000` |
-| `server.dev.port` | `3001` |
-| `server.basePath` | `/__evjs` |
-| 服务端函数端点 | `${server.basePath}/fn` |
+| `output.client` | `dist/client` |
+| `output.server` | `dist/server` |
+| `output.crossOriginLoading` | `"anonymous"` |
 
-服务端函数端点从 `server.basePath` 派生，没有单独的公开函数端点配置。
+服务端函数、PPR 和 RSC 的运行时路径都从 `server.basePath` 派生。没有单独公开的
+`server.functions` 或函数端点配置。
 
-顶层 config object 只接受 `entry`、`html`、`output`、`dev`、`server`、
-`transport`、`app`、`routing`、`bundler`、`plugins` 和 `pages`。
-生成的 app 声明、页面路由运行时接线、server-function endpoint 等框架
-metadata 都由 evjs 派生，不需要也不能直接配置。
+没有根级 `entry` 配置。约定式文件路由会在内部生成页面应用入口；手动自举 SPA 使用
+`app.entry`。
 
-## 约定配置
+## 常用配置
 
-客户端和服务端 conventions 使用同一种归属模型，只是对象名称不同：
-
-| 约定入口 | 路由发现 | 约定控制项 | 默认文件 |
-|--------|----------|------------|----------|
-| 客户端页面 | `routing` | `routing.conventions.layout` 控制 SPA 根布局；page-route 文件规则位于 `routing.dir` 下 | `./src/pages`，以及存在时该目录旁边的 `layout/index.tsx` |
-| 服务端请求 | `server.routing` | `server.conventions.middleware` 控制 framework request middleware 和 API route middleware | `./src/apis`、`./src/middleware.ts` 和 `./src/apis/**/middleware.ts` |
-
-顶层 `routing` 仍然是客户端/page 归属对象，客户端约定开关放在
-`routing.conventions` 下。Server conventions 放在 `server.conventions` 下，
-因为 server functions、RSC、PPR 和 runtime endpoints 是独立的 server framework
-能力。
-
-## 输出 HTML 资源
-
-evjs 默认会为注入到输出 HTML document 中的 JavaScript 和 CSS 资源标签添加
-`crossorigin="anonymous"`，并让浏览器 chunk loader 对动态加载的 chunk 使用
-同一策略。设置 `output.crossOriginLoading` 可以修改或关闭这个策略：
+使用 `src/pages` 的约定式 SPA 可以保持最小配置：
 
 ```ts
+import { defineConfig } from "@evjs/ev";
+
 export default defineConfig({
-  output: {
-    crossOriginLoading: "anonymous",
+  routing: {
+    mode: "spa",
   },
 });
 ```
 
-`output.crossOriginLoading` 可设置为 `false`、`"anonymous"` 或
-`"use-credentials"`。设置为 `false` 时不会添加该属性，动态 chunk 使用 bundler
-默认行为。
-如果不同 HTML document 或单个首屏资源需要不同属性，请使用 `transformHtml` 插件。
+MPA 输出复用同一套 `src/pages` 文件，只需要切换模式：
+
+```ts
+import { defineConfig } from "@evjs/ev";
+
+export default defineConfig({
+  routing: {
+    mode: "mpa",
+  },
+});
+```
+
+使用 `src/apis` 下的服务端文件路由时，启用 `server.routing`：
+
+```ts
+import { defineConfig } from "@evjs/ev";
+
+export default defineConfig({
+  server: {
+    routing: true,
+  },
+});
+```
+
+只写需要修改的字段：
+
+```ts
+import { defineConfig } from "@evjs/ev";
+
+export default defineConfig({
+  dev: {
+    port: 4000,
+  },
+  server: {
+    dev: {
+      port: 4001,
+    },
+  },
+});
+```
 
 ## 路由
 
-`src/pages` 是主要客户端路由模型。可以把顶层 `routing` 视为客户端约定对象：
-它拥有路由目录、输出模式、SPA 根布局约定、HTML 模板和 mount selector。
-服务端文件路由使用对应的 `server.routing` 和 `server.conventions` 约定入口。SPA
-模式会从页面文件构建一个框架托管的应用：
+`routing` 负责从 `src/pages` 发现客户端页面：
 
 ```ts
 export default defineConfig({
@@ -88,39 +106,19 @@ export default defineConfig({
 });
 ```
 
-MPA 模式使用同一套文件，但每个路由输出独立页面，不引入客户端路由器：
+当项目存在 `src/pages`，且没有声明显式 `app` 或 `pages` 配置时，SPA 路由会自动启用。
+需要关闭文件路由发现时，设置 `routing: false`。
+
+SPA routing 模式下，浏览器入口会从已发现的页面树生成。只有应用明确要用手写 SPA
+bootstrap 代替文件路由时，才使用 `app.entry`。
+
+SPA 根布局会在路由目录旁边自动查找 `layout/index.tsx`，例如 `src/pages` 对应
+`src/layout/index.tsx`。只有应用 shell 明确放在其他位置时，才使用
+`routing.conventions.layout`：
 
 ```ts
 export default defineConfig({
   routing: {
-    mode: "mpa",
-  },
-});
-```
-
-MPA 文件路由可以用 colocated HTML 模板替代全局 `index.html` 模板。例如
-`src/pages/about.tsx` 使用 `src/pages/about.html`，`src/pages/product/index.tsx`
-使用 `src/pages/product/index.html`。没有 colocated 模板的路由会使用顶层
-`html` 模板，其默认值是 `./index.html`；也可以通过
-`routing: { html: "..." }` 覆盖。
-
-当项目存在 `src/pages`，且项目没有声明显式的 `app` 或 `pages`
-配置时，SPA 路由会自动启用。
-需要显式关闭文件路由发现时，设置 `routing: false`。
-导出的 config 必须是 object。启用并配置选项时，`routing` 必须是 object；array 和
-`null` 都会被拒绝。
-
-SPA 模式可以使用根布局模块。默认情况下，evjs 会在路由目录旁边查找
-`layout/index.tsx`，例如 `src/pages` 对应 `src/layout/index.tsx`，
-`routing.dir: "./src/app/pages"` 对应 `src/app/layout/index.tsx`。如果迁移应用的外框在其他位置，
-也可以通过 `routing.conventions.layout` 显式指定模块路径。显式布局模块必须是源码模块，
-不能是声明文件、测试/spec、Storybook、client-only 或 server-only 文件；如果 SPA 不需要外部根布局，
-可以设置为 `false`：
-
-```ts
-export default defineConfig({
-  routing: {
-    mode: "spa",
     conventions: {
       layout: "./src/shell/AppLayout.tsx",
     },
@@ -128,73 +126,25 @@ export default defineConfig({
 });
 ```
 
-MPA 模式不支持 layout conventions。路由目录内的 layout 模块也是 SPA 路由约定。
-MPA 页面需要共享外框时，应像普通 React 代码一样组合共享组件；如果只是文档外壳相同，
-可以复用页面 HTML 模板。
+如果 SPA 不需要框架根布局，设置 `routing.conventions.layout: false`。Layout 约定只用于
+SPA；MPA 页面应组合普通 React 组件或复用 HTML 模板。
 
-`routing.mode` 必须是 `spa` 或 `mpa`。提供 `routing.dir`、`routing: { html }`
-或 `routing.mount` 时，它们必须是非空字符串。`routing.conventions` 必须是
-`true`、`false` 或 object；object 形式目前支持 `layout`。
-`routing.conventions.layout` 必须是 boolean 或非空模块路径。
-
-只有手动 bootstrap 单应用时，才使用顶层 `entry` / `html`。使用
-`src/pages` 的应用不应该额外手写客户端 router 或 framework bootstrap：
-
-```ts
-export default defineConfig({
-  entry: "./src/main.tsx",
-  html: "./index.html",
-});
-```
-
-提供顶层 `entry` 和 `html` 时，它们必须是非空字符串。更底层的 `app`
-声明中，字符串写法或 `{ source }` 指向 lifecycle module；`{ entry, html?, mount? }`
-指向自行 bootstrap 的浏览器入口：
-
-```ts
-export default defineConfig({
-  app: {
-    entry: "./src/main.tsx",
-    html: "./index.html",
-    mount: "#app",
-  },
-});
-```
-
-`app` 必须是字符串模块路径或 object；`null` 和 array 会被拒绝。object 形式的
-`app` 必须且只能指定 `source` 或 `entry` 之一。提供 `source`、`entry`、`html`
-或 `mount` 时，它们必须是非空字符串。object 形式的 `app` 只接受 `source`、
-`entry`、`html` 和 `mount`。
-顶层 `html`、`app.html`、`routing: { html }` 和 `pages.*.html` 中配置的 HTML
-模板必须指向文件，并会在 bundler 运行之前被校验。配置对象声明了 `mount`
-时，该 selector 必须能在对应 HTML 模板中匹配到元素。共享模板是允许的，
-每个声明的 mount selector 都会独立校验。
+MPA 文件路由可以使用 colocated HTML 模板。例如 `src/pages/about.tsx` 使用
+`src/pages/about.html`，`src/pages/product/index.tsx` 使用
+`src/pages/product/index.html`。没有 colocated 模板的路由会使用顶层 `html` 模板，
+除非配置了 `routing.html`。
 
 ## 页面
 
-`pages` 是独立页面输出和非约定式路由的显式底层 API。当页面集合直接来自
-`src/pages` 时，优先使用 `routing: { mode: "mpa" }`。字符串页面是
-framework-managed React 组件模块的简写；只有页面需要自己控制 bootstrap 时才使用
-`{ entry }`：
+普通文件路由 SPA/MPA 优先使用 `routing`。只有输出无法用 `src/pages` 目录形状表达时，
+才使用 `pages`。
+
+字符串和 `{ component }` 都表示 evjs 托管的 React 页面：
 
 ```ts
 export default defineConfig({
   pages: {
     home: "./src/pages/Home.tsx",
-    about: {
-      entry: "./src/pages/about/main.tsx",
-      html: "./src/pages/about/index.html",
-    },
-  },
-});
-```
-
-`{ component }` 对象写法等价于字符串简写；当页面需要 `path`、`html` 或
-`mount` 时使用对象写法：
-
-```ts
-export default defineConfig({
-  pages: {
     dashboard: {
       path: "/dashboard",
       component: "./src/pages/dashboard/Page.tsx",
@@ -205,123 +155,20 @@ export default defineConfig({
 });
 ```
 
-Component page 对象也可以直接声明 framework render metadata：
+只有页面需要自己控制浏览器 bootstrap 时，才使用 `{ entry }`：
 
 ```ts
 export default defineConfig({
   pages: {
-    dashboard: {
-      path: "/dashboard",
-      component: "./src/pages/dashboard/Page.tsx",
-      render: "ssr",
-      hydrate: "visible",
+    landing: {
+      entry: "./src/landing/main.tsx",
+      html: "./src/landing/index.html",
     },
   },
 });
 ```
 
-`pages` 必须是 object map。Page id 必须是非空 build identifier：只能使用字母、
-数字、下划线或连字符，不能包含路径分隔符。每个 page value 必须是字符串模块路径或
-page object，并且每个页面必须且只能指定一种模块契约：`entry`、`component`
-或 `app`。这些模块路径必须是非空字符串。Page object 只接受 `path`、`entry`、
-`component`、`app`、`html`、`mount`、`render`、`hydrate`、`prerender` 和 `rsc`。
-提供 `path` 时必须以 `/` 开头，并且不能和其他显式页面重复。动态参数名不会产生不同的
-URL shape，所以 `/users/:id` 和 `/users/:userId` 会冲突。它是 URL pathname，因此不能包含空白字符、
-query string 或 hash。`html` 和 `mount` 在提供时也必须是非空字符串。Page id 会参与生成
-build entry name 和 HTML 文件名，因此不能与 app entry 或其他页面输出冲突。
-
-```tsx
-// src/pages/dashboard/Page.tsx
-export const render = "ssr";
-export const hydrate = "load";
-
-export default function DashboardPage() {
-  return <main>Dashboard</main>;
-}
-```
-
-配置了 `path` 时，该页面也会贡献 framework route。SSR、SSG、PPR 等由框架服务端处理的页面应把 URL 和 component 放在配置里。
-Rendering metadata 可以放在 component page config 中，也可以作为组件模块的
-static exports。配置里显式声明的字段优先；未声明的字段会继续从 static exports
-中补齐。未配置 `path` 时，页面会输出为 `campaign.html` 这样的 HTML 文档。
-Route-derived page id 必须唯一；例如 `/admin/panel` 和 `/admin_panel` 都会派生出
-`admin_panel` 时，evjs 会报告冲突。生成的 id 会冲突时，请重命名其中一个
-route 文件，或改用显式 `pages` 配置并提供唯一 page id。
-
-### Page Module 静态导出
-
-当对应的 component page config 字段没有声明时，evjs 会从 framework-managed
-page module 中读取以下 named static exports。请使用字面量值，这样 graph analysis
-不需要执行用户代码也能解析。
-无效的字面量值会在 app graph analysis 阶段报错，并且发生在 bundling 之前。
-
-PPR 使用 SSR 加 prerender metadata：
-
-- `render = "ssr"` 声明 server document。
-- `prerender = { partial: true }` 开启 partial prerendering。
-- PPR 不是独立的 `render` 值。
-- `prerender` 对象只能包含 `partial`、`delivery` 和 `revalidate`。
-- `prerender` 对象至少要声明其中一个属性。
-- `revalidate` 必须是 `false` 或表示秒数的正整数。
-- 没有选项的 full prerendering 请使用 `true`。
-
-Analyzer 支持：
-
-- 直接的 `export const` 声明；
-- 本地 export specifier，例如
-  `const mode = "ssr"; export { mode as render };`。
-
-Analyzer 会拒绝：
-
-- 来自其他模块的 page metadata re-export；
-- `export let render;` 这类未初始化 runtime metadata；
-- 用作 metadata 的 function export 和 class export；
-- 重复的 `render`、`hydrate`、`prerender` 或 `rsc` runtime export。
-
-`export type { mode as render }` 这类 type-only export，以及
-`export declare const render: "ssr"` 这类 ambient declaration 都会被忽略，因为它们不会产生
-runtime value。重复 metadata 名称是 graph-analysis 错误，而不是 last-write-wins。
-
-| 导出 | 可选值 | 含义 |
-| --- | --- | --- |
-| `render` | `"csr"` | 客户端渲染页面。页面在浏览器中 mount，不生成 server document renderer。省略 `render` 时默认是该模式。 |
-| `render` | `"ssr"` | 服务端渲染 document。框架服务端为请求生成 HTML，然后浏览器按 `hydrate` 策略 hydration。需要启用 `server`。 |
-| `render` | `"ssg"` | 静态 document 意图。manifest 会把页面标记为 fully prerendered/static，默认 hydration mode 是 `none`。不需要动态服务端能力时，deployment adapter 可以把它作为静态 HTML 服务。 |
-| `hydrate` | `"none"` | 不对整页做浏览器 hydration。适合静态页面、RSC document，或通过显式 islands/regions 建模交互的 PPR shell。 |
-| `hydrate` | `"load"` | 页面 runtime 加载后 hydration。非 SSG 的 server-rendered 页面默认是该模式。 |
-| `hydrate` | `"visible"` | 声明 mount point 可见后再 hydration。不支持 visibility scheduling 的 runtime/adapter 可以回退到 `load`。 |
-| `hydrate` | `"idle"` | 声明浏览器空闲时再 hydration。不支持 idle scheduling 的 runtime/adapter 可以回退到 `load`。 |
-| `prerender` | `true` | 标记非 CSR 页面可 full prerender，但不启用 partial prerendering。manifest 会输出 `rendering.prerender = "full"`；如果初始 HTML 需要静态交付，请使用 `render = "ssg"`。 |
-| `prerender` | `{ partial: true }` | 启用 experimental PPR。公开编写模型是 React `Suspense`；evjs 0.2 尚未实现任意 Suspense boundary 的 runtime postponed/resume。 |
-| `prerender.delivery` | `"merge"` | 非流式 PPR delivery。服务端解析 shell 和 regions 后，返回一个完整 HTML response。partial prerendering 默认使用该模式。 |
-| `prerender.delivery` | `"stream"` | 流式 PPR delivery。服务端可以先 flush shell，再把已完成的 regions patch 到同一个 response 中。 |
-| `prerender.revalidate` | 正整数 | 声明 prerendered output 的 revalidation 间隔，单位是秒。 |
-| `prerender.revalidate` | `false` | 声明 prerendered output 不自动 revalidate。 |
-| `rsc` | `true` | 启用 RSC 页面路径。需要和 `render = "ssr"` 一起使用。RSC document 默认使用 `hydrate = "none"`；显式声明 `load`、`visible` 或 `idle` hydration 会被拒绝。需要当前 bundler/server adapter 支持 `server.rsc`。 |
-
-`rsc = false` 会作为兼容性的 no-op 被接受，但会产生 warning。除非页面要改成
-`rsc = true` 的 RSC 页面，否则请删除它。
-
-### 渲染支持契约
-
-页面渲染模式刻意保持收敛。不支持的组合会在 bundling 之前失败，因此 deployment
-adapter 可以信任 manifest：
-
-| 能力 | 必需页面契约 | SPA document 输出 | MPA document 输出 | Server/runtime 要求 | 不支持的组合 |
-| --- | --- | --- | --- | --- | --- |
-| CSR | 省略 `render`，或导出 `render = "csr"` | App HTML fallback | 每个页面一个 HTML document | 仍会输出 framework server 以承载 conventions 和 functions | 无 |
-| SSR | `render = "ssr"` | route-owned server document | route-owned server document，不输出静态 HTML 文件 | Framework server document route | 无 |
-| SSG | `render = "ssg"` | App HTML fallback，并为 route page 记录 static metadata | 独立静态 HTML document | 生成和 manifest linking 阶段需要 server build | 无 |
-| PPR | component page 上声明 `render = "ssr"` + `prerender = { partial: true }` | 带服务端合成 regions 的 route-owned server document | 带服务端合成 regions 的 route-owned server document | Framework server document route，另有可选 `runtime.server.ppr` direct/debug endpoint | 同页 RSC、整页 hydration entry |
-| RSC | component page 上声明 `render = "ssr"` + `rsc = true` | route-owned server document 加 RSC Flight endpoint | route-owned server document 加 RSC Flight endpoint | Framework server document route 加 `runtime.server.rsc` | 同页 PPR、`hydrate` 不是 `"none"` |
-如果同一个页面同时需要 RSC 数据流和 partial prerendered regions，当前请拆成不同
-page routes。单个 component page 必须在 `rsc = true` 和
-`prerender = { partial: true }` 之间二选一。
-
-Framework server 始终是构建的一部分。使用 `output.client` 和
-`output.server` 选择产物目录，而不是禁用 server。
-
-PPR 页面推荐用普通 React `Suspense` 表达可延后内容：
+Component page 对象可以直接声明渲染元信息：
 
 ```ts
 export default defineConfig({
@@ -329,168 +176,50 @@ export default defineConfig({
     campaign: {
       path: "/campaign",
       component: "./src/pages/campaign/Page.tsx",
+      render: "ssr",
+      hydrate: "load",
     },
   },
 });
 ```
 
-```tsx
-import { Suspense } from "react";
-import Offer from "./Offer";
-import OfferSkeleton from "./OfferSkeleton";
+同样的元信息也可以写成组件模块里的字面量导出：
 
+```tsx
 export const render = "ssr";
-export const hydrate = "none";
-export const prerender = {
-  partial: true,
-  delivery: "stream",
-} as const;
+export const hydrate = "load";
 
 export default function CampaignPage() {
-  return (
-    <Suspense fallback={<OfferSkeleton />}>
-      <Offer />
-    </Suspense>
-  );
+  return <main>Campaign</main>;
 }
 ```
 
-evjs 0.2 中 partial prerendering 仍是 experimental。稳定的编写 API 是
-`prerender = { partial: true }` 加 React `Suspense`；用户不应声明或依赖 PPR
-region id。当前还没有实现任意 Suspense boundary 的 runtime postponed/resume。
-为了兼容现有服务端合成实现，graph analysis 仍能把一个受限形态拆成内部 region
-renderer：`Suspense` boundary 的直接子节点是静态声明的
-`React.lazy(() => import("./..."))` 组件。生成的 region id 是框架内部 opaque
-细节，未来可能变化。
+## 显式 App
 
-兼容 region module 可以声明以下静态导出：
-
-| 导出 | 可选值 | 含义 |
-| --- | --- | --- |
-| `cache` | `"no-store"` | 每次都动态渲染 region。适合请求相关或用户相关数据。 |
-| `cache` | `{ revalidate: 正整数 }` | 缓存 region output，并在给定秒数后 revalidate。 |
-| `hydrate` | `"none"` | 不在浏览器中 hydrate region。server-only region 默认使用该模式。 |
-| `hydrate` | `"load"` | region client runtime 加载后 hydration。 |
-| `hydrate` | `"visible"` | 声明 region 可见后 hydration。不支持 visibility scheduling 的 runtime 可以回退到 `load`。 |
-| `hydrate` | `"idle"` | 声明 region 在浏览器空闲时 hydration。不支持 idle scheduling 的 runtime 可以回退到 `load`。 |
-
-无效的 region 静态导出字面量会在 graph analysis 阶段、bundling 之前报错，
-与 page module metadata 的校验保持一致。
-Region metadata 也遵循和 page metadata 相同的 runtime export 规则：
-runtime export 必须是带静态 initializer 的本地变量。重新导出的 metadata、
-function export 和 class export 都是无效的；type-only export 和 ambient
-`declare` 声明会被忽略。每个 region metadata 名称只能导出一次；重复的 `cache`
-或 `hydrate` 导出是 graph-analysis 错误。
-
-框架合成 PPR page response 时，会根据 region cache 策略派生默认
-`Cache-Control`。只要任意 region 是 `"no-store"` 或省略 `cache`，page response
-默认使用 `no-store`；如果所有 regions 都声明 `{ revalidate }`，page response 默认使用
-最小 region `s-maxage`。如果 shell renderer 自己返回了 `Cache-Control`，框架会保留它。
-服务端 adapter 可以在运行时设置 `framework.ppr.staleWhileRevalidate`。设置后，可缓存的
-PPR region response 和合成后的 page response 会包含 `stale-while-revalidate`，
-过期但仍在 stale 窗口内的 region entry 会先返回给请求，同时由框架在后台刷新缓存。
-
-`prerender.delivery` 控制初始 document response。`"merge"` 是默认非流式模式：
-框架服务端先渲染 shell 和 regions，再返回完整 HTML。`"stream"` 会先发送 shell，
-再在同一个 HTML response 中把已完成的 regions patch 到页面里。两种模式的首屏
-导航都不要求浏览器主动请求 `/__evjs/ppr`。
-
-PPR 页面由服务端合成，不会生成整页客户端 hydration entry。需要交互能力的
-PPR 页面应显式建模为 client islands 或 region-level hydration，而不是 hydrate
-整个 page shell。
-
-RSC 页面使用 SSR document render mode，并通过 `rsc = true` 显式开启 RSC：
+只有手动自举 SPA 时才使用 `app.entry`：
 
 ```ts
 export default defineConfig({
-  pages: {
-    insights: {
-      path: "/insights",
-      component: "./src/pages/Insights.tsx",
-    },
-  },
-  server: {
-    rsc: true,
+  app: {
+    entry: "./src/main.tsx",
+    html: "./index.html",
   },
 });
 ```
-
-```tsx
-// src/pages/Insights.tsx
-export const render = "ssr";
-export const rsc = true;
-export const hydrate = "none";
-
-export default function InsightsPage() {
-  return <main>Insights</main>;
-}
-```
-
-RSC 页面可以省略 `hydrate = "none"`，因为这是 RSC document 的默认值。
-如果显式声明 `hydrate`，则必须是 `"none"`；RSC document 不支持整页浏览器
-hydration 模式。
-RSC Flight response 默认使用 `Cache-Control: no-store`，因为它可能依赖 request
-状态和服务端数据。RSC renderer 显式返回的 `Cache-Control` 会被保留。
-RSC 页面不能同时声明 partial prerendering；在组合 runtime contract 可用之前，
-请把 RSC 和 PPR 行为拆到不同 page routes。
-
-当前 webpack validation adapter 已经覆盖完整 RSC 请求链路。默认 Utoopack adapter
-仍需要补齐等价的 client/server reference metadata 后，才能运行同样路径。
-
-`react-server-dom-webpack` 是 evjs client 和 server runtime 的可选 peer
-dependency。直接使用 RSC 的应用需要安装它，或者使用提供 RSC runtime path 的
-bundler/server adapter。
-
-服务端渲染的 RSC document 会包含一个很小的 `__EVJS_RSC_BOOTSTRAP__` payload，
-用于告诉 client runtime Flight endpoint、page id、mount selector、public path、页面
-assets 和可选 page route metadata。client runtime 会在请求 Flight 数据前校验该
-payload；JSON 格式错误、非法 build/page identifier、非法 public path、格式错误的页面
-assets 或缺少必填字段都会报告为启动错误。自定义 runtime 调用
-`startReactRscPageRuntime({ document })` 时，会用这个 document 同时查找 bootstrap
-和解析 mount selector。
-
-## 输出
-
-```ts
-export default defineConfig({
-  output: {
-    client: "dist",
-    server: "dist-server",
-  },
-});
-```
-
-`output.client` 和 `output.server` 控制产物目录：
-
-- `output.client` 默认是 `dist/client`。
-- `output.server` 默认是 `dist/server`。
-- 当 public manifest 和浏览器资源需要直接写入 `dist`，同时 server 产物需要保留在
-  public 输出目录外时，设置 `output.client: "dist"` 和
-  `output.server: "dist-server"`。
 
 ## 服务端
 
+`server.basePath` 控制服务端运行时边界。除非部署平台要求固定路径，否则保持默认值：
+
 ```ts
 export default defineConfig({
   server: {
-    dev: {
-      port: 3001,
-      https: false,
-    },
+    basePath: "/__evjs",
   },
 });
 ```
 
-框架服务端边界默认是 `/__evjs`。只有部署平台要求固定路径时，才需要配置
-`server.basePath`：
-
-Server conventions 在 `server` 下使用同一种归属模型：`server.routing` 拥有
-服务端文件路由发现，`server.conventions` 拥有从服务端目录树发现的
-服务端行为模块。
-
-通过 `server.routing` 启用服务端文件路由。`true` 会扫描
-`./src/apis`；object 形式目前只支持 `dir`。这里没有 `prefix` 选项：
-如果 URL 需要以 `/api` 开头，请把文件放在 `src/apis/api` 这样的目录下。
+启用服务端文件路由：
 
 ```ts
 export default defineConfig({
@@ -500,15 +229,15 @@ export default defineConfig({
 });
 ```
 
-启用 `server.routing` 时，server conventions 默认启用。当前 convention 会发现：
+`server.routing: true` 会扫描 `./src/apis`。对象形式目前支持 `dir`；没有 `prefix`
+选项。如果 URL 需要以 `/api` 开头，请把文件放到 `src/apis/api` 这样的目录中。
 
-- `src/middleware.ts` 作为 framework request middleware；
-- `src/apis/**/middleware.ts` 作为 API route middleware。
+启用 `server.routing` 时，服务端中间件约定默认启用：
 
-缺失的 middleware 文件会被忽略。
-Framework request middleware 会在 framework-managed server requests 之前运行，包括
-server file routes、server functions、SSR、PPR 和 RSC。API route middleware 只作用于
-`server.routing.dir` 下的 descendant server file routes。
+- `src/middleware.ts`：全局服务端中间件。
+- `src/apis/**/middleware.ts`：只作用于后代服务端文件路由的 API 路由中间件。
+
+可以用 `server.conventions: false` 关闭所有服务端约定，或只关闭 middleware 发现：
 
 ```ts
 export default defineConfig({
@@ -521,47 +250,73 @@ export default defineConfig({
 });
 ```
 
-使用 `server.conventions: false` 可以关闭所有 server conventions。
+启用 React Server Components 支持：
 
-这些配置字段会在 build work 开始前校验：
-
-- 提供 `output`、`dev`、`server`、`server.dev` 和 `transport` 时，它们都必须是
-  object。
-- `output.client` 和 `output.server` 必须是非空字符串，并且指向不同目录。
-- `server.routing` 必须是 `true`、`false` 或 object；object 形式只接受可选的非空
-  `dir` 字符串。
-- `server.conventions` 必须是 `true`、`false` 或 object；object 形式目前支持
-  `middleware`。
-- `server.basePath` 必须是以 `/` 开头的非空 URL pathname，不能包含空白字符、query
-  string 或 hash。
-- `server.basePath` 尾部 `/` 会被归一化移除。
-- 如果 `server.rsc` 配置为 object，`server.rsc.endpoint` 也遵循同样的 URL pathname
-  规则。
-- `dev.https` 和 `server.dev.https` 中的 key/cert 值必须是非空字符串。
-- HTTPS object config 不能是 `null` 或 array。
-- `dev.port` 和 `server.dev.port` 必须是 `1` 到 `65535` 之间的 TCP 端口整数。
-
-派生路径：
-
-```txt
-/__evjs/fn       服务端函数
-/__evjs/ppr      存在 PPR 页面时的 region direct/debug endpoint
-/__evjs/rsc      启用 server.rsc 时的 Flight endpoint
+```ts
+export default defineConfig({
+  server: {
+    rsc: true,
+  },
+});
 ```
 
-PPR 页面首屏不会要求浏览器调用 `/__evjs/ppr`；框架服务端在服务 page route 时解析
-内部 regions。direct/debug region 调用必须精确使用
-`GET /__evjs/ppr/<pageId>/<regionId>`；`pageId` 和 opaque internal `regionId`
-使用 build identifier 规则，多余 path segment 不会匹配。
-成功的 RSC page model 响应必须使用 `Content-Type: text/x-component`，
-可以附带 content-type 参数。
-客户端 RSC debug JSON helper 只会解析以 `Content-Type: application/json`
-返回的响应，可以附带 content-type 参数。
-Debug payload 必须使用 `version: 1`、`type: "evjs.rsc"`，包含符合 build
-identifier 规则的 `buildId`，并提供结构正确的 asset 列表，`loadRscDebugPage()`
-才会挂载诊断 HTML。
+## 开发服务器
 
-只有当浏览器需要调用另一个 origin 上的框架服务端时，才配置 `transport.baseUrl`：
+浏览器开发服务器默认使用端口 `3000`；服务端开发运行时默认使用端口 `3001`：
+
+```ts
+export default defineConfig({
+  dev: {
+    port: 4000,
+  },
+  server: {
+    dev: {
+      port: 4001,
+    },
+  },
+});
+```
+
+`dev.https` 和 `server.dev.https` 可设置为 `false`、`true`，或包含 `key` 和 `cert`
+的对象。
+
+使用 `dev.proxy` 代理自己的后端服务：
+
+```ts
+export default defineConfig({
+  dev: {
+    proxy: [
+      {
+        context: ["/api"],
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+    ],
+  },
+});
+```
+
+## 输出
+
+默认情况下，evjs 把浏览器资源写入 `dist/client`，服务端产物写入 `dist/server`。
+部署平台需要其他目录结构时再修改：
+
+```ts
+export default defineConfig({
+  output: {
+    client: "dist",
+    server: "dist-server",
+  },
+});
+```
+
+`output.crossOriginLoading` 控制 evjs 为生成的 JavaScript 和 CSS 标签添加的
+`crossorigin` 属性。可选值是 `false`、`"anonymous"` 或 `"use-credentials"`。
+
+## 传输
+
+同源应用不需要配置 transport。只有浏览器需要访问另一个 origin 上的服务端运行时时，
+才设置 `transport.baseUrl`：
 
 ```ts
 export default defineConfig({
@@ -571,18 +326,9 @@ export default defineConfig({
 });
 ```
 
-提供 `transport` 时它必须是 object。提供 `transport.baseUrl` 时，它必须是
-absolute HTTP(S) URL，且不能包含首尾空白字符。这个值会被浏览器发起的
-framework server 请求共享，包括 server functions、RSC Flight，以及面向
-server routes 的客户端 helper。
-
-启用 framework server 时，用户配置的 `dev.proxy` 规则会排在框架代理之前。每条规则都
-必须是 object，包含非空的 `context` pathname pattern 数组，以及作为 absolute
-HTTP(S) URL 的 `target`；`null` 和 array entry 会被拒绝。Context pattern 必须以
-`/` 开头，不能包含空白字符、query string 或 hash，并且同一条规则内不能重复。Target
-不能包含首尾空白字符。可选的 `changeOrigin` 和 `secure` 必须是布尔值。
-
 ## 插件
+
+通过 `plugins` 注册框架插件：
 
 ```ts
 export default defineConfig({
@@ -592,8 +338,8 @@ export default defineConfig({
       setup() {
         const start = Date.now();
         return {
-          buildEnd({ output }) {
-            console.log("Build", output.buildId, Date.now() - start);
+          buildEnd() {
+            console.log("Build finished", Date.now() - start);
           },
         };
       },
@@ -602,16 +348,11 @@ export default defineConfig({
 });
 ```
 
-`plugins` 必须是 plugin object 数组。每个 plugin 都需要非空 `name`，且不能包含首尾空白。
-提供 `dependencies` 或 `optionalDependencies` 时，它们必须是非空 plugin name 数组；
-`enforce` 必须是 `pre`、`normal` 或 `post`。Plugin object 只接受 `name`、
-`dependencies`、`optionalDependencies`、`enforce`、`config` 和 `setup`。
-
-更多 hook 签名、单 HTML 文档上下文和 bundler 辅助函数见 [插件指南](./plugins.md)。
+更多 hook 签名、单 HTML 文档上下文和 bundler 辅助函数见 [插件指南](./plugins)。
 
 ## Bundler
 
-CLI 默认使用 Utoopack。也可以显式传入 adapter：
+Utoopack 是默认 bundler。只有确实要切换时，才显式传入 bundler adapter：
 
 ```ts
 import { defineConfig } from "@evjs/ev";
@@ -622,9 +363,16 @@ export default defineConfig({
 });
 ```
 
-`bundler` 必须是 adapter object，并且包含非空 `name` 以及 `build` / `dev`
-函数，且只接受这三个 key。`null`、array、未知 key 和不完整的 adapter object 会在
-config resolution 阶段被拒绝，不会等到命令启动后才报错。
+## 不支持的旧字段
 
-`@evjs/bundler-webpack` 主要用于框架验证，等待 Utoopack 底层 API 补齐时兜底。
-Utoopack 仍是默认运行路径。
+这些字段不是公开配置：
+
+- `server.entry`
+- `server.functions`
+- `server.functionRuntime`
+- `routing.routes`
+- `routing.entry`
+- 顶层 `functions` 或 `serverFunctions`
+
+服务端文件路由使用 `server.routing`，服务端函数使用 `"use server"` 模块，服务端运行时路径使用
+`server.basePath`，显式页面输出使用 `pages`。

@@ -2,7 +2,7 @@
 
 服务端函数允许你在与前端代码同源的地方编写后端逻辑，并在 React 组件中获得类似本地
 async 函数调用的体验，但它本质上仍是类型安全的服务端边界。框架会序列化参数，
-通过 framework server 分发请求，并返回序列化后的结果或结构化错误。虽然我们不强制要求，
+通过服务端运行时分发请求，并返回序列化后的结果或结构化错误。虽然我们不强制要求，
 但建议将服务端函数文件以 `.server.ts` 结尾。构建系统会自动将它们转换为 RPC 调用。
 
 ## 基本用法
@@ -27,9 +27,8 @@ export const deleteUser = async (id: string) => {
 ### 规则
 
 - 文件必须以 `"use server";` 指令开头
-- 格式错误的 `"use server"` 模块会报告
-  `Server function module could not be parsed:` 和 parser message；graph
-  analysis 已知文件路径时，会在 server-function transform 运行前一并报告。
+- 格式错误的 `"use server"` 模块会在 bundler 运行前报错；evjs 能解析文件路径时，
+  会同时给出文件路径和 parser message。
 - 只有 **命名的可调用导出** 会被转换：`export function`、
   `export async function`、`export const name = () => {}`、
   `export const name = async () => {}`，或
@@ -53,9 +52,8 @@ export const deleteUser = async (id: string) => {
 - **推荐**：使用 `.server.ts` 或 `.server.tsx` 文件名（例如 `users.server.ts`），
   让路由发现忽略就近放置的 server-only 文件。Server functions 没有目录约定。
 - 不支持默认导出、跨模块 runtime re-export，也不支持导出常量等非函数 runtime 值
-- 可达的 `"use server"` 模块会被转换为 client references 和 server
-  registrations。"可达" 指由 app、page、server file-route 或 server
-  middleware convention graph 导入；graph 外的无关文件会被忽略。
+- 可达的 `"use server"` 模块会变成可从浏览器调用的服务端函数。"可达" 指由 app
+  代码、页面模块、服务端文件路由或服务端中间件导入；无关文件会被忽略。
 
 ## 请求上下文 helper
 
@@ -88,7 +86,8 @@ render、RSC Flight 请求或 PPR region 请求时可用。在模块顶层、构
 
 ## 查询模式
 
-evjs 提供类型安全的 `useQuery` 和 `useSuspenseQuery`，可直接接受服务端函数。服务端函数桩还携带 `.queryKey()`、`.fnId`、`.fnName`，以及固定签名下的 `.fnArity` 元信息，用于缓存失效和元信息获取。
+evjs 提供类型安全的 `useQuery` 和 `useSuspenseQuery`，可直接接受服务端函数。加载器、
+预取或变更需要复用 query key 时，使用配套 cache helper。
 
 ### 直接使用（推荐）
 
@@ -121,29 +120,23 @@ loader: ({ context }) =>
   context.queryClient.ensureQueryData(getFnQueryOptions(getUsers));
 ```
 
-函数重载要求传入编译器生成的 server function stub，因为服务端边界需要稳定的函数 ID、
-请求 endpoint 和 query key 元信息。把普通 async function 传给 `useQuery(fn)`、
+函数重载要求传入编译后的 server function reference。把普通 async function 传给 `useQuery(fn)`、
 `useSuspenseQuery(fn)`、`useMutation(fn)`、`getFnQueryKey(fn)` 或
 `getFnQueryOptions(fn)` 时，会抛出带 `[evjs]` 前缀并指出被拒绝函数名称的诊断。
 非 server function 请使用 TanStack object 形式，例如
 `useQuery({ queryKey, queryFn })`。
 
-### 服务端函数元信息
+### 缓存 helper
 
-每个注册的服务端函数桩在运行时携带以下属性：
+使用 `getFnQueryKey()` 和 `getFnQueryOptions()`，不要读取服务端函数内部字段：
 
 ```ts
-getFnQueryKey(getUsers)         // → ["<fnId>"]
-getFnQueryKey(getUsers, someArg)// → ["<fnId>", someArg]
-getUsers.fnId               // → "<hash>"（稳定的 SHA-256）
-getUsers.fnName             // → "getUsers"
-getUsers.fnArity            // → 固定签名的声明参数数量（存在时）
+getFnQueryKey(getUsers);
+getFnQueryKey(getUser, userId);
+getFnQueryOptions(getUsers);
 ```
 
 - **`getFnQueryKey(fn, ...args)`** — 构建 TanStack Query key。用于 `invalidateQueries`、`setQueryData` 等。
-- **`.fnId`** — 稳定的内部函数 ID（只读）。
-- **`.fnName`** — 可读的导出名称（只读）。
-- **`.fnArity`** — 固定签名的声明参数数量（只读）。带 optional、default 或 rest 参数的签名会省略这个元信息，因为这些函数接受更灵活的参数形状。`useMutation()` 会在存在 `.fnArity` 时用它序列化变量。
 - **`getFnQueryOptions(fn, ...args)`** — 返回 `{ queryKey, queryFn }`，用于加载器、预取和 `useInfiniteQuery`。
 
 ### 变更参数
@@ -160,15 +153,15 @@ mutate(["admin", "editor"]);
 mutate(["Alice", "alice@example.com"]);
 ```
 
-固定签名会生成 `.fnArity`：
+固定签名下，evjs 可以按参数数量序列化 mutation variables：
 
 ```ts
-export async function refresh() {}                   // fnArity = 0
-export async function saveRoles(roles: string[]) {}  // fnArity = 1
-export async function createUser(name: string, email: string) {} // fnArity = 2
+export async function refresh() {}
+export async function saveRoles(roles: string[]) {}
+export async function createUser(name: string, email: string) {}
 ```
 
-灵活签名会省略 `.fnArity`：
+灵活签名会使用 fallback 参数形状：
 
 ```ts
 export async function search(query: string, options = {}) {}
@@ -176,9 +169,8 @@ export async function maybeUser(id?: string) {}
 export const saveTags = async (...tags: string[]) => {};
 ```
 
-当 `.fnArity` 被省略时，`useMutation()` 使用灵活 fallback：不传变量会变成
-`[]`，数组变量会被当作完整参数列表，非数组变量会变成一个参数。如果数组本身应该作为
-一个参数，请声明一个必填参数，例如上面的 `saveRoles()`。
+对于灵活签名，不传变量会变成 `[]`，数组变量会被当作完整参数列表，非数组变量会变成
+一个参数。如果数组本身应该作为一个参数，请声明一个必填参数，例如上面的 `saveRoles()`。
 
 调用 `useMutation(serverFn, options)` 时不要提供 `mutationFn`；evjs 会从服务端函数
 推导它。只有非服务端函数才使用标准 TanStack 的 `useMutation({ mutationFn })`
@@ -199,54 +191,24 @@ initTransport({
 });
 ```
 
-`baseUrl`、`credentials` 和 `headers` 用于配置内置 server-function HTTP
-适配器。函数路径本身是由 `server.basePath` 派生的框架运行时元数据，所以应用代码
-通常只在服务端运行时部署到另一个 origin 时配置 `baseUrl`：
+`baseUrl`、`credentials` 和 `headers` 用于配置内置 HTTP 适配器。通常只有服务端运行时
+部署在另一个 origin 时，应用代码才需要配置 `baseUrl`：
 
-- `baseUrl`：框架服务端调用的 absolute HTTP(S) origin 或 base URL；不能包含首尾空白字符。
+- `baseUrl`：服务端运行时调用的 absolute HTTP(S) origin 或 base URL；不能包含首尾空白字符。
 - `credentials`：fetch credentials 策略，例如 `"include"`。
 - `headers`：静态请求头，或每次调用时求值的函数。
   内置 adapter 会固定使用 `Content-Type: application/json`；该选项用于追加
   auth、tracing 或 CSRF token 等请求头。
 
-对于 framework build，如果浏览器需要访问另一个 origin 上的 framework server，
-优先在 `ev.config.ts` 中配置 `transport.baseUrl`。这个构建期值会写入 manifest，
-并被浏览器发起的 framework 请求共享，例如 server functions、RSC Flight，以及
-面向 server routes 的客户端 helper。
+对于 evjs 构建，如果浏览器需要访问另一个 origin 上的服务端运行时，
+优先在 `ev.config.ts` 中配置 `transport.baseUrl`。这个值会被浏览器发起的请求共享，
+例如 server functions、RSC Flight，以及面向 server routes 的客户端 helper。
 
 Fetch `mode` 不提供配置。服务端函数请求使用浏览器默认 CORS 行为；跨域
 cookie 应通过 `credentials` 和服务端 CORS 响应头配合控制。
 
-默认 HTTP adapter 的请求规则如下：
-
-- 发送 POST JSON，形状是 `{ fnId, args }`。
-- `fnId` 是精确的生成 server function ID。
-- `args` 始终是数组。
-- 请求必须使用 `Content-Type: application/json`；缺失或其他 media type 会收到结构化
-  `415` 响应。
-- 其他 HTTP method 会收到带 `Allow: POST` 的结构化 `405` 响应。
-- 缺失、非字符串、空字符串或带首尾空白的 `fnId`，以及非数组的 `args`，都会在
-  dispatch 前以 `400` 拒绝。
-- 超过 1 MiB 的请求体会以同样的 `{ error, fnId, status }` JSON 结构被拒绝，并返回
-  `413`。
-
-自定义 transport 即使不使用 HTTP，也应保持同样的逻辑契约。
-
-默认 adapter 的响应规则也比较严格：
-
-- 网络错误或 abort 错误会作为 `ServerFunctionError` 抛出，`status` 为 `0`，原始错误
-  保留在 `cause` 中。
-- 结构化 error envelope 只会从精确的 `application/json` 响应中识别，允许带
-  content-type 参数。
-- 对于非 JSON 错误响应，adapter 会使用 trim 后的响应体作为错误消息；当响应体为空或
-  仅包含空白字符时，会回退到 `statusText`。
-- 成功的 HTTP 响应也必须使用 `Content-Type: application/json`，默认 adapter 才会解析
-  `{ result }` payload。
-
-默认 adapter 使用的 fetch shim 或测试替身必须返回类 Response 对象：
-
-- 成功响应需要 boolean `ok`、`headers.get("Content-Type")` 和 `json()`；
-- 错误响应还需要 number `status`、string `statusText` 以及 `text()`。
+内置 adapter 管理 JSON 请求和响应细节。网络错误和服务端结构化错误会以
+`ServerFunctionError` 暴露给客户端。
 
 ### 自定义适配器（如 WebSocket）
 
@@ -307,38 +269,18 @@ try {
 }
 ```
 
-## 构建管道
+## 构建行为
 
-在构建时，`"use server"` 指令触发两个独立的转换：
+执行 `ev dev` 和 `ev build` 时，evjs 会找到可达的 `"use server"` 模块、校验导出，
+并让这些函数可以从浏览器代码调用。应用不需要手写 endpoint、client proxy 或服务端注册代码。
 
-```mermaid
-flowchart TD
-    SRC[".server.ts 文件"] --> DETECT{"检测到 'use server'？"}
-    DETECT -->|是| CLIENT["客户端转换"]
-    DETECT -->|是| SERVER["服务端转换"]
-    DETECT -->|否| SKIP["跳过（普通模块）"]
-
-    CLIENT --> STUBS["内部 client reference 桩代码"]
-    SERVER --> REGISTER["registerServerReference()"]
-    SERVER --> MANIFEST["manifest.json 条目"]
-```
-
-- **Graph analysis**：跟随 app、page、server file-route 和 server middleware
-  convention import graph，校验并记录可达的 `"use server"` 模块。
-- **Client build**：函数体会被替换为内部 client reference 桩代码。固定签名会携带 arity 元信息；optional、default 和 rest 参数签名会省略它。
-- **Server build**：保留原始函数体，并注入 `registerServerReference()`。
-- 函数 ID 是由 `filePath + exportName` 生成的稳定 SHA-256 hash。
-
-运行时如果出现重复函数 ID，注册会失败，而不会覆盖之前的实现。这样可以在服务端启动时暴露
-hash collision 或意外重复的 server-function metadata。
-
-不支持的导出会在 bundler 运行前的 graph analysis 阶段报错。例如
+不支持的导出会在 bundler 运行前报错。例如
 `export default`、`export const VERSION = "1"` 和
 `export declare function getUser()` 都不是合法 server function。
 `export { getUser } from "./other"` 这类 runtime re-export 同样不受支持。
 
-可达的 server module 会进入 framework server output。如果某个 server function
-不应属于当前应用 graph，请移除对应 import。
+可达的 server module 会进入当前应用的服务端运行时。如果某个 server function 不应该属于当前应用，
+请移除对应 import。
 
 ## 要点总结
 
@@ -349,6 +291,5 @@ hash collision 或意外重复的 server-function metadata。
 | 变更 | `useMutation(fn)` 或 `useMutation(fn, { onSuccess })` |
 | 缓存失效 | `getFnQueryKey(fn, ...args)` |
 | 加载器 / 预取 | `getFnQueryOptions(fn, ...args)` → `{ queryKey, queryFn }` |
-| 函数元信息 | `fn.fnId`、`fn.fnName`，固定签名下还有 `fn.fnArity` |
 | 参数传递 | 展开传入：`useQuery(getUser, id)` 而不是 `useQuery(getUser, [id])` |
 | 服务端错误 | 服务端 `ServerError` → 客户端 `ServerFunctionError` |

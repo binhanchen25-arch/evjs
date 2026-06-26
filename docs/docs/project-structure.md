@@ -16,7 +16,7 @@ my-evjs-app/
 ├── tsconfig.json
 └── src/
     ├── styles.css               # global CSS / Tailwind entry
-    ├── middleware.ts            # framework request middleware
+    ├── middleware.ts            # global server middleware
     ├── layout/
     │   └── index.tsx            # optional SPA root layout
     ├── pages/                   # page routes
@@ -31,7 +31,7 @@ my-evjs-app/
     │   └── users/$userId.tsx    # /users/$userId
     ├── apis/                    # server file routes
     │   ├── middleware.ts        # API route middleware
-    │   ├── users.server.ts      # colocated "use server" functions
+    │   ├── users.server.ts      # colocated server functions
     │   └── api/
     │       └── health.ts        # /api/health server file route
     ├── components/              # reusable UI
@@ -56,6 +56,8 @@ This shape covers the complete framework surface:
 | Generated route types | `<routing-dir-parent>/route-types.d.ts` | SPA mode writes type-safe navigation declarations, such as `src/route-types.d.ts` or `src/app/route-types.d.ts`. Keep them ignored and do not import them from application code. |
 | Page metadata | Named exports in page modules | Rendering metadata lives with the page component. |
 | Server functions | `"use server";` in `*.server.*` modules | Server functions have no convention directory and can live beside pages, features, or server file routes. |
+| Server file routes | `src/apis` | Request/Response route modules discovered when `server.routing` is enabled. Files without route exports stay ordinary colocated helpers. |
+| Server middleware | `src/middleware.ts`, `src/apis/**/middleware.ts` | Global server middleware wraps server runtime requests; API route middleware wraps descendant server file routes only. |
 | Manual server code | Ordinary files such as `server.ts` | Standalone/manual `@evjs/server` code is not discovered as a file convention and is unrelated to `server.routing`. |
 | Domain code | `features/`, `components/`, `lib/`, `hooks/` | Keep business logic, reusable UI, browser-safe helpers, and React hooks out of route/page files. |
 
@@ -64,7 +66,7 @@ This shape covers the complete framework surface:
 Use this table as the source of truth when creating files. Only a few paths are
 framework conventions; the rest are ordinary project organization.
 For a dedicated filename and scope reference, see
-[File Conventions](./file-conventions.md).
+[File Conventions](./file-conventions).
 
 Quick rules:
 
@@ -103,7 +105,7 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 | --- | --- | --- | --- |
 | `src/pages/**/*.{tsx,jsx,ts,js}` | SPA/MPA page route discovery | Thin page components with optional literal rendering metadata | Shared helpers, tests, bracket routes, catch-all routes, or hand-written SPA router/bootstrap code |
 | Same-basename `src/pages/**/*.html` beside a page route | MPA page HTML template | Page-specific document templates such as `about.html` beside `about.tsx` or `users/index.html` beside `users/index.tsx` | SPA layouts, route modules, or templates for unrelated routes |
-| Route paths, dynamic URL shapes, and generated route IDs under `src/pages` | Route collision checks before graph/build-plan generation | One page module per URL path, one parameter naming choice per dynamic URL shape, and unique generated route IDs | Parallel `users.tsx`/`users/index.tsx`, `users/$id.tsx`/`users/$userId.tsx`, or `admin/panel.tsx`/`admin_panel.tsx` routes |
+| Route paths, dynamic URL shapes, and generated route IDs under `src/pages` | Route collision checks before build output is generated | One page module per URL path, one parameter naming choice per dynamic URL shape, and unique generated route IDs | Parallel `users.tsx`/`users/index.tsx`, `users/$id.tsx`/`users/$userId.tsx`, or `admin/panel.tsx`/`admin_panel.tsx` routes |
 | `src/pages/(group)/**` | Pathless route group | Organizing page and layout modules without adding a URL segment | URL segments that should be visible in the browser path |
 | `src/pages/_*` and `src/pages/**/_*` | Ignored private route modules | Colocated helper components, utilities, fixtures, and page-local implementation details | URL routes, SPA root layouts, or generated files |
 | `src/pages/.*` and `src/pages/**/.*` | Ignored hidden route modules | Local scratch files or tool metadata that should stay invisible to route discovery | URL routes, generated route types, or source modules that should be imported by pages |
@@ -113,9 +115,9 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 | `<routing-dir-parent>/route-types.d.ts` | Generated SPA navigation types | Editor and type-checker support | Manual edits, imports from app code, template/scaffold source, or MPA mode |
 | `**/*.server.{ts,tsx,js,jsx}` with `"use server";` | Recommended server-function module naming | Reachable modules that export named callable server functions | Browser-only helpers, default exports, runtime re-exports, or relying on a directory name for discovery |
 | `src/apis/**/*.{ts,tsx,js,jsx}` | Server file route discovery when `server.routing` is enabled | Request/Response route modules exporting uppercase HTTP methods | `route.ts` sentinels, `foo.get.ts` method suffix files, bracket/catch-all/optional routes, `middleware`/`middlewares`, default exports, or helper exports from route candidates |
-| `src/middleware.{ts,tsx,js,jsx}` | Framework request middleware | Hono-compatible middleware that runs before framework-managed server requests: server file routes, server functions, SSR, PPR, and RSC | API-route-only concerns, matcher config, route handlers, or helper exports |
-| `src/apis/**/middleware.{ts,tsx,js,jsx}` | API route middleware | Hono-compatible middleware for descendant server file routes in that directory tree | Flat sibling routes such as `api.ts`, framework request middleware for server functions/SSR, or matcher config |
-| Server route paths and dynamic URL shapes under `src/apis` | Server route collision checks before graph/build-plan generation | One server route module per URL path and one parameter naming choice per dynamic URL shape | Parallel `users.ts`/`users/index.ts`, `users/$id.ts`/`users/$userId.ts`, or splitting methods for one path across files |
+| `src/middleware.{ts,tsx,js,jsx}` | Global server middleware | Hono-compatible middleware that runs before server runtime requests: server file routes, server functions, SSR, PPR, and RSC | API-route-only concerns, matcher config, route handlers, or helper exports |
+| `src/apis/**/middleware.{ts,tsx,js,jsx}` | API route middleware | Hono-compatible middleware for descendant server file routes in that directory tree | Flat sibling routes such as `api.ts`, global server middleware for server functions/SSR, or matcher config |
+| Server route paths and dynamic URL shapes under `src/apis` | Server route collision checks before build output is generated | One server route module per URL path and one parameter naming choice per dynamic URL shape | Parallel `users.ts`/`users/index.ts`, `users/$id.ts`/`users/$userId.ts`, or splitting methods for one path across files |
 | `src/features`, `src/components`, `src/lib`, `src/hooks` | No direct framework convention | Domain code, reusable UI, browser-safe helpers, and React hooks | Files that depend on route discovery by filename |
 
 Do not mix ownership models in one app unless you need the lower-level API:
@@ -123,8 +125,7 @@ Do not mix ownership models in one app unless you need the lower-level API:
 - Use `src/pages` plus `routing` for normal SPA/MPA page routes.
 - Use explicit `pages` config only when the output cannot be expressed by
   `src/pages`.
-- Use top-level `entry`/`html` only for a manually bootstrapped single browser
-  app.
+- Use `app.entry` only for a manually bootstrapped single browser app.
 
 ## Matching Config
 
@@ -205,12 +206,10 @@ Collision and ordering rules are also deterministic:
   normalized before route parsing so paths and generated route IDs stay the same
   across operating systems.
 
-The resolved route list used by graph and build-plan generation follows the
-same rules. It rejects duplicate paths, dynamic URL shapes, route IDs, empty
-dynamic params, reserved dynamic params, duplicate dynamic params, explicit
-`:_splat` params, whitespace, query strings, and hashes. Explicit wildcard
-routes can contain at most one `*` segment because page hooks expose one
-`_splat` value.
+Before build output is generated, evjs applies the same route checks to
+configured paths. It rejects duplicate paths, dynamic URL shapes, route IDs,
+empty dynamic params, reserved dynamic params, duplicate dynamic params,
+whitespace, query strings, and hashes.
 
 Generated route IDs come from URL paths and normalize separators and
 punctuation to underscores. That means `admin/panel.tsx` and
@@ -230,7 +229,7 @@ punctuation to underscores. That means `admin/panel.tsx` and
 | `src/pages/.draft.tsx` | Ignored | Dot-prefixed files and folders are hidden from route discovery. |
 | `src/pages/profile.test.tsx` | Ignored | Test/spec files can be colocated with a page without becoming routes. |
 | `src/pages/profile.stories.tsx` | Ignored | Storybook files are never route pages. |
-| `src/pages/ClientCard.client.tsx` | Ignored | Client-only modules can be colocated for RSC/client references without becoming URL routes. |
+| `src/pages/ClientCard.client.tsx` | Ignored | Client-only modules can be colocated without becoming URL routes. |
 | `src/pages/users.server.ts` | Ignored | Server-only modules are not page routes; imported server functions are still handled by the server-function transform. |
 | `src/pages/users/[id].tsx` | Rejected | Bracket route syntax is not supported; use `$id.tsx`. |
 | `src/pages/files/$...path.tsx` | Rejected | Catch-all segments are not part of the convention. |
@@ -281,10 +280,8 @@ Rendering metadata is literal-only:
 - `prerender.revalidate` is `false` or a positive integer number of seconds;
 - `rsc` is a boolean literal for RSC pages.
 
-Malformed page modules are reported during graph analysis with the file path
-and parser message before the bundler runs. Malformed PPR region modules from
-the experimental compatibility path are reported the same way when region
-metadata is read.
+Malformed page modules are reported with the file path and parser message before
+the bundler runs.
 
 ## Server Boundary
 
@@ -309,12 +306,25 @@ export const GET = async () => Response.json({ ok: true });
 The file path under `src/apis` is the URL path, so the example above
 maps to `/api/health`. A root route uses `src/apis/index.ts`; dynamic
 segments use `$param` filenames and map to Hono params such as `:userId`.
+Route groups are pathless, and the same segment safety rules used by page
+routes apply here: bracket, catch-all, optional, uppercase static segments,
+duplicate path, and duplicate dynamic-shape routes are rejected.
+
+A file under `src/apis` becomes a server route only after it exports an
+uppercase HTTP method such as `GET` or `POST`. Files with no route exports are
+ignored, so `schema.ts`, `db.ts`, and `types.ts` can be colocated with route
+modules. Once a file is a route candidate, it may export only uppercase HTTP
+methods; move helpers to plain non-route files, `_`-prefixed private files, or
+modules outside the route tree. `route.ts` sentinels, method suffix files such
+as `users.get.ts`, lowercase method exports, `middleware`/`middlewares`
+exports, default exports, and other helper exports from route candidates are
+reported before bundling.
 
 Server file routes live under `src/apis` by default. Server middleware has two
 separate scopes and both use Hono's `MiddlewareHandler` signature.
 
-Framework request middleware lives at `src/middleware.ts`. It runs before
-framework-managed server requests, including server file routes, server
+Global server middleware lives at `src/middleware.ts`. It runs before server
+runtime requests, including server file routes, server
 functions, SSR, PPR, and RSC:
 
 ```ts
@@ -331,7 +341,9 @@ export default middleware;
 
 API route middleware lives inside the server file-route tree. `src/apis/middleware.ts`
 applies to every server file route under `src/apis`, and nested
-`src/apis/**/middleware.ts` files apply only to descendant routes:
+`src/apis/**/middleware.ts` files apply only to descendant routes. For example,
+`src/apis/api/middleware.ts` covers `src/apis/api/users.ts` and nested files
+under `src/apis/api/**`, but not the flat sibling route `src/apis/api.ts`:
 
 ```ts
 // src/apis/middleware.ts
@@ -361,7 +373,7 @@ export const GET = async (_req, ctx) => {
 - `apis/` is the server file route source folder when `server.routing`
   is enabled. `*.server.*` modules can be colocated there when server functions
   are imported by reachable app code.
-- `middleware.ts` at `src/` is framework request middleware. Nested
+- `middleware.ts` at `src/` is global server middleware. Nested
   `apis/**/middleware.ts` files are API route middleware for descendant server
   file routes.
 - `features/` owns business domains.

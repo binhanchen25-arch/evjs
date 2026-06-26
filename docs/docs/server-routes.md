@@ -9,7 +9,7 @@ second evjs routing mode, and evjs framework routing does not inspect
 programmatic route declarations.
 
 For the complete server file route and middleware filename rules, see
-[File Conventions](./file-conventions.md).
+[File Conventions](./file-conventions).
 
 ## File Routes
 
@@ -97,8 +97,8 @@ export const GET = async (_req, ctx) => {
 evjs has two server middleware scopes. Middleware files default-export a
 Hono-compatible middleware function and do not contain matcher configuration.
 
-Framework request middleware lives at `src/middleware.ts` and runs before every
-framework-managed server request: server file routes, server functions, SSR,
+Global server middleware lives at `src/middleware.ts` and runs before every
+server runtime request: server file routes, server functions, SSR,
 PPR, and RSC framework handling:
 
 ```ts
@@ -123,7 +123,7 @@ src/apis/api/admin/middleware.ts  -> routes under api/admin/**
 src/apis/(admin)/middleware.ts    -> routes under (admin)/**
 ```
 
-Execution order is framework request middleware, then API route middleware from
+Execution order is global server middleware, then API route middleware from
 parent directory to child directory, then the HTTP method handler. Route groups
 do not add URL segments, but they do participate in filesystem scoping.
 `src/apis/api/middleware.ts` covers `src/apis/api/index.ts`,

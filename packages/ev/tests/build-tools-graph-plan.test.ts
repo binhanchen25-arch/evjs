@@ -36,7 +36,7 @@ afterEach(async () => {
 });
 
 describe("createAppGraph and createBuildPlan", () => {
-  it("creates one app client entry for a top-level entry config", async () => {
+  it("creates one default app client entry from resolved defaults", async () => {
     const cwd = await createFixture({
       "src/main.tsx": "console.log('app');",
       "index.html": '<div id="app"></div>',
