@@ -11,8 +11,12 @@ import type {
   PageOutput,
   PageRenderingOutput,
   PprRegionOutput,
+  PublicAppOutput,
+  PublicManifestOutput,
+  PublicPageOutput,
+  PublicPprRegionOutput,
+  PublicRuntimeModuleOutput,
   RscReferenceOutput,
-  RuntimeModuleOutput,
   ServerFunctionOutput,
   ServerRouteOutput,
 } from "./index.js";
@@ -49,11 +53,11 @@ export interface ServerManifestOutput {
   version: 1;
   entry?: string;
   assets: AssetGroup;
-  fns: Record<string, ServerManifestFnOutput>;
-  routes?: ServerManifestRouteOutput[];
+  functions: Record<string, ServerManifestFunctionOutput>;
+  routes: ServerManifestRouteOutput[];
 }
 
-export interface ServerManifestFnOutput {
+export interface ServerManifestFunctionOutput {
   assets: AssetGroup;
 }
 
@@ -152,7 +156,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
             ? {
                 type: "entry" as const,
                 href,
-                source: app.entry,
               }
             : undefined,
         },
@@ -214,7 +217,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
                     ? ("lifecycle" as const)
                     : ("entry" as const),
                 href,
-                source: page.component ?? page.app ?? page.entry,
               }
             : undefined,
           ppr: isPartialPrerenderPage(page)
@@ -289,16 +291,15 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
     pages,
     routes: input.graph.routes
       .filter((route) => route.kind !== "layout")
-      .map((route) => ({
-        id: route.id,
-        path: route.path,
-        appId: route.appId,
-        pageId: route.pageId,
-        module: route.module,
-        render: route.render,
-        hydrate: route.hydrate,
-        runtime: route.runtime,
-      })),
+      .map((route) =>
+        pruneUndefined({
+          id: route.id,
+          path: route.path,
+          appId: route.appId,
+          pageId: route.pageId,
+          module: route.module,
+        }),
+      ),
     server: {
       entry: serverEntry,
       assets: serverAssets,
@@ -387,15 +388,14 @@ function assertServerRuntimeEntry(
  * needs those facts. The public manifest must not expose that implementation
  * metadata.
  */
-export function createPublicManifest(output: BuildOutput): BuildOutput {
+export function createPublicManifest(
+  output: BuildOutput,
+): PublicManifestOutput {
   const publicAssetFiles = collectPublicAssetFiles(output);
   return pruneUndefined({
     version: output.version,
     buildId: output.buildId,
-    distDir: output.distDir,
-    paths: output.paths,
     publicPath: output.publicPath,
-    runtime: output.runtime,
     assets: clonePublicAssetRecord(output.assets, publicAssetFiles),
     apps: Object.fromEntries(
       Object.entries(output.apps).map(([id, app]) => [
@@ -415,30 +415,8 @@ export function createPublicManifest(output: BuildOutput): BuildOutput {
         path: route.path,
         appId: route.appId,
         pageId: route.pageId,
-        render: route.render,
-        hydrate: route.hydrate,
-        runtime: route.runtime,
       }),
     ),
-    server: pruneUndefined({
-      assets: clonePublicAssets(output.server.assets, publicAssetFiles),
-      functions: Object.fromEntries(
-        Object.entries(output.server.functions).map(([id, fn]) => [
-          id,
-          pruneUndefined({
-            assets: clonePublicAssets(fn.assets, publicAssetFiles),
-            exportName: fn.exportName,
-          }),
-        ]),
-      ),
-      routes: output.server.routes.map((route) =>
-        pruneUndefined({
-          path: route.path,
-          methods: [...route.methods],
-          assets: clonePublicAssets(route.assets, publicAssetFiles),
-        }),
-      ),
-    }),
     rsc: output.rsc
       ? pruneUndefined({
           endpoint: output.rsc.endpoint,
@@ -456,10 +434,7 @@ export function createPublicManifest(output: BuildOutput): BuildOutput {
             : undefined,
         })
       : undefined,
-    deployment: output.deployment
-      ? sanitizePublicMetadata(output.deployment)
-      : undefined,
-  }) as BuildOutput;
+  }) as PublicManifestOutput;
 }
 
 export function createServerManifest(
@@ -475,13 +450,13 @@ export function createServerManifest(
     version: 1,
     ...(output.server.entry ? { entry: output.server.entry } : {}),
     assets: cloneAssets(output.server.assets),
-    fns: Object.fromEntries(
+    functions: Object.fromEntries(
       Object.entries(output.server.functions).map(([id, fn]) => [
         id,
         { assets: cloneAssets(fn.assets) },
       ]),
     ),
-    ...(routes.length > 0 ? { routes } : {}),
+    routes,
   };
 }
 
@@ -495,19 +470,19 @@ function createBuildOutputPaths(
   };
 }
 
-function sanitizeAppOutput(app: AppOutput): AppOutput {
+function sanitizeAppOutput(app: AppOutput): PublicAppOutput {
   return pruneUndefined({
     assets: cloneAssets(app.assets),
     document: cloneHtmlDocument(app.document),
     mount: app.mount,
     module: sanitizeRuntimeModule(app.module),
-  }) as AppOutput;
+  }) as PublicAppOutput;
 }
 
 function sanitizePageOutput(
   page: PageOutput,
   publicAssetFiles: Set<string>,
-): PageOutput {
+): PublicPageOutput {
   return pruneUndefined({
     assets: clonePublicAssets(page.assets, publicAssetFiles),
     document: cloneHtmlDocument(page.document),
@@ -532,7 +507,7 @@ function sanitizePageOutput(
           ),
         }
       : undefined,
-  }) as PageOutput;
+  }) as PublicPageOutput;
 }
 
 function createHtmlDocumentLookup(html: BuildPlan["html"]): {
@@ -563,23 +538,23 @@ function cloneHtmlDocument(
 function sanitizePprRegion(
   region: PprRegionOutput,
   publicAssetFiles: Set<string>,
-): PprRegionOutput {
+): PublicPprRegionOutput {
   return pruneUndefined({
     id: region.id,
     assets: clonePublicAssets(region.assets, publicAssetFiles),
     cache: region.cache,
     hydrate: region.hydrate,
-  }) as PprRegionOutput;
+  }) as PublicPprRegionOutput;
 }
 
 function sanitizeRuntimeModule(
-  module: RuntimeModuleOutput | undefined,
-): RuntimeModuleOutput | undefined {
+  module: PublicRuntimeModuleOutput | undefined,
+): PublicRuntimeModuleOutput | undefined {
   if (!module) return undefined;
   return pruneUndefined({
     type: module.type,
     href: module.href,
-  }) as RuntimeModuleOutput;
+  }) as PublicRuntimeModuleOutput;
 }
 
 function clonePublicAssetRecord(
@@ -632,49 +607,6 @@ function mergeAssetGroups(...groups: AssetGroup[]): AssetGroup {
     js: [...new Set(groups.flatMap((group) => group.js))],
     css: [...new Set(groups.flatMap((group) => group.css))],
   };
-}
-
-function sanitizePublicMetadata(
-  value: unknown,
-  key = "",
-): Record<string, unknown> | undefined {
-  const sanitized = sanitizeMetadataValue(value, key);
-  return sanitized && typeof sanitized === "object" && !Array.isArray(sanitized)
-    ? (sanitized as Record<string, unknown>)
-    : undefined;
-}
-
-function sanitizeMetadataValue(value: unknown, key: string): unknown {
-  if (value === undefined || typeof value === "function") return undefined;
-  if (value === null) return null;
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => sanitizeMetadataValue(item, key))
-      .filter((item) => item !== undefined);
-  }
-  if (typeof value === "object") {
-    return pruneUndefined(
-      Object.fromEntries(
-        Object.entries(value as Record<string, unknown>)
-          .map(([childKey, childValue]) => [
-            childKey,
-            sanitizeMetadataValue(childValue, childKey),
-          ])
-          .filter(([, childValue]) => childValue !== undefined),
-      ),
-    );
-  }
-  if (typeof value === "string" && isSourceLikeString(value, key)) {
-    return undefined;
-  }
-  return value;
-}
-
-function isSourceLikeString(value: string, key: string): boolean {
-  if (key === "href" || key === "manifest") return false;
-  if (/^file:\/\//.test(value)) return true;
-  if (/\.[cm]?tsx?(?:[?#]|$)/.test(value)) return true;
-  return /(?:^|\/)(?:Users|home|private|tmp)\//.test(value);
 }
 
 function pruneUndefined<T extends Record<string, unknown>>(value: T): T {

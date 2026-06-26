@@ -8,12 +8,6 @@ import {
   parsePageSearch,
   type RscFlightClientPageUrlParamError,
 } from "@evjs/shared";
-import {
-  assertFrameworkManifestShape,
-  type BuildOutput,
-  type HydrationMode,
-  type RenderMode,
-} from "@evjs/shared/manifest";
 import { type ComponentType, createElement } from "react";
 import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 import {
@@ -30,6 +24,12 @@ import {
   isReactComponentExport,
   type ReactComponentExport,
 } from "./react-component.js";
+import {
+  assertClientRuntime,
+  type ClientRuntime,
+  type HydrationMode,
+  type RenderMode,
+} from "./runtime-config.js";
 import type { AppContext, AppModule } from "./shell.js";
 import { formatErrorDetail, isRecord } from "./validation.js";
 
@@ -58,7 +58,7 @@ export interface ReactPageRouteContext {
 }
 
 export interface RscFlightFetchOptions {
-  manifest: BuildOutput;
+  runtime: ClientRuntime;
   pageId?: string;
   url?: string | URL;
   fetch?: typeof fetch;
@@ -76,9 +76,17 @@ export interface RscDebugPayload {
     js: string[];
     css: string[];
   };
-  clientReferences?: Record<string, unknown>;
-  serverReferences?: Record<string, unknown>;
-  pages?: NonNullable<BuildOutput["rsc"]>["pages"];
+  pages?: Record<
+    string,
+    {
+      renderer: string;
+      assets: {
+        js: string[];
+        css: string[];
+      };
+      routeId?: string;
+    }
+  >;
 }
 
 export interface RscDebugPayloadMountOptions {
@@ -298,11 +306,10 @@ export async function fetchRscFlight(
   options: RscFlightFetchOptions,
 ): Promise<Response> {
   assertRscFlightFetchOptions(options);
-  const endpoint =
-    options.manifest.rsc?.endpoint ?? options.manifest.runtime.server?.rsc;
+  const endpoint = options.runtime.runtime.server?.rsc;
   if (!endpoint) {
     throw new Error(
-      "[evjs] RSC Flight endpoint is not present in the manifest.",
+      "[evjs] RSC Flight endpoint is not present in the runtime.",
     );
   }
 
@@ -330,12 +337,7 @@ export function assertRscFlightFetchOptions(
   if (!isRecord(options)) {
     throw new Error("[evjs] fetchRscFlight() options must be an object.");
   }
-  assertFrameworkManifestShape(options.manifest, "fetchRscFlight() manifest", {
-    serverFunctionModules: "optional",
-    pageRendererReferences: "optional",
-    pprRendererReferences: "optional",
-    rscRendererReferences: "optional",
-  });
+  assertClientRuntime(options.runtime, "fetchRscFlight() runtime");
   assertOptionalRscFlightString(options.pageId, "fetchRscFlight() pageId");
   assertOptionalRscFlightUrl(options.url, "fetchRscFlight() url");
 }
@@ -423,7 +425,7 @@ function resolveRscFlightUrl(
   const explicitUrl = options.url?.toString();
   const locationHref = globalThis.location?.href;
   const currentUrl = explicitUrl ?? locationHref;
-  const transportBaseUrl = options.manifest.runtime.transport?.baseUrl;
+  const transportBaseUrl = options.runtime.runtime.transport?.baseUrl;
   const base = transportBaseUrl ?? locationHref ?? explicitUrl ?? endpoint;
   const url = new URL(endpoint, base);
   if (options.pageId) {
@@ -523,15 +525,11 @@ function readEmbeddedPageProps(): Record<string, unknown> | undefined {
 
 function pagePropsFromContext(ctx: AppContext): Record<string, unknown> {
   if (ctx.kind !== "page") return {};
-  const route = findRouteForPage(
-    ctx.manifest,
-    ctx.id,
-    readRequestPathname(ctx),
-  );
+  const route = findRouteForPage(ctx.runtime, ctx.id, readRequestPathname(ctx));
 
   return {
-    manifest: {
-      buildId: ctx.manifest.buildId,
+    runtime: {
+      buildId: ctx.runtime.buildId,
     },
     pageId: ctx.id,
     route,
@@ -539,11 +537,11 @@ function pagePropsFromContext(ctx: AppContext): Record<string, unknown> {
 }
 
 function findRouteForPage(
-  manifest: BuildOutput,
+  runtime: ClientRuntime,
   pageId: string,
   pathname: string | undefined,
 ): ReactPageRouteContext | undefined {
-  const pageRoutes = manifest.routes.filter(
+  const pageRoutes = runtime.routes.filter(
     (candidate) => candidate.pageId === pageId,
   );
   const route = pathname
@@ -679,14 +677,6 @@ function assertRscDebugPayload(
   if (value.assets !== undefined) {
     assertRscDebugAssets(value.assets, `${source}.assets`);
   }
-  assertOptionalRscDebugRecord(
-    value.clientReferences,
-    `${source}.clientReferences`,
-  );
-  assertOptionalRscDebugRecord(
-    value.serverReferences,
-    `${source}.serverReferences`,
-  );
   assertOptionalRscDebugRecord(value.pages, `${source}.pages`);
 }
 

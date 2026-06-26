@@ -1,4 +1,3 @@
-import type { BuildOutput } from "@evjs/shared/manifest";
 import { memo } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createReactPageModule, mountReactPage } from "../src/internal";
@@ -8,6 +7,7 @@ import {
   loadRscDebugPage,
   mountRscDebugPayload,
 } from "../src/react.js";
+import type { ClientRuntime } from "../src/runtime-config.js";
 
 const calls: string[] = [];
 const renderedElements: unknown[] = [];
@@ -343,19 +343,10 @@ describe("createReactPageModule", () => {
       pathname: "/users/settings",
       search: "",
     });
-    const manifest: BuildOutput = {
-      ...createRscManifest(),
+    const runtime: ClientRuntime = {
+      ...createRscRuntime(),
       pages: {
-        profile: {
-          assets: { js: [], css: [] },
-          render: "csr",
-          rendering: {
-            component: "client",
-            html: "client",
-            streaming: false,
-            hydrate: "load",
-          },
-        },
+        profile: {},
       },
       routes: [
         {
@@ -381,8 +372,8 @@ describe("createReactPageModule", () => {
       {
         id: "profile",
         kind: "page",
-        manifest,
-        output: manifest.pages.profile,
+        runtime,
+        output: runtime.pages.profile,
         request: { url: "/users/settings" },
       } as never,
     );
@@ -403,7 +394,7 @@ describe("createReactPageModule", () => {
       loaderData: undefined,
     });
     expect(element.props?.children?.props).toEqual({
-      manifest: { buildId: "test" },
+      runtime: { buildId: "test" },
       pageId: "profile",
       route: { id: "settings", path: "/users/settings" },
     });
@@ -580,27 +571,17 @@ describe("fetchRscFlight", () => {
     const fetchMock = vi.fn(async () => new Response("flight"));
 
     await fetchRscFlight({
-      manifest: {
+      runtime: {
         version: 1,
         buildId: "test",
-        distDir: "dist",
-        publicPath: "/",
         runtime: {
           server: {
-            basePath: "/__evjs",
-            fn: "/__evjs/fn",
             rsc: "/__evjs/rsc",
           },
         },
-        assets: {},
         apps: {},
         pages: {},
         routes: [],
-        server: {
-          assets: { js: [], css: [] },
-          functions: {},
-          routes: [],
-        },
       },
       pageId: "dashboard",
       url: "https://example.com/dashboard?tab=comments&tag=a&tag=b",
@@ -617,7 +598,7 @@ describe("fetchRscFlight", () => {
     const fetchMock = vi.fn(async () => new Response("flight"));
 
     await fetchRscFlight({
-      manifest: createRscManifest(),
+      runtime: createRscRuntime(),
       pageId: "dashboard",
       url: "/dashboard?tab=stats",
       fetch: fetchMock,
@@ -633,10 +614,10 @@ describe("fetchRscFlight", () => {
     const fetchMock = vi.fn(async () => new Response("flight"));
 
     await fetchRscFlight({
-      manifest: {
-        ...createRscManifest(),
+      runtime: {
+        ...createRscRuntime(),
         runtime: {
-          ...createRscManifest().runtime,
+          ...createRscRuntime().runtime,
           transport: {
             baseUrl: "https://runtime.example.com/service/",
           },
@@ -660,24 +641,24 @@ describe("fetchRscFlight", () => {
     );
     await expect(
       fetchRscFlight({
-        manifest: null,
+        runtime: null,
         fetch: fetchMock,
       } as never),
-    ).rejects.toThrow("[evjs] fetchRscFlight() manifest must be an object.");
+    ).rejects.toThrow("[evjs] fetchRscFlight() runtime must be an object.");
     await expect(
       fetchRscFlight({
-        manifest: {
-          ...createRscManifest(),
+        runtime: {
+          ...createRscRuntime(),
           runtime: null,
         } as never,
         fetch: fetchMock,
       }),
     ).rejects.toThrow(
-      "[evjs] fetchRscFlight() manifest.runtime must be an object.",
+      "[evjs] fetchRscFlight() runtime.runtime must be an object.",
     );
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "",
         fetch: fetchMock,
       }),
@@ -686,7 +667,7 @@ describe("fetchRscFlight", () => {
     );
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: " dashboard ",
         fetch: fetchMock,
       }),
@@ -695,7 +676,7 @@ describe("fetchRscFlight", () => {
     );
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         url: { pathname: "/dashboard" } as never,
         fetch: fetchMock,
       }),
@@ -712,7 +693,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "",
         fetch: fetchMock,
@@ -723,7 +704,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "dashboard",
         fetch: fetchMock,
@@ -734,7 +715,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "javascript:alert(1)",
         fetch: fetchMock,
@@ -745,7 +726,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "/dashboard#details",
         fetch: fetchMock,
@@ -754,7 +735,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://evil.example/dashboard",
         fetch: fetchMock,
@@ -770,7 +751,7 @@ describe("fetchRscFlight", () => {
     vi.stubGlobal("fetch", undefined);
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
       }),
     ).rejects.toThrow(
@@ -779,7 +760,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         fetch: "fetch" as never,
       }),
@@ -789,7 +770,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () => {
@@ -800,7 +781,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () => null as never,
@@ -811,7 +792,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscFlight({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () => ({}) as never,
@@ -834,7 +815,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: fetchMock,
@@ -851,7 +832,7 @@ describe("fetchRscFlight", () => {
   it("rejects RSC debug payload responses with invalid JSON", async () => {
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -865,7 +846,7 @@ describe("fetchRscFlight", () => {
   it("rejects RSC debug payload responses without application/json content type", async () => {
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -888,7 +869,7 @@ describe("fetchRscFlight", () => {
   it("includes RSC debug payload error response bodies", async () => {
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -905,7 +886,7 @@ describe("fetchRscFlight", () => {
   it("reports malformed RSC debug payload response metadata", async () => {
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () => ({ ok: false }) as never,
@@ -916,7 +897,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () => ({ ok: false, status: 500 }) as never,
@@ -927,7 +908,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () => ({ ok: true }) as never,
@@ -938,7 +919,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -954,7 +935,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -969,7 +950,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -985,7 +966,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -1002,7 +983,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -1022,7 +1003,7 @@ describe("fetchRscFlight", () => {
 
     await expect(
       fetchRscDebugPayload({
-        manifest: createRscManifest(),
+        runtime: createRscRuntime(),
         pageId: "dashboard",
         url: "https://example.com/dashboard",
         fetch: async () =>
@@ -1090,7 +1071,7 @@ describe("fetchRscFlight", () => {
   it("loads and mounts an RSC page", async () => {
     const mountPoint = { innerHTML: "" } as Element & { innerHTML: string };
     const payload = await loadRscDebugPage({
-      manifest: createRscManifest(),
+      runtime: createRscRuntime(),
       pageId: "dashboard",
       url: "https://example.com/dashboard",
       mount: mountPoint,
@@ -1109,27 +1090,17 @@ describe("fetchRscFlight", () => {
   });
 });
 
-function createRscManifest(): BuildOutput {
+function createRscRuntime(): ClientRuntime {
   return {
     version: 1,
     buildId: "test",
-    distDir: "dist",
-    publicPath: "/",
     runtime: {
       server: {
-        basePath: "/__evjs",
-        fn: "/__evjs/fn",
         rsc: "/__evjs/rsc",
       },
     },
-    assets: {},
     apps: {},
     pages: {},
     routes: [],
-    server: {
-      assets: { js: [], css: [] },
-      functions: {},
-      routes: [],
-    },
   };
 }

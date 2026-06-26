@@ -589,7 +589,6 @@ describe("utoopackAdapter dev", () => {
       module: {
         type: "entry",
         href: "main.js",
-        source: "./src/main.tsx",
       },
     });
     expect(serverManifest.entry).toBe("index.js");

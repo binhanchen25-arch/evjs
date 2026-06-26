@@ -54,6 +54,10 @@ import {
   resolveConfig,
   resolvePluginsConfig,
 } from "./config.js";
+import {
+  createClientRuntime,
+  createFrameworkRuntime,
+} from "./framework-runtime.js";
 import { buildHtml } from "./html.js";
 import {
   type BuildResult,
@@ -73,6 +77,7 @@ const DEV_PAGE_RENDER_PROXY_HEADER = "x-evjs-dev-page-render";
 const DEV_DIST_DIR = "dist";
 const DEV_DIST_LOCK_FILE = ".evjs-dev.lock";
 const MANIFEST_FILE = "manifest.json";
+const RUNTIME_FILE = "runtime.json";
 const BUILD_OUTPUT_FILE = "build-output.json";
 const PLUGIN_HOOK_NAMES = [
   "buildStart",
@@ -1221,27 +1226,53 @@ async function emitFrameworkManifest(
   await fs.promises.rm(path.join(serverDir, BUILD_OUTPUT_FILE), {
     force: true,
   });
-  await removeManifestIfInactive(rootDir, [clientDir, serverDir]);
-  await removeManifestIfInactive(path.join(rootDir, "client"), [
+  await removeFrameworkOutputFileIfInactive(rootDir, MANIFEST_FILE, [
     clientDir,
     serverDir,
   ]);
-  await removeManifestIfInactive(path.join(rootDir, "server"), [
+  await removeFrameworkOutputFileIfInactive(rootDir, RUNTIME_FILE, [
     clientDir,
     serverDir,
   ]);
+  await removeFrameworkOutputFileIfInactive(
+    path.join(rootDir, "client"),
+    MANIFEST_FILE,
+    [clientDir, serverDir],
+  );
+  await removeFrameworkOutputFileIfInactive(
+    path.join(rootDir, "client"),
+    RUNTIME_FILE,
+    [clientDir, serverDir],
+  );
+  await removeFrameworkOutputFileIfInactive(
+    path.join(rootDir, "server"),
+    MANIFEST_FILE,
+    [clientDir, serverDir],
+  );
+  await removeFrameworkOutputFileIfInactive(
+    path.join(rootDir, "server"),
+    RUNTIME_FILE,
+    [clientDir, serverDir],
+  );
 
   const publicManifest = createPublicManifest(output);
+  const clientRuntime = createClientRuntime(output);
   await fs.promises.mkdir(clientDir, { recursive: true });
   await fs.promises.writeFile(
     path.join(clientDir, MANIFEST_FILE),
     JSON.stringify(publicManifest, null, 2),
     "utf-8",
   );
+  await fs.promises.writeFile(
+    path.join(clientDir, RUNTIME_FILE),
+    JSON.stringify(clientRuntime, null, 2),
+    "utf-8",
+  );
 }
 
-async function removeManifestIfInactive(
+async function removeFrameworkOutputFileIfInactive(
   dir: string,
+  fileName: string,
   activeDirs: string[],
 ): Promise<void> {
   const normalizedDir = path.resolve(dir);
@@ -1250,7 +1281,7 @@ async function removeManifestIfInactive(
   ) {
     return;
   }
-  await fs.promises.rm(path.join(normalizedDir, MANIFEST_FILE), {
+  await fs.promises.rm(path.join(normalizedDir, fileName), {
     force: true,
   });
 }
@@ -1487,6 +1518,24 @@ function readServerEntryFromManifest(
     );
   } catch (err) {
     logger.warn`Failed to parse build manifest for server entry: ${err}`;
+    return undefined;
+  }
+}
+
+function readFrameworkRuntime(
+  cwd: string,
+  distDir: string,
+): ReturnType<typeof createFrameworkRuntime> | undefined {
+  const outputPath = path.resolve(cwd, distDir, BUILD_OUTPUT_FILE);
+  if (!fs.existsSync(outputPath)) return undefined;
+
+  try {
+    const output = JSON.parse(
+      fs.readFileSync(outputPath, "utf-8"),
+    ) as BuildOutput;
+    return createFrameworkRuntime(output);
+  } catch (err) {
+    logger.warn`Failed to parse build output for framework runtime: ${err}`;
     return undefined;
   }
 }
@@ -2234,6 +2283,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
     const bootstrapPath = path.join(devRootDir, "_dev_start.cjs");
     try {
       const serverBundlePath = path.join(devRootDir, "server", serverEntry);
+      const frameworkRuntime = readFrameworkRuntime(cwd, activePlan.distDir);
 
       if (!fs.existsSync(path.dirname(bootstrapPath))) {
         fs.mkdirSync(path.dirname(bootstrapPath), { recursive: true });
@@ -2242,12 +2292,9 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
         bootstrapPath,
         [
           `(async () => {`,
-          `const fs = require("node:fs");`,
           `const path = require("node:path");`,
           `const { pathToFileURL } = require("node:url");`,
-          `const manifestPath = ${JSON.stringify(path.join(devRootDir, BUILD_OUTPUT_FILE))};`,
-          `const manifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, "utf-8")) : undefined;`,
-          `if (manifest) globalThis.__EVJS_MANIFEST__ = manifest;`,
+          `globalThis.__EVJS_FRAMEWORK_RUNTIME__ = ${JSON.stringify(frameworkRuntime, null, 2)};`,
           `globalThis.__EVJS_DEV_PAGE_RENDER_PROXY_HEADER__ = ${JSON.stringify(DEV_PAGE_RENDER_PROXY_HEADER)};`,
           `const serverDir = path.dirname(${JSON.stringify(serverBundlePath)});`,
           `globalThis.__EVJS_SERVER_MODULE_LOADER__ = async (asset) => { const mod = await import(pathToFileURL(path.resolve(serverDir, asset)).href); const nested = mod && typeof mod.default === "object" ? mod.default : undefined; return nested && ("default" in nested || "render" in nested) ? nested : mod; };`,

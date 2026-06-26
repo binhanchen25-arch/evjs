@@ -19,6 +19,7 @@ import {
   getServerRenderedPaths,
 } from "@evjs/shared/manifest";
 import { test as base, expect } from "@playwright/test";
+import { createFrameworkRuntime } from "../packages/ev/src/framework-runtime";
 
 export { expect };
 
@@ -33,7 +34,7 @@ interface WorkerFixture {
   _exampleApp: { webPort: number; apiPort: number };
 }
 
-type RuntimeManifestFixture = Pick<
+type RoutingFixture = Pick<
   BuildOutput,
   "apps" | "pages" | "routes" | "runtime"
 >;
@@ -209,28 +210,26 @@ function pathMatchesPrefix(pathname: string, prefix: string): boolean {
   );
 }
 
-function getServerProxyPrefixes(manifest: RuntimeManifestFixture): string[] {
+function getServerProxyPrefixes(output: RoutingFixture): string[] {
   return compactUnique([
     "/api",
     "/__evjs",
-    manifest.runtime?.server?.basePath,
-    manifest.runtime?.server?.fn,
-    manifest.runtime?.server?.ppr,
-    manifest.runtime?.server?.rsc,
-    ...getServerRenderedPaths(manifest),
+    output.runtime?.server?.basePath,
+    output.runtime?.server?.fn,
+    output.runtime?.server?.ppr,
+    output.runtime?.server?.rsc,
+    ...getServerRenderedPaths(output),
   ]);
 }
 
-function getClientPathRewrites(
-  manifest: RuntimeManifestFixture,
-): Record<string, string> {
+function getClientPathRewrites(output: RoutingFixture): Record<string, string> {
   const rewrites = Object.fromEntries(
-    Object.entries(manifest.pages ?? {}).flatMap(([pageId, page]) =>
+    Object.entries(output.pages ?? {}).flatMap(([pageId, page]) =>
       page.path && page.render === "csr" ? [[page.path, `${pageId}.html`]] : [],
     ),
   );
 
-  for (const { path, target } of getClientRouteMatches(manifest)) {
+  for (const { path, target } of getClientRouteMatches(output)) {
     rewrites[path] ??= getClientRouteHtmlFileName(target);
   }
 
@@ -362,17 +361,9 @@ export function createExampleTest(exampleName: string) {
 
         await buildExample(exampleDir, bundlerName);
 
-        // Read the public manifest for client routing, the server manifest for
-        // the bundle entry, and the full BuildOutput for framework bootstrap.
-        // The public manifest is browser-safe and intentionally does not
-        // expose server entry files.
-        const manifestPath = path.join(
-          exampleDir,
-          "dist",
-          "client",
-          "manifest.json",
-        );
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+        // Read BuildOutput for fixture routing and the server manifest
+        // for the bundle entry. BuildOutput stays in the fixture process and
+        // is projected before the server bootstrap sees it.
         const serverManifestPath = path.join(
           exampleDir,
           "dist",
@@ -391,6 +382,10 @@ export function createExampleTest(exampleName: string) {
           "dist",
           "build-output.json",
         );
+        const buildOutput = JSON.parse(
+          fs.readFileSync(buildOutputPath, "utf-8"),
+        ) as BuildOutput;
+        const frameworkRuntime = createFrameworkRuntime(buildOutput);
         const serverEntryPath = path.join(
           exampleDir,
           "dist",
@@ -407,8 +402,7 @@ export function createExampleTest(exampleName: string) {
             `const fs = require("node:fs");`,
             `const path = require("node:path");`,
             `const { pathToFileURL } = require("node:url");`,
-            `const manifest = JSON.parse(fs.readFileSync(${JSON.stringify(buildOutputPath)}, "utf-8"));`,
-            `globalThis.__EVJS_MANIFEST__ = manifest;`,
+            `globalThis.__EVJS_FRAMEWORK_RUNTIME__ = ${JSON.stringify(frameworkRuntime, null, 2)};`,
             `const serverDir = path.dirname(${JSON.stringify(serverEntryPath)});`,
             `globalThis.__EVJS_SERVER_MODULE_LOADER__ = async (asset) => { const mod = await import(pathToFileURL(path.resolve(serverDir, asset)).href); const nested = mod && typeof mod.default === "object" ? mod.default : undefined; return nested && ("default" in nested || "render" in nested) ? nested : mod; };`,
             `const serverModule = await import(pathToFileURL(${JSON.stringify(serverEntryPath)}).href);`,
@@ -452,8 +446,8 @@ export function createExampleTest(exampleName: string) {
         const distDir = path.join(exampleDir, "dist", "client");
         const staticServer = createStaticServer(distDir, {
           apiPort,
-          proxyPrefixes: getServerProxyPrefixes(manifest),
-          pathRewrites: getClientPathRewrites(manifest),
+          proxyPrefixes: getServerProxyPrefixes(buildOutput),
+          pathRewrites: getClientPathRewrites(buildOutput),
         });
 
         await new Promise<void>((resolve) => {

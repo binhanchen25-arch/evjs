@@ -124,6 +124,7 @@ export interface GraphConfig {
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx"]);
 const DEFAULT_TOP_LEVEL_ENTRY = "./src/main.tsx";
+const DEFAULT_SOURCE_ALIAS = "@/";
 
 interface FrameworkSourceFiles {
   analysisFiles: string[];
@@ -1552,7 +1553,15 @@ function extractStaticImportSpecifiers(source: string): string[] {
     specifiers.add(specifier);
   }
 
-  return [...specifiers].filter((specifier) => specifier.startsWith("."));
+  return [...specifiers].filter(isLocalSourceImportSpecifier);
+}
+
+function isLocalSourceImportSpecifier(specifier: string): boolean {
+  return (
+    specifier.startsWith(".") ||
+    specifier === DEFAULT_SOURCE_ALIAS.slice(0, -1) ||
+    specifier.startsWith(DEFAULT_SOURCE_ALIAS)
+  );
 }
 
 function extractParsedStaticImportSpecifiers(source: string): string[] {
@@ -1611,6 +1620,15 @@ async function resolveSourceImport(
   fromFile: string,
   specifier: string,
 ): Promise<string | undefined> {
+  if (specifier === DEFAULT_SOURCE_ALIAS.slice(0, -1)) {
+    return resolveSourcePath(cwd, path.resolve(cwd, "src"));
+  }
+  if (specifier.startsWith(DEFAULT_SOURCE_ALIAS)) {
+    return resolveSourcePath(
+      cwd,
+      path.resolve(cwd, "src", specifier.slice(DEFAULT_SOURCE_ALIAS.length)),
+    );
+  }
   return resolveSourcePath(
     cwd,
     path.resolve(path.dirname(fromFile), specifier),

@@ -1,4 +1,3 @@
-import type { BuildOutput } from "@evjs/shared/manifest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type AppModule,
@@ -8,22 +7,14 @@ import {
   type HistoryDriverOptions,
   registerShellModule,
 } from "../src/internal";
+import type { ClientRuntime } from "../src/runtime-config.js";
 
-const manifest: BuildOutput = {
+const runtime: ClientRuntime = {
   version: 1,
   buildId: "test",
-  distDir: "dist",
-  publicPath: "/",
-  runtime: {
-    server: {
-      basePath: "/__evjs",
-      fn: "/__evjs/fn",
-    },
-  },
-  assets: {},
+  runtime: {},
   apps: {
     default: {
-      assets: { js: ["default.js"], css: [] },
       module: {
         type: "lifecycle",
         href: "/default.js",
@@ -32,28 +23,12 @@ const manifest: BuildOutput = {
   },
   pages: {
     home: {
-      assets: { js: ["home.js"], css: [] },
-      render: "csr",
-      rendering: {
-        component: "client",
-        html: "client",
-        streaming: false,
-        hydrate: "load",
-      },
       module: {
         type: "lifecycle",
         href: "/home.js",
       },
     },
     about: {
-      assets: { js: ["about.js"], css: [] },
-      render: "csr",
-      rendering: {
-        component: "client",
-        html: "client",
-        streaming: false,
-        hydrate: "load",
-      },
       module: {
         type: "lifecycle",
         href: "/about.js",
@@ -77,11 +52,6 @@ const manifest: BuildOutput = {
       appId: "default",
     },
   ],
-  server: {
-    assets: { js: [], css: [] },
-    functions: {},
-    routes: [],
-  },
 };
 
 afterEach(() => {
@@ -96,97 +66,56 @@ describe("createShell", () => {
     );
     expect(() =>
       createShell({
-        manifest: null,
+        runtime: null,
         resolveMountPoint: () => ({}) as Element,
       } as never),
-    ).toThrow("[evjs] createShell() manifest must be an object.");
+    ).toThrow("[evjs] createShell() runtime must be an object.");
     expect(() =>
       createShell({
-        manifest: { ...manifest, version: 2 },
+        runtime: { ...runtime, version: 2 },
         resolveMountPoint: () => ({}) as Element,
       } as never),
-    ).toThrow("[evjs] createShell() manifest.version must be 1.");
+    ).toThrow("[evjs] createShell() runtime.version must be 1.");
     expect(() =>
       createShell({
-        manifest: { ...manifest, buildId: "" },
-        resolveMountPoint: () => ({}) as Element,
-      } as never),
-    ).toThrow(
-      "[evjs] createShell() manifest.buildId must be a non-empty string.",
-    );
-    expect(() =>
-      createShell({
-        manifest: { ...manifest, buildId: "build.1" },
+        runtime: { ...runtime, buildId: "" },
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      "[evjs] createShell() manifest.buildId must contain only letters, numbers, underscores, or hyphens.",
+      "[evjs] createShell() runtime.buildId must be a non-empty string.",
     );
     expect(() =>
       createShell({
-        manifest: { ...manifest, runtime: null },
-        resolveMountPoint: () => ({}) as Element,
-      } as never),
-    ).toThrow("[evjs] createShell() manifest.runtime must be an object.");
-    expect(() =>
-      createShell({
-        manifest: { ...manifest, assets: [] },
-        resolveMountPoint: () => ({}) as Element,
-      } as never),
-    ).toThrow("[evjs] createShell() manifest.assets must be an object.");
-    expect(() =>
-      createShell({
-        manifest: { ...manifest, assets: { main: { js: "main.js", css: [] } } },
-        resolveMountPoint: () => ({}) as Element,
-      } as never),
-    ).toThrow("[evjs] createShell() manifest.assets.main.js must be an array.");
-    expect(() =>
-      createShell({
-        manifest: {
-          ...manifest,
-          assets: { "main.entry": { js: [], css: [] } },
-        },
+        runtime: { ...runtime, buildId: "build.1" },
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      '[evjs] createShell() manifest.assets key "main.entry" must contain only letters, numbers, underscores, or hyphens.',
+      "[evjs] createShell() runtime.buildId must contain only letters, numbers, underscores, or hyphens.",
     );
     expect(() =>
       createShell({
-        manifest: { ...manifest, pages: [] },
+        runtime: { ...runtime, runtime: null },
         resolveMountPoint: () => ({}) as Element,
       } as never),
-    ).toThrow("[evjs] createShell() manifest.pages must be an object.");
+    ).toThrow("[evjs] createShell() runtime.runtime must be an object.");
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
-          pages: {
-            ...manifest.pages,
-            home: {
-              ...manifest.pages.home,
-              assets: { js: [], css: [""] },
-            },
-          },
-        },
+        runtime: { ...runtime, pages: [] },
         resolveMountPoint: () => ({}) as Element,
       } as never),
-    ).toThrow(
-      "[evjs] createShell() manifest.pages.home.assets.css must contain only non-empty strings.",
-    );
+    ).toThrow("[evjs] createShell() runtime.pages must be an object.");
     expect(() =>
       createShell({
-        manifest: { ...manifest, apps: [] },
+        runtime: { ...runtime, apps: [] },
         resolveMountPoint: () => ({}) as Element,
       } as never),
-    ).toThrow("[evjs] createShell() manifest.apps must be an object.");
+    ).toThrow("[evjs] createShell() runtime.apps must be an object.");
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
+        runtime: {
+          ...runtime,
           apps: {
             "admin.app": {
-              assets: { js: [], css: [] },
               module: { type: "lifecycle", href: "/admin.js" },
             },
           },
@@ -194,62 +123,62 @@ describe("createShell", () => {
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      '[evjs] createShell() manifest.apps key "admin.app" must contain only letters, numbers, underscores, or hyphens.',
+      '[evjs] createShell() runtime.apps key "admin.app" must contain only letters, numbers, underscores, or hyphens.',
     );
     expect(() =>
       createShell({
-        manifest: { ...manifest, routes: {} },
+        runtime: { ...runtime, routes: {} },
         resolveMountPoint: () => ({}) as Element,
       } as never),
-    ).toThrow("[evjs] createShell() manifest.routes must be an array.");
+    ).toThrow("[evjs] createShell() runtime.routes must be an array.");
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
+        runtime: {
+          ...runtime,
           routes: [{ id: "home", path: "home", pageId: "home" }],
         },
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      '[evjs] createShell() manifest.routes[0].path must start with "/".',
+      '[evjs] createShell() runtime.routes[0].path must start with "/".',
     );
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
+        runtime: {
+          ...runtime,
           routes: [{ id: " home", path: "/home", pageId: "home" }],
         },
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      "[evjs] createShell() manifest.routes[0].id must not contain leading or trailing whitespace.",
+      "[evjs] createShell() runtime.routes[0].id must not contain leading or trailing whitespace.",
     );
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
+        runtime: {
+          ...runtime,
           routes: [{ id: "orders", path: "/orders", appId: "missing" }],
         },
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      '[evjs] createShell() manifest.routes[0].appId "missing" does not match any manifest.apps entry.',
+      '[evjs] createShell() runtime.routes[0].appId "missing" does not match any runtime.apps entry.',
     );
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
+        runtime: {
+          ...runtime,
           routes: [{ id: "orders", path: "/orders", appId: "default " }],
         },
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      "[evjs] createShell() manifest.routes[0].appId must not contain leading or trailing whitespace.",
+      "[evjs] createShell() runtime.routes[0].appId must not contain leading or trailing whitespace.",
     );
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
+        runtime: {
+          ...runtime,
           routes: [
             { id: "userById", path: "/users/$id", pageId: "home" },
             {
@@ -262,74 +191,72 @@ describe("createShell", () => {
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      '[evjs] createShell() manifest.routes[1].path has the same route shape as createShell() manifest.routes[0].path "/users/$id". Use one page route per URL shape.',
+      '[evjs] createShell() runtime.routes[1].path has the same route shape as createShell() runtime.routes[0].path "/users/$id". Use one page route per URL shape.',
     );
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
-          runtime: { ...manifest.runtime, transport: [] },
+        runtime: {
+          ...runtime,
+          runtime: { ...runtime.runtime, transport: [] },
         },
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      "[evjs] createShell() manifest.runtime.transport must be an object.",
+      "[evjs] createShell() runtime.runtime.transport must be an object.",
     );
     expect(() =>
       createShell({
-        manifest: {
-          ...manifest,
+        runtime: {
+          ...runtime,
           runtime: {
-            ...manifest.runtime,
+            ...runtime.runtime,
             transport: { baseUrl: "http://[::1" },
           },
         },
         resolveMountPoint: () => ({}) as Element,
       } as never),
     ).toThrow(
-      "[evjs] createShell() manifest.runtime.transport.baseUrl must be a valid URL string.",
+      "[evjs] createShell() runtime.runtime.transport.baseUrl must be a valid URL string.",
     );
   });
 
   it("rejects invalid shell driver and callback shapes", () => {
-    expect(() => createShell({ manifest, drivers: {} as never })).toThrow(
+    expect(() => createShell({ runtime, drivers: {} as never })).toThrow(
       "[evjs] createShell() drivers must be an array.",
     );
-    expect(() => createShell({ manifest, drivers: [null as never] })).toThrow(
+    expect(() => createShell({ runtime, drivers: [null as never] })).toThrow(
       "[evjs] createShell() drivers[0] must be a shell driver object.",
     );
     expect(() =>
-      createShell({ manifest, drivers: [{ current: "now" } as never] }),
+      createShell({ runtime, drivers: [{ current: "now" } as never] }),
     ).toThrow("[evjs] createShell() drivers[0].current must be a function.");
     expect(() =>
       createShell({
-        manifest,
+        runtime,
         drivers: [{ current: () => ({}), subscribe: "listen" } as never],
       }),
     ).toThrow(
       "[evjs] createShell() drivers[0].subscribe must be a function when provided.",
     );
-    expect(() =>
-      createShell({ manifest, loadModule: "load" as never }),
-    ).toThrow(
+    expect(() => createShell({ runtime, loadModule: "load" as never })).toThrow(
       "[evjs] createShell() loadModule must be a function when provided.",
     );
     expect(() =>
-      createShell({ manifest, resolveMountPoint: "resolve" as never }),
+      createShell({ runtime, resolveMountPoint: "resolve" as never }),
     ).toThrow(
       "[evjs] createShell() resolveMountPoint must be a function when provided.",
     );
-    expect(() => createShell({ manifest, onError: "handle" as never })).toThrow(
+    expect(() => createShell({ runtime, onError: "handle" as never })).toThrow(
       "[evjs] createShell() onError must be a function when provided.",
     );
-    expect(() => createShell({ manifest, onWarning: "warn" as never })).toThrow(
+    expect(() => createShell({ runtime, onWarning: "warn" as never })).toThrow(
       "[evjs] createShell() onWarning must be a function when provided.",
     );
   });
 
   it("rejects invalid shell activation request shapes", async () => {
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
     });
 
@@ -356,7 +283,7 @@ describe("createShell", () => {
     await expect(
       shell.activate({ pageId: "home", buildId: "stale" }),
     ).rejects.toThrow(
-      '[evjs] Shell activate() request.buildId "stale" does not match manifest.buildId "test".',
+      '[evjs] Shell activate() request.buildId "stale" does not match runtime.buildId "test".',
     );
     await expect(
       shell.activate({ pageId: "home", buildId: "build.1" }),
@@ -396,35 +323,35 @@ describe("createShell", () => {
     const loadModule = vi.fn(async () => ({
       mount() {},
     }));
-    const createMalformedShell = (nextManifest: BuildOutput) =>
+    const createMalformedShell = (nextRuntime: ClientRuntime) =>
       createShell({
-        manifest: nextManifest,
+        runtime: nextRuntime,
         resolveMountPoint: () => ({}) as Element,
         loadModule,
       });
 
     expect(() =>
       createMalformedShell({
-        ...manifest,
+        ...runtime,
         pages: {
-          ...manifest.pages,
+          ...runtime.pages,
           home: {
-            ...manifest.pages.home,
+            ...runtime.pages.home,
             module: null as never,
           },
         },
       }),
     ).toThrow(
-      "[evjs] createShell() manifest.pages.home.module must be an object.",
+      "[evjs] createShell() runtime.pages.home.module must be an object.",
     );
 
     expect(() =>
       createMalformedShell({
-        ...manifest,
+        ...runtime,
         pages: {
-          ...manifest.pages,
+          ...runtime.pages,
           home: {
-            ...manifest.pages.home,
+            ...runtime.pages.home,
             module: {
               type: "lifecycle",
               href: 42,
@@ -433,15 +360,14 @@ describe("createShell", () => {
         },
       }),
     ).toThrow(
-      "[evjs] createShell() manifest.pages.home.module.href must be a non-empty string.",
+      "[evjs] createShell() runtime.pages.home.module.href must be a non-empty string.",
     );
 
     expect(() =>
       createMalformedShell({
-        ...manifest,
+        ...runtime,
         apps: {
           default: {
-            assets: { js: [], css: [] },
             module: {
               type: "lifecycle",
               href: " /app.js",
@@ -450,7 +376,7 @@ describe("createShell", () => {
         },
       }),
     ).toThrow(
-      "[evjs] createShell() manifest.apps.default.module.href must not contain leading or trailing whitespace.",
+      "[evjs] createShell() runtime.apps.default.module.href must not contain leading or trailing whitespace.",
     );
 
     expect(loadModule).not.toHaveBeenCalled();
@@ -458,7 +384,7 @@ describe("createShell", () => {
 
   it("rejects invalid shell preload request shapes", async () => {
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
     });
 
@@ -482,7 +408,7 @@ describe("createShell", () => {
     await expect(
       shell.preload({ pageId: "home", buildId: "stale" }),
     ).rejects.toThrow(
-      '[evjs] Shell preload() request.buildId "stale" does not match manifest.buildId "test".',
+      '[evjs] Shell preload() request.buildId "stale" does not match runtime.buildId "test".',
     );
     await expect(
       shell.preload({ pageId: "home", buildId: "build.1" }),
@@ -491,7 +417,7 @@ describe("createShell", () => {
     );
   });
 
-  it("activates and disposes manifest modules", async () => {
+  it("activates and disposes runtime modules", async () => {
     const events: string[] = [];
     const mountPoint = {} as Element;
     const mod: AppModule = {
@@ -503,7 +429,7 @@ describe("createShell", () => {
       },
     };
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => mountPoint,
       async loadModule(href) {
         events.push(`load:${href}`);
@@ -533,7 +459,7 @@ describe("createShell", () => {
       },
     };
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => mountPoint,
       async loadModule(href) {
         events.push(`load:${href}`);
@@ -573,7 +499,7 @@ describe("createShell", () => {
       },
     };
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule(href) {
         events.push(`load:${href}`);
@@ -602,7 +528,7 @@ describe("createShell", () => {
     });
 
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
     });
 
@@ -641,7 +567,7 @@ describe("createShell", () => {
   it("rejects malformed direct shell module registry state", async () => {
     const createDefaultLoaderShell = () =>
       createShell({
-        manifest,
+        runtime,
         resolveMountPoint: () => ({}) as Element,
       });
 
@@ -692,7 +618,7 @@ describe("createShell", () => {
   it("reports invalid shell modules as load errors", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule() {
         return null as never;
@@ -717,7 +643,7 @@ describe("createShell", () => {
   it("reports invalid shell module lifecycle hooks as load errors", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule() {
         return {
@@ -750,7 +676,7 @@ describe("createShell", () => {
     }));
 
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
     });
 
@@ -784,7 +710,7 @@ describe("createShell", () => {
     vi.stubGlobal("document", document);
 
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
     });
 
@@ -802,7 +728,7 @@ describe("createShell", () => {
       },
     });
     const scriptShell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
     });
 
@@ -823,12 +749,12 @@ describe("createShell", () => {
       },
     });
     const scriptShell = createShell({
-      manifest: {
-        ...manifest,
+      runtime: {
+        ...runtime,
         pages: {
-          ...manifest.pages,
+          ...runtime.pages,
           home: {
-            ...manifest.pages.home,
+            ...runtime.pages.home,
             module: {
               type: "lifecycle",
               href: "/invalid-create-element.js",
@@ -860,12 +786,12 @@ describe("createShell", () => {
       },
     });
     const scriptShell = createShell({
-      manifest: {
-        ...manifest,
+      runtime: {
+        ...runtime,
         pages: {
-          ...manifest.pages,
+          ...runtime.pages,
           home: {
-            ...manifest.pages.home,
+            ...runtime.pages.home,
             module: {
               type: "lifecycle",
               href: "/append-fail.js",
@@ -886,7 +812,7 @@ describe("createShell", () => {
   it("preloads without mounting", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule(href) {
         events.push(`load:${href}`);
@@ -907,7 +833,7 @@ describe("createShell", () => {
   it("serializes overlapping activations", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule(href, ctx) {
         events.push(`load:${ctx.id}:${href}`);
@@ -946,7 +872,7 @@ describe("createShell", () => {
       resolveModule = resolve;
     });
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule(href) {
         events.push(`load:${href}`);
@@ -983,7 +909,7 @@ describe("createShell", () => {
       finishMount = resolve;
     });
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule() {
         return {
@@ -1012,7 +938,7 @@ describe("createShell", () => {
 
   it("rejects shell lifecycle calls after dispose", async () => {
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
     });
 
@@ -1032,7 +958,7 @@ describe("createShell", () => {
   it("keeps the current activation mounted when the next module load fails", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule(href, ctx) {
         events.push(`load:${ctx.id}:${href}`);
@@ -1065,7 +991,7 @@ describe("createShell", () => {
   it("restores the current hydrated page when the next hydration fails", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule(href, ctx) {
         events.push(`load:${ctx.id}:${href}`);
@@ -1101,7 +1027,7 @@ describe("createShell", () => {
   it("starts from drivers and unsubscribes on dispose", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       drivers: [
         {
           current() {
@@ -1145,7 +1071,7 @@ describe("createShell", () => {
     const error = new Error("mount failed");
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule() {
         return {
@@ -1170,7 +1096,7 @@ describe("createShell", () => {
   it("reports missing mount points as resolve errors", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       async loadModule() {
         return {
           mount() {},
@@ -1194,7 +1120,7 @@ describe("createShell", () => {
   it("reports invalid resolved mount points as resolve errors", async () => {
     const events: string[] = [];
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => "root" as never,
       async loadModule() {
         return {
@@ -1223,7 +1149,7 @@ describe("createShell", () => {
     const loadError = new Error("load failed");
     let loadCount = 0;
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule() {
         loadCount++;
@@ -1260,7 +1186,7 @@ describe("createShell", () => {
     const initError = new Error("init failed");
     let initCount = 0;
     const shell = createShell({
-      manifest,
+      runtime,
       resolveMountPoint: () => ({}) as Element,
       async loadModule() {
         events.push("load");
@@ -1406,18 +1332,18 @@ describe("createHistoryDriver", () => {
     expect(() => createHistoryDriver(null as never)).toThrow(
       "[evjs] createHistoryDriver() options must be an object.",
     );
-    expect(() => createHistoryDriver({ manifest: null } as never)).toThrow(
-      "[evjs] createHistoryDriver() manifest must be an object.",
+    expect(() => createHistoryDriver({ runtime: null } as never)).toThrow(
+      "[evjs] createHistoryDriver() runtime must be an object.",
     );
     expect(() =>
       createHistoryDriver({
-        manifest: { ...manifest, routes: {} },
+        runtime: { ...runtime, routes: {} },
         window: createMockWindow("https://example.com/home"),
       } as never),
-    ).toThrow("[evjs] createHistoryDriver() manifest.routes must be an array.");
+    ).toThrow("[evjs] createHistoryDriver() runtime.routes must be an array.");
     expect(() =>
       createHistoryDriver({
-        manifest,
+        runtime,
         window: {
           addEventListener() {},
           removeEventListener() {},
@@ -1428,7 +1354,7 @@ describe("createHistoryDriver", () => {
     );
     expect(() =>
       createHistoryDriver({
-        manifest,
+        runtime,
         window: {
           location: { href: "https://example.com/home" },
           removeEventListener() {},
@@ -1439,7 +1365,7 @@ describe("createHistoryDriver", () => {
     );
     expect(() =>
       createHistoryDriver({
-        manifest,
+        runtime,
         window: {
           addEventListener() {},
           location: { href: "https://example.com/home" },
@@ -1452,14 +1378,14 @@ describe("createHistoryDriver", () => {
 
   it("reports unavailable or invalid history window locations with evjs errors", () => {
     vi.stubGlobal("window", undefined);
-    const missingWindowDriver = createHistoryDriver({ manifest });
+    const missingWindowDriver = createHistoryDriver({ runtime });
 
     expect(() => missingWindowDriver.current()).toThrow(
       "[evjs] createHistoryDriver() window must be available or provided.",
     );
 
     const invalidHrefDriver = createHistoryDriver({
-      manifest,
+      runtime,
       window: {
         ...createMockWindow("https://example.com/home"),
         location: { href: "" } as Location,
@@ -1480,7 +1406,7 @@ describe("createHistoryDriver", () => {
       removeEventListener() {},
     };
     const addFailureDriver = createHistoryDriver({
-      manifest,
+      runtime,
       window: addFailureWindow,
     });
 
@@ -1496,7 +1422,7 @@ describe("createHistoryDriver", () => {
       },
     };
     const removeFailureDriver = createHistoryDriver({
-      manifest,
+      runtime,
       window: removeFailureWindow,
     });
     const unsubscribe = removeFailureDriver.subscribe(() => {});
@@ -1506,9 +1432,9 @@ describe("createHistoryDriver", () => {
     );
   });
 
-  it("creates activation requests from matched manifest routes", () => {
+  it("creates activation requests from matched runtime routes", () => {
     const driver = createHistoryDriver({
-      manifest,
+      runtime,
       window: createMockWindow("https://example.com/orders/123"),
     });
 
@@ -1519,9 +1445,9 @@ describe("createHistoryDriver", () => {
     });
   });
 
-  it("prefers the most specific manifest route for activation requests", () => {
-    const orderedManifest: BuildOutput = {
-      ...manifest,
+  it("prefers the most specific runtime route for activation requests", () => {
+    const orderedRuntime: ClientRuntime = {
+      ...runtime,
       routes: [
         {
           id: "user",
@@ -1536,7 +1462,7 @@ describe("createHistoryDriver", () => {
       ],
     };
     const driver = createHistoryDriver({
-      manifest: orderedManifest,
+      runtime: orderedRuntime,
       window: createMockWindow("https://example.com/users/settings"),
     });
 
@@ -1550,7 +1476,7 @@ describe("createHistoryDriver", () => {
   it("subscribes to browser history navigation", () => {
     const calls: unknown[] = [];
     const win = createMockWindow("https://example.com/home");
-    const driver = createHistoryDriver({ manifest, window: win });
+    const driver = createHistoryDriver({ runtime, window: win });
 
     const unsubscribe = driver.subscribe((request) => calls.push(request));
     win.dispatchPopState();

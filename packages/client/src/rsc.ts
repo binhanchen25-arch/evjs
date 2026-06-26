@@ -7,11 +7,6 @@ import {
   type PathPatternValidationError,
   RSC_FLIGHT_CONTENT_TYPE,
 } from "@evjs/shared";
-import type {
-  AssetGroup,
-  BuildOutput,
-  PublicPathOutput,
-} from "@evjs/shared/manifest";
 import { createElement, type ReactNode, Suspense } from "react";
 import { createRoot, hydrateRoot, type Root } from "react-dom/client";
 import {
@@ -20,6 +15,7 @@ import {
   getRscFetchResponseContentType,
   type RscFlightFetchOptions,
 } from "./react.js";
+import type { ClientAssetGroup, ClientRuntime } from "./runtime-config.js";
 import { formatErrorDetail, isRecord } from "./validation.js";
 
 export interface ReactRscModelOptions extends RscFlightFetchOptions {
@@ -39,17 +35,16 @@ export interface ReactRscRuntimeBootstrap {
   pageId: string;
   endpoint: string;
   basePath?: string;
-  publicPath?: PublicPathOutput;
+  publicPath?: string;
   mount: string;
   page?: {
-    assets?: AssetGroup;
+    assets?: ClientAssetGroup;
     routeId?: string;
   };
 }
 
 const rootByMountPoint = new WeakMap<Element, Root>();
 const RSC_BOOTSTRAP_SCRIPT_ID = "__EVJS_RSC_BOOTSTRAP__";
-const RSC_BOOTSTRAP_RENDERER_ID = "evjs-rsc-bootstrap";
 let runtimeStarted = false;
 let runtimeStarting = false;
 
@@ -209,7 +204,7 @@ export async function startReactRscPageRuntime(
   const runtimeDocument = resolveRscDocument(doc);
 
   const model = await mountReactRscPage({
-    manifest: createBootstrapManifest(bootstrap),
+    runtime: createBootstrapRuntime(bootstrap),
     pageId: bootstrap.pageId,
     moduleBaseURL: publicPathModuleBaseURL(
       bootstrap.publicPath,
@@ -224,7 +219,7 @@ export async function startReactRscPageRuntime(
 }
 
 function publicPathModuleBaseURL(
-  publicPath: PublicPathOutput | undefined,
+  publicPath: string | undefined,
   document: Document,
 ): string | undefined {
   if (!publicPath || publicPath === "auto") return undefined;
@@ -471,72 +466,24 @@ function formatBootstrapPathnameError(
   }
 }
 
-function createBootstrapManifest(
+function createBootstrapRuntime(
   bootstrap: ReactRscRuntimeBootstrap,
-): BuildOutput {
-  const basePath = bootstrap.basePath ?? "/__evjs";
+): ClientRuntime {
   return {
     version: 1,
     buildId: bootstrap.buildId,
-    distDir: "dist",
-    paths: {
-      rootDir: "dist",
-      publicDir: "dist/client",
-      serverDir: "dist/server",
-    },
-    publicPath: bootstrap.publicPath ?? "auto",
     runtime: {
       server: {
-        basePath,
-        fn: joinEndpoint(basePath, "fn"),
         rsc: bootstrap.endpoint,
       },
       transport: {},
     },
-    assets: {},
     apps: {},
     pages: {
-      [bootstrap.pageId]: {
-        assets: bootstrap.page?.assets ?? { js: [], css: [] },
-        render: "ssr",
-        componentModel: "rsc",
-        rendering: {
-          component: "rsc",
-          html: "server",
-          streaming: true,
-          hydrate: "none",
-        },
-        routeId: bootstrap.page?.routeId,
-      },
+      [bootstrap.pageId]: {},
     },
     routes: [],
-    server: {
-      assets: { js: [], css: [] },
-      renderers: {
-        [RSC_BOOTSTRAP_RENDERER_ID]: {
-          kind: "rsc-page",
-          owner: { pageId: bootstrap.pageId },
-          module: "@evjs/client/rsc-bootstrap",
-          assets: bootstrap.page?.assets ?? { js: [], css: [] },
-        },
-      },
-      functions: {},
-      routes: [],
-    },
-    rsc: {
-      endpoint: bootstrap.endpoint,
-      pages: {
-        [bootstrap.pageId]: {
-          renderer: RSC_BOOTSTRAP_RENDERER_ID,
-          assets: bootstrap.page?.assets ?? { js: [], css: [] },
-        },
-      },
-    },
   };
-}
-
-function joinEndpoint(basePath: string, name: string): string {
-  return `/${basePath.split("/").concat(name).filter(Boolean).join("/")}`;
 }
 
 function scheduleRscRuntimeStart(): void {

@@ -103,15 +103,13 @@ function createTestBuildResult(
       version: 1 as const,
       ...(output.server.entry ? { entry: output.server.entry } : {}),
       assets: output.server.assets,
-      fns: Object.fromEntries(
+      functions: Object.fromEntries(
         Object.entries(output.server.functions).map(([id, fn]) => [
           id,
           { assets: fn.assets },
         ]),
       ),
-      ...(output.server.routes.length > 0
-        ? { routes: output.server.routes }
-        : {}),
+      routes: output.server.routes,
     },
     isRebuild,
   };

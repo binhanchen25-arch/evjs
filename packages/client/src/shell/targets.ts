@@ -1,17 +1,15 @@
-import type { BuildOutput } from "@evjs/shared/manifest";
+import type { ClientRuntime } from "../runtime-config.js";
 import { isRecord } from "../validation.js";
 import type { ActivationRequest, ResolvedShellTarget } from "./types.js";
 
 export async function resolveTarget(
-  manifest: BuildOutput,
+  runtime: ClientRuntime,
   request: ActivationRequest,
 ): Promise<ResolvedShellTarget> {
   if (request.pageId) {
-    const page = manifest.pages[request.pageId];
+    const page = runtime.pages[request.pageId];
     if (!page) {
-      throw new Error(
-        `[evjs] Page "${request.pageId}" is not in the manifest.`,
-      );
+      throw new Error(`[evjs] Page "${request.pageId}" is not in the runtime.`);
     }
     const href = readRuntimeModuleHref(page.module, `Page "${request.pageId}"`);
     if (!href) {
@@ -25,17 +23,17 @@ export async function resolveTarget(
       ctx: {
         id: request.pageId,
         kind: "page",
-        manifest,
+        runtime,
         output: page,
         request,
       },
     };
   }
 
-  const appId = request.appId ?? Object.keys(manifest.apps)[0];
-  const app = appId ? manifest.apps[appId] : undefined;
+  const appId = request.appId ?? Object.keys(runtime.apps)[0];
+  const app = appId ? runtime.apps[appId] : undefined;
   if (!appId || !app) {
-    throw new Error("[evjs] No app target is available in the manifest.");
+    throw new Error("[evjs] No app target is available in the runtime.");
   }
   const href = readRuntimeModuleHref(app.module, `App "${appId}"`);
   if (!href) {
@@ -49,7 +47,7 @@ export async function resolveTarget(
     ctx: {
       id: appId,
       kind: "app",
-      manifest,
+      runtime,
       output: app,
       request,
     },

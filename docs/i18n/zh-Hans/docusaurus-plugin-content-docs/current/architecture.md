@@ -1,9 +1,9 @@
 # 架构
 
 evjs 是围绕文件约定、显式 source declaration、框架 graph、bundler 无关 build
-plan，以及单一 runtime manifest 构建的 React 框架。框架托管的路由模型是文件化的：
-客户端页面来自 `src/pages`，服务端文件路由来自 `src/apis`，server middleware
-分成 `src/middleware.ts` 中的 framework request middleware，以及
+plan、私有 BuildOutput 契约和生成的 runtime 投影构建的 React 框架。框架托管的路由模型
+是文件化的：客户端页面来自 `src/pages`，服务端文件路由来自 `src/apis`，server
+middleware 分成 `src/middleware.ts` 中的 framework request middleware，以及
 `src/apis/**/middleware.ts` 中的 API route middleware。
 
 ```txt
@@ -157,9 +157,17 @@ sequenceDiagram
 ```
 
 构建会在 `dist/build-output.json` 输出完整私有 `BuildOutput` handoff artifact。
-public manifest 路径来自 `output.client`，server manifest 路径来自
-`output.server`。Deployment adapter 可以把等价的 runtime 数据内嵌进平台产物，
-因此已部署的 server runtime 不必在启动时读取 `dist/build-output.json`。
+client/server manifest 路径来自 `output.client` 和 `output.server`；这些文件是部署/工具
+元信息。浏览器 bootstrap 消费生成的 `runtime.json` 投影，Deployment adapter 会把等价的
+`FrameworkRuntime` 数据内嵌进平台服务端产物，因此已部署的 server runtime 不会在启动时读取
+`dist/build-output.json` 或 manifest 文件。
+浏览器运行时投影刻意小于 public manifest：只保留启动和导航需要的 build id、
+transport base URL、RSC endpoint、app/page module target、mount selector 和 route
+lookup 数据。资源索引、部署元信息、源码引用和 renderer bundle 元信息留在 manifest 或
+`BuildOutput` 中。
+在 `BuildOutput` 和公开 manifest 中，client route 是 URL 到目标的索引。页面渲染、
+hydrate 和 component model 元信息留在 `pages` 下，framework endpoint 留在 runtime/server
+投影下。
 
 ## 运行时流程
 
@@ -169,12 +177,13 @@ sequenceDiagram
   participant Shell as "@evjs/ev/internal/client"
   participant Runtime as "@evjs/ev/page"
   participant Server as "@evjs/ev/internal/server"
-  participant Manifest as "BuildOutput"
+  participant ClientRuntime as "ClientRuntime"
+  participant FrameworkRuntime as "FrameworkRuntime"
 
   Browser->>Runtime: page/app boot
-  Runtime->>Manifest: load embedded or /manifest.json
+  Runtime->>ClientRuntime: load embedded or /runtime.json
   Runtime->>Shell: create internal shell
-  Shell->>Manifest: resolve app/page target
+  Shell->>ClientRuntime: resolve app/page target
   Shell->>Browser: import JS/CSS module assets
   Shell->>Runtime: mount/hydrate/unmount lifecycle
 
@@ -183,16 +192,16 @@ sequenceDiagram
   Server-->>Browser: JSON result/error
 
   Browser->>Server: GET page route
-  Server->>Manifest: match route/page/renderer
+  Server->>FrameworkRuntime: match route/page/renderer
   Server-->>Browser: SSR HTML
 
   Browser->>Server: GET PPR page route
-  Server->>Manifest: match shell and region renderers
+  Server->>FrameworkRuntime: match shell and region renderers
   Server->>Server: render/cache internal regions
   Server-->>Browser: PPR HTML in the same route response
 
   Browser->>Server: GET runtime.server.rsc?page=id
-  Server->>Manifest: read RSC renderer and reference manifests
+  Server->>FrameworkRuntime: read RSC renderer and reference manifests
   Server-->>Browser: React Flight stream
 ```
 
@@ -239,7 +248,7 @@ runtime postponed/resume 尚未实现，当前兼容 splitter 只会为受限的
 直接 `lazy(() => import(...))` 形态生成内部 region renderer。Region id 是框架
 内部 opaque 细节。
 
-PPR 页面在 public manifest 中的 page-level hydration 是 `none`。需要客户端交互时，
+PPR 页面在 client runtime 中的 page-level hydration 是 `none`。需要客户端交互时，
 应通过显式 client islands 或 region-level hydration metadata 引入，而不是 hydrate 整个
 PPR shell。
 
@@ -356,9 +365,11 @@ Deployment adapter 消费 `BuildOutput`。`@evjs/ev` 提供：
 
 平台专属 adapter 应从 `BuildOutput` 派生 routing、framework endpoint、SSR、PPR、RSC 和 asset metadata，而不是读取 bundler stats。
 构建流水线中的 adapter 会在内存里收到这个对象；构建后的工具可以读取 `dist/build-output.json`。
-完整 BuildOutput manifest 会保留源码 module 和 server renderer reference；公开/浏览器
-manifest 保持相同的 routing 与 asset 结构，但会脱敏这些 server-only 字段，因此客户端
-校验会把它们视为可选。
+完整 BuildOutput manifest 会保留源码 module 和 server renderer reference。client/server
+manifest 是部署元信息；生成的浏览器和服务端运行时消费最小化的 ClientRuntime 和
+FrameworkRuntime contract。
+Deployment artifact 会把 framework endpoint 和 transport 数据归到 server 分组下，而不是
+重复携带原始 runtime 对象。
 
 部署模型由能力分类驱动：
 

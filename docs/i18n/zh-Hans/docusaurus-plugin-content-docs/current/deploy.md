@@ -19,6 +19,7 @@ npm run build
 dist/
 ├── client/
 │   ├── manifest.json
+│   ├── runtime.json
 │   └── ...
 ├── server/
 │   ├── manifest.json
@@ -29,12 +30,13 @@ dist/
 重要路径：
 
 - `dist/client/`：浏览器资源和生成的 HTML。
-- `dist/client/manifest.json`：浏览器安全的路由、资源和运行时元信息。
+- `dist/client/manifest.json`：给部署工具消费的浏览器安全路由和资源元信息。
+- `dist/client/runtime.json`：生成的页面 bootstrap 在 HTML 未内嵌配置时加载的最小浏览器运行时配置。
 - `dist/server/`：应用使用服务端函数、服务端文件路由、SSR、PPR 或 RSC 时生成的服务端 bundle 和服务端元信息。
 - `dist/build-output.json`：面向工具和部署 adapter 的完整构建元信息。应用代码不应导入或修改它。
 
-如果页面 HTML 没有内嵌 manifest，浏览器 runtime 会从配置的 manifest URL 或
-`/manifest.json` 获取它。部署时应把该响应作为 JSON 返回，并设置
+如果页面 HTML 没有内嵌 runtime config，浏览器 runtime 会从配置的 runtime URL 或
+`/runtime.json` 获取它。部署时应把该响应作为 JSON 返回，并设置
 `Content-Type: application/json`。
 
 ## 选择部署目标

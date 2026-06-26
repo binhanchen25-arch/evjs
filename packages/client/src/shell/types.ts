@@ -1,4 +1,8 @@
-import type { AppOutput, BuildOutput, PageOutput } from "@evjs/shared/manifest";
+import type {
+  ClientRuntime,
+  ClientRuntimeApp,
+  ClientRuntimePage,
+} from "../runtime-config.js";
 
 export interface AppModule {
   init?: (ctx: AppContext) => void | Promise<void>;
@@ -14,8 +18,8 @@ export type ShellModuleRegistration =
 export interface AppContext {
   id: string;
   kind: "app" | "page";
-  manifest: BuildOutput;
-  output: AppOutput | PageOutput;
+  runtime: ClientRuntime;
+  output: ClientRuntimeApp | ClientRuntimePage;
   request: ActivationRequest;
 }
 
@@ -29,7 +33,7 @@ export interface ActivationRequest {
 }
 
 export interface ShellOptions {
-  manifest: BuildOutput;
+  runtime: ClientRuntime;
   drivers?: ShellDriver[];
   loadModule?: (href: string, ctx: AppContext) => Promise<AppModule>;
   resolveMountPoint?: (ctx: AppContext) => Element | null;
@@ -63,7 +67,7 @@ export interface PageDriverOptions {
 export interface PageDriver extends ShellDriver {}
 
 export interface HistoryDriverOptions {
-  manifest: BuildOutput;
+  runtime: ClientRuntime;
   window?: BrowserWindowLike;
 }
 

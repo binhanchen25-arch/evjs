@@ -34,7 +34,7 @@ export function createHistoryDriver(
   return {
     current() {
       return createActivationRequestFromUrl(
-        options.manifest,
+        options.runtime,
         getWindowHref(getWindow(options)),
       );
     },
@@ -42,7 +42,7 @@ export function createHistoryDriver(
       const win = getWindow(options);
       const listener = () =>
         callback(
-          createActivationRequestFromUrl(options.manifest, getWindowHref(win)),
+          createActivationRequestFromUrl(options.runtime, getWindowHref(win)),
         );
       addHistoryPopStateListener(win, listener);
       return () => removeHistoryPopStateListener(win, listener);
@@ -163,21 +163,21 @@ function assertHistoryDriverOptions(
   if (!isRecord(options)) {
     throw new Error("[evjs] createHistoryDriver() options must be an object.");
   }
-  assertHistoryDriverManifest(options.manifest);
+  assertHistoryDriverRuntime(options.runtime);
   if (options.window !== undefined) {
     assertBrowserWindow(options.window, "window");
   }
 }
 
-function assertHistoryDriverManifest(
-  manifest: unknown,
-): asserts manifest is HistoryDriverOptions["manifest"] {
-  if (!isRecord(manifest)) {
-    throw new Error("[evjs] createHistoryDriver() manifest must be an object.");
+function assertHistoryDriverRuntime(
+  runtime: unknown,
+): asserts runtime is HistoryDriverOptions["runtime"] {
+  if (!isRecord(runtime)) {
+    throw new Error("[evjs] createHistoryDriver() runtime must be an object.");
   }
-  if (!Array.isArray(manifest.routes)) {
+  if (!Array.isArray(runtime.routes)) {
     throw new Error(
-      "[evjs] createHistoryDriver() manifest.routes must be an array.",
+      "[evjs] createHistoryDriver() runtime.routes must be an array.",
     );
   }
 }

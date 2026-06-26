@@ -1,6 +1,6 @@
-import type { BuildOutput } from "@evjs/shared/manifest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { startPageRuntime } from "../src/internal";
+import type { ClientRuntime } from "../src/runtime-config.js";
 import {
   __resetForTesting,
   callServer,
@@ -13,12 +13,12 @@ afterEach(() => {
 });
 
 describe("startPageRuntime", () => {
-  it("boots the shell from framework HTML attributes and an embedded manifest", async () => {
+  it("boots the shell from framework HTML attributes and an embedded runtime", async () => {
     const events: string[] = [];
     const mountPoint = {} as Element;
-    const manifest = createManifest();
+    const runtime = createRuntime();
     const document = createDocument({
-      manifest,
+      runtime,
       mountPoint,
       attributes: {
         "data-evjs-kind": "page",
@@ -46,7 +46,7 @@ describe("startPageRuntime", () => {
     expect(events).toEqual(["load:/home.js", "hydrate:page:home:true"]);
   });
 
-  it("fetches the manifest when it is not embedded", async () => {
+  it("fetches the runtime when it is not embedded", async () => {
     const events: string[] = [];
     const mountPoint = {} as Element;
     const document = createDocument({
@@ -54,12 +54,12 @@ describe("startPageRuntime", () => {
       attributes: {
         "data-evjs-kind": "page",
         "data-evjs-id": "home",
-        "data-evjs-manifest": "/assets/manifest.json",
+        "data-evjs-runtime": "/assets/runtime.json",
       },
     });
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Response.json(createManifest())),
+      vi.fn(async () => Response.json(createRuntime())),
     );
 
     await startPageRuntime({
@@ -74,11 +74,11 @@ describe("startPageRuntime", () => {
       },
     });
 
-    expect(fetch).toHaveBeenCalledWith("/assets/manifest.json");
+    expect(fetch).toHaveBeenCalledWith("/assets/runtime.json");
     expect(events).toEqual(["load:/home.js", "mount"]);
   });
 
-  it("rejects invalid framework HTML target attributes before manifest loading", async () => {
+  it("rejects invalid framework HTML target attributes before runtime loading", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
@@ -156,9 +156,9 @@ describe("startPageRuntime", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("reports malformed embedded manifests with an evjs error", async () => {
+  it("reports malformed embedded runtimes with an evjs error", async () => {
     const document = createDocument({
-      embeddedManifestText: "{",
+      embeddedRuntimeText: "{",
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
@@ -167,13 +167,13 @@ describe("startPageRuntime", () => {
     });
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to parse embedded manifest "__EVJS_MANIFEST__" as JSON',
+      '[evjs] Failed to parse embedded runtime "__EVJS_CLIENT_RUNTIME__" as JSON',
     );
   });
 
-  it("reports invalid embedded manifest script text with an evjs error", async () => {
+  it("reports invalid embedded runtime script text with an evjs error", async () => {
     const document = createDocument({
-      embeddedManifestText: 42,
+      embeddedRuntimeText: 42,
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
@@ -182,17 +182,17 @@ describe("startPageRuntime", () => {
     });
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Embedded manifest "__EVJS_MANIFEST__" textContent must be a string when provided.',
+      '[evjs] Embedded runtime "__EVJS_CLIENT_RUNTIME__" textContent must be a string when provided.',
     );
   });
 
-  it("reports malformed fetched manifests with an evjs error", async () => {
+  it("reports malformed fetched runtimes with an evjs error", async () => {
     const document = createDocument({
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
         "data-evjs-id": "home",
-        "data-evjs-manifest": "/assets/manifest.json",
+        "data-evjs-runtime": "/assets/runtime.json",
       },
     });
     vi.stubGlobal(
@@ -207,11 +207,11 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to parse manifest "/assets/manifest.json" as JSON',
+      '[evjs] Failed to parse runtime "/assets/runtime.json" as JSON',
     );
   });
 
-  it("rejects invalid manifest URL attributes before fetching", async () => {
+  it("rejects invalid runtime URL attributes before fetching", async () => {
     await expect(
       startPageRuntime({
         document: createDocument({
@@ -219,12 +219,12 @@ describe("startPageRuntime", () => {
           attributes: {
             "data-evjs-kind": "page",
             "data-evjs-id": "home",
-            "data-evjs-manifest": "",
+            "data-evjs-runtime": "",
           },
         }),
       }),
     ).rejects.toThrow(
-      "[evjs] startPageRuntime() data-evjs-manifest must be a non-empty manifest URL.",
+      "[evjs] startPageRuntime() data-evjs-runtime must be a non-empty runtime URL.",
     );
 
     await expect(
@@ -234,12 +234,12 @@ describe("startPageRuntime", () => {
           attributes: {
             "data-evjs-kind": "page",
             "data-evjs-id": "home",
-            "data-evjs-manifest": " /assets/manifest.json ",
+            "data-evjs-runtime": " /assets/runtime.json ",
           },
         }),
       }),
     ).rejects.toThrow(
-      "[evjs] startPageRuntime() data-evjs-manifest must not include leading or trailing whitespace.",
+      "[evjs] startPageRuntime() data-evjs-runtime must not include leading or trailing whitespace.",
     );
 
     await expect(
@@ -249,22 +249,22 @@ describe("startPageRuntime", () => {
           attributes: {
             "data-evjs-kind": "page",
             "data-evjs-id": "home",
-            "data-evjs-manifest": "javascript:alert(1)",
+            "data-evjs-runtime": "javascript:alert(1)",
           },
         }),
       }),
     ).rejects.toThrow(
-      "[evjs] startPageRuntime() data-evjs-manifest must be an http(s) URL or path.",
+      "[evjs] startPageRuntime() data-evjs-runtime must be an http(s) URL or path.",
     );
   });
 
-  it("reports failed manifest fetches with an evjs error", async () => {
+  it("reports failed runtime fetches with an evjs error", async () => {
     const document = createDocument({
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
         "data-evjs-id": "home",
-        "data-evjs-manifest": "/assets/manifest.json",
+        "data-evjs-runtime": "/assets/runtime.json",
       },
     });
     vi.stubGlobal(
@@ -275,33 +275,33 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": network offline',
+      '[evjs] Failed to load runtime "/assets/runtime.json": network offline',
     );
   });
 
-  it("reports missing fetch support for manifest loading", async () => {
+  it("reports missing fetch support for runtime loading", async () => {
     const document = createDocument({
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
         "data-evjs-id": "home",
-        "data-evjs-manifest": "/assets/manifest.json",
+        "data-evjs-runtime": "/assets/runtime.json",
       },
     });
     vi.stubGlobal("fetch", undefined);
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": fetch is not available.',
+      '[evjs] Failed to load runtime "/assets/runtime.json": fetch is not available.',
     );
   });
 
-  it("reports invalid manifest fetch response objects with an evjs error", async () => {
+  it("reports invalid runtime fetch response objects with an evjs error", async () => {
     const document = createDocument({
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
         "data-evjs-id": "home",
-        "data-evjs-manifest": "/assets/manifest.json",
+        "data-evjs-runtime": "/assets/runtime.json",
       },
     });
 
@@ -311,19 +311,19 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": fetch returned an invalid Response object.',
+      '[evjs] Failed to load runtime "/assets/runtime.json": fetch returned an invalid Response object.',
     );
 
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
         ok: "yes",
-        json: async () => createManifest(),
+        json: async () => createRuntime(),
       })),
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": fetch response.ok must be a boolean.',
+      '[evjs] Failed to load runtime "/assets/runtime.json": fetch response.ok must be a boolean.',
     );
 
     vi.stubGlobal(
@@ -335,7 +335,7 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": fetch response.status must be a number when ok is false.',
+      '[evjs] Failed to load runtime "/assets/runtime.json": fetch response.status must be a number when ok is false.',
     );
 
     vi.stubGlobal(
@@ -347,7 +347,7 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": fetch response.statusText must be a string when ok is false.',
+      '[evjs] Failed to load runtime "/assets/runtime.json": fetch response.statusText must be a string when ok is false.',
     );
 
     vi.stubGlobal(
@@ -358,7 +358,7 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": fetch response.json must be a function.',
+      '[evjs] Failed to load runtime "/assets/runtime.json": fetch response.json must be a function.',
     );
 
     vi.stubGlobal(
@@ -366,12 +366,12 @@ describe("startPageRuntime", () => {
       vi.fn(async () => ({
         ok: true,
         headers: new Headers({ "Content-Type": "text/application/json" }),
-        json: async () => createManifest(),
+        json: async () => createRuntime(),
       })),
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": fetch response Content-Type must be "application/json"; received "text/application/json".',
+      '[evjs] Failed to load runtime "/assets/runtime.json": fetch response Content-Type must be "application/json"; received "text/application/json".',
     );
 
     vi.stubGlobal(
@@ -379,22 +379,22 @@ describe("startPageRuntime", () => {
       vi.fn(async () => ({
         ok: true,
         headers: new Headers(),
-        json: async () => createManifest(),
+        json: async () => createRuntime(),
       })),
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": fetch response Content-Type must be "application/json"; received missing Content-Type.',
+      '[evjs] Failed to load runtime "/assets/runtime.json": fetch response Content-Type must be "application/json"; received missing Content-Type.',
     );
   });
 
-  it("reports failed manifest HTTP responses without requiring a JSON parser", async () => {
+  it("reports failed runtime HTTP responses without requiring a JSON parser", async () => {
     const document = createDocument({
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
         "data-evjs-id": "home",
-        "data-evjs-manifest": "/assets/manifest.json",
+        "data-evjs-runtime": "/assets/runtime.json",
       },
     });
 
@@ -408,14 +408,14 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": 503 Service Unavailable',
+      '[evjs] Failed to load runtime "/assets/runtime.json": 503 Service Unavailable',
     );
 
     vi.stubGlobal(
       "fetch",
       vi.fn(
         async () =>
-          new Response("deployment manifest missing", {
+          new Response("deployment runtime missing", {
             status: 503,
             statusText: "Service Unavailable",
           }),
@@ -423,7 +423,7 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": 503 Service Unavailable: deployment manifest missing',
+      '[evjs] Failed to load runtime "/assets/runtime.json": 503 Service Unavailable: deployment runtime missing',
     );
 
     vi.stubGlobal(
@@ -438,13 +438,13 @@ describe("startPageRuntime", () => {
     );
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Failed to load manifest "/assets/manifest.json": 502 Bad Gateway',
+      '[evjs] Failed to load runtime "/assets/runtime.json": 502 Bad Gateway',
     );
   });
 
-  it("reports invalid loaded manifest shapes with an evjs error", async () => {
+  it("reports invalid loaded runtime shapes with an evjs error", async () => {
     const document = createDocument({
-      embeddedManifestText: "[]",
+      embeddedRuntimeText: "[]",
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
@@ -453,14 +453,14 @@ describe("startPageRuntime", () => {
     });
 
     await expect(startPageRuntime({ document })).rejects.toThrow(
-      '[evjs] Loaded embedded manifest "__EVJS_MANIFEST__" must be a JSON object.',
+      '[evjs] Loaded embedded runtime "__EVJS_CLIENT_RUNTIME__" must be a JSON object.',
     );
 
     await expect(
       startPageRuntime({
         document: createDocument({
-          embeddedManifestText: JSON.stringify({
-            ...createManifest(),
+          embeddedRuntimeText: JSON.stringify({
+            ...createRuntime(),
             version: 2,
           }),
           mountPoint: {} as Element,
@@ -471,14 +471,14 @@ describe("startPageRuntime", () => {
         }),
       }),
     ).rejects.toThrow(
-      '[evjs] Loaded embedded manifest "__EVJS_MANIFEST__" version must be 1.',
+      '[evjs] Loaded embedded runtime "__EVJS_CLIENT_RUNTIME__" version must be 1.',
     );
 
     await expect(
       startPageRuntime({
         document: createDocument({
-          embeddedManifestText: JSON.stringify({
-            ...createManifest(),
+          embeddedRuntimeText: JSON.stringify({
+            ...createRuntime(),
             pages: [],
           }),
           mountPoint: {} as Element,
@@ -489,11 +489,11 @@ describe("startPageRuntime", () => {
         }),
       }),
     ).rejects.toThrow(
-      '[evjs] Loaded embedded manifest "__EVJS_MANIFEST__" pages must be an object.',
+      '[evjs] Loaded embedded runtime "__EVJS_CLIENT_RUNTIME__" pages must be an object.',
     );
   });
 
-  it("reports invalid explicit manifest options with an evjs error", async () => {
+  it("reports invalid explicit runtime options with an evjs error", async () => {
     const document = createDocument({
       mountPoint: {} as Element,
       attributes: {
@@ -503,145 +503,97 @@ describe("startPageRuntime", () => {
     });
 
     await expect(
-      startPageRuntime({ document, manifest: null as never }),
-    ).rejects.toThrow("[evjs] Loaded provided manifest must be a JSON object.");
+      startPageRuntime({ document, runtime: null as never }),
+    ).rejects.toThrow("[evjs] Loaded provided runtime must be a JSON object.");
 
     await expect(
       startPageRuntime({
         document,
-        manifest: {
-          ...createManifest(),
+        runtime: {
+          ...createRuntime(),
           buildId: "build.1",
         } as never,
       }),
     ).rejects.toThrow(
-      "[evjs] Loaded provided manifest.buildId must contain only letters, numbers, underscores, or hyphens.",
+      "[evjs] Loaded provided runtime.buildId must contain only letters, numbers, underscores, or hyphens.",
     );
 
     await expect(
       startPageRuntime({
         document,
-        manifest: {
-          ...createManifest(),
-          publicPath: { mode: "asset" },
-        } as never,
-      }),
-    ).rejects.toThrow(
-      "[evjs] Loaded provided manifest.publicPath must be a non-empty string.",
-    );
-
-    await expect(
-      startPageRuntime({
-        document,
-        manifest: {
-          ...createManifest(),
-          assets: [],
-        } as never,
-      }),
-    ).rejects.toThrow(
-      "[evjs] Loaded provided manifest.assets must be an object.",
-    );
-
-    await expect(
-      startPageRuntime({
-        document,
-        manifest: {
-          ...createManifest(),
+        runtime: {
+          ...createRuntime(),
           pages: {
             home: {
-              ...createManifest().pages.home,
+              ...createRuntime().pages.home,
               module: { type: "lifecycle", href: " /home.js " },
             },
           },
         } as never,
       }),
     ).rejects.toThrow(
-      "[evjs] Loaded provided manifest.pages.home.module.href must not contain leading or trailing whitespace.",
+      "[evjs] Loaded provided runtime.pages.home.module.href must not contain leading or trailing whitespace.",
     );
 
     await expect(
       startPageRuntime({
         document,
-        manifest: {
-          ...createManifest(),
-          pages: {
-            home: {
-              ...createManifest().pages.home,
-              rendering: {
-                component: "server",
-                html: "server",
-                streaming: false,
-                hydrate: "viewport",
-              },
-            },
-          },
+        runtime: {
+          ...createRuntime(),
+          runtime: { ...createRuntime().runtime, transport: [] },
         } as never,
       }),
     ).rejects.toThrow(
-      '[evjs] Loaded provided manifest.pages.home.rendering.hydrate must be "none", "load", "visible", or "idle".',
+      "[evjs] Loaded provided runtime.runtime.transport must be an object.",
     );
 
     await expect(
       startPageRuntime({
         document,
-        manifest: {
-          ...createManifest(),
-          runtime: { ...createManifest().runtime, transport: [] },
-        } as never,
-      }),
-    ).rejects.toThrow(
-      "[evjs] Loaded provided manifest.runtime.transport must be an object.",
-    );
-
-    await expect(
-      startPageRuntime({
-        document,
-        manifest: {
-          ...createManifest(),
+        runtime: {
+          ...createRuntime(),
           runtime: {
-            ...createManifest().runtime,
+            ...createRuntime().runtime,
             transport: { baseUrl: "http://[::1" },
           },
         } as never,
       }),
     ).rejects.toThrow(
-      "[evjs] Loaded provided manifest.runtime.transport.baseUrl must be a valid URL string.",
+      "[evjs] Loaded provided runtime.runtime.transport.baseUrl must be a valid URL string.",
     );
 
     await expect(
       startPageRuntime({
         document,
-        manifest: {
-          ...createManifest(),
+        runtime: {
+          ...createRuntime(),
           apps: [],
         } as never,
       }),
-    ).rejects.toThrow(
-      "[evjs] Loaded provided manifest apps must be an object.",
-    );
+    ).rejects.toThrow("[evjs] Loaded provided runtime apps must be an object.");
 
     await expect(
       startPageRuntime({
         document,
-        manifest: {
-          ...createManifest(),
+        runtime: {
+          ...createRuntime(),
           routes: {},
         } as never,
       }),
     ).rejects.toThrow(
-      "[evjs] Loaded provided manifest routes must be an array.",
+      "[evjs] Loaded provided runtime routes must be an array.",
     );
 
     await expect(
       startPageRuntime({
         document,
-        manifest: {
-          ...createManifest(),
+        runtime: {
+          ...createRuntime(),
           routes: [{ id: "home", path: "home", pageId: "home" }],
         } as never,
       }),
     ).rejects.toThrow(
-      '[evjs] Loaded provided manifest.routes[0].path must start with "/".',
+      '[evjs] Loaded provided runtime.routes[0].path must start with "/".',
     );
   });
 
@@ -649,18 +601,18 @@ describe("startPageRuntime", () => {
     await expect(startPageRuntime(null as never)).rejects.toThrow(
       "[evjs] startPageRuntime() options must be an object.",
     );
-    await expect(startPageRuntime({ manifestUrl: "" })).rejects.toThrow(
-      "[evjs] startPageRuntime() manifestUrl must be a non-empty string.",
+    await expect(startPageRuntime({ runtimeUrl: "" })).rejects.toThrow(
+      "[evjs] startPageRuntime() runtimeUrl must be a non-empty string.",
     );
     await expect(
-      startPageRuntime({ manifestUrl: " /manifest.json" }),
+      startPageRuntime({ runtimeUrl: " /runtime.json" }),
     ).rejects.toThrow(
-      "[evjs] startPageRuntime() manifestUrl must not include leading or trailing whitespace.",
+      "[evjs] startPageRuntime() runtimeUrl must not include leading or trailing whitespace.",
     );
     await expect(
-      startPageRuntime({ manifestUrl: "javascript:alert(1)" }),
+      startPageRuntime({ runtimeUrl: "javascript:alert(1)" }),
     ).rejects.toThrow(
-      "[evjs] startPageRuntime() manifestUrl must be an http(s) URL or path.",
+      "[evjs] startPageRuntime() runtimeUrl must be an http(s) URL or path.",
     );
     await expect(startPageRuntime({ mount: "" })).rejects.toThrow(
       "[evjs] startPageRuntime() mount must be a non-empty selector string.",
@@ -706,7 +658,7 @@ describe("startPageRuntime", () => {
 
   it("reports invalid custom mount selectors with an evjs error", async () => {
     const document = createDocument({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
@@ -731,7 +683,7 @@ describe("startPageRuntime", () => {
 
   it("reports unresolved custom mount selectors with an evjs error", async () => {
     const document = createDocument({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       mountPoint: {} as Element,
       attributes: {
         "data-evjs-kind": "page",
@@ -757,7 +709,7 @@ describe("startPageRuntime", () => {
   it("reports invalid custom mount selector results with an evjs error", async () => {
     const document = {
       ...createDocument({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         mountPoint: {} as Element,
         attributes: {
           "data-evjs-kind": "page",
@@ -783,14 +735,14 @@ describe("startPageRuntime", () => {
     );
   });
 
-  it("initializes HTTP transport from manifest runtime metadata", async () => {
+  it("initializes HTTP transport from runtime runtime metadata", async () => {
     const mountPoint = {} as Element;
-    const manifest = createManifest();
-    manifest.runtime.transport = {
+    const runtime = createRuntime();
+    runtime.runtime.transport = {
       baseUrl: "https://api.example.com/framework",
     };
     const document = createDocument({
-      manifest,
+      runtime,
       mountPoint,
       attributes: {
         "data-evjs-kind": "page",
@@ -825,12 +777,12 @@ describe("startPageRuntime", () => {
     const send = vi.fn().mockResolvedValue("ok");
     initTransport({ adapter: { send } });
     const mountPoint = {} as Element;
-    const manifest = createManifest();
-    manifest.runtime.transport = {
+    const runtime = createRuntime();
+    runtime.runtime.transport = {
       baseUrl: "https://api.example.com/framework",
     };
     const document = createDocument({
-      manifest,
+      runtime,
       mountPoint,
       attributes: {
         "data-evjs-kind": "page",
@@ -852,30 +804,14 @@ describe("startPageRuntime", () => {
   });
 });
 
-function createManifest(): BuildOutput {
+function createRuntime(): ClientRuntime {
   return {
     version: 1,
     buildId: "test",
-    distDir: "dist",
-    publicPath: "/",
-    runtime: {
-      server: {
-        basePath: "/__evjs",
-        fn: "/__evjs/fn",
-      },
-    },
-    assets: {},
+    runtime: {},
     apps: {},
     pages: {
       home: {
-        assets: { js: ["home.js"], css: [] },
-        render: "ssr",
-        rendering: {
-          component: "server",
-          html: "server",
-          streaming: false,
-          hydrate: "load",
-        },
         mount: "#root",
         module: {
           type: "lifecycle",
@@ -884,17 +820,12 @@ function createManifest(): BuildOutput {
       },
     },
     routes: [],
-    server: {
-      assets: { js: [], css: [] },
-      functions: {},
-      routes: [],
-    },
   };
 }
 
 function createDocument(options: {
-  manifest?: BuildOutput;
-  embeddedManifestText?: unknown;
+  runtime?: ClientRuntime;
+  embeddedRuntimeText?: unknown;
   mountPoint: Element;
   attributes: Record<string, string>;
 }): Document {
@@ -905,15 +836,15 @@ function createDocument(options: {
       },
     },
     getElementById(id: string) {
-      if (id !== "__EVJS_MANIFEST__") return null;
-      if (options.embeddedManifestText !== undefined) {
+      if (id !== "__EVJS_CLIENT_RUNTIME__") return null;
+      if (options.embeddedRuntimeText !== undefined) {
         return {
-          textContent: options.embeddedManifestText,
+          textContent: options.embeddedRuntimeText,
         };
       }
-      if (!options.manifest) return null;
+      if (!options.runtime) return null;
       return {
-        textContent: JSON.stringify(options.manifest),
+        textContent: JSON.stringify(options.runtime),
       };
     },
     querySelector(selector: string) {

@@ -3894,6 +3894,39 @@ describe("createAppGraph and createBuildPlan", () => {
     );
   });
 
+  it("follows the default source alias when discovering server functions", async () => {
+    const cwd = await createFixture({
+      "src/main.tsx": `
+        import { saveOrder } from "@/actions";
+        void saveOrder();
+      `,
+      "src/actions.ts": `
+        "use server";
+
+        export async function saveOrder() {
+          return { ok: true };
+        }
+      `,
+    });
+    const config = createConfig({
+      server: {
+        basePath: "/__evjs",
+      },
+    });
+    const analysis = await createAppGraph(config, cwd);
+
+    expect(analysis.diagnostics).toEqual([]);
+    expect(
+      analysis.graph.serverFunctions.map((fn) => ({
+        module: fn.module,
+        exportName: fn.exportName,
+      })),
+    ).toEqual([{ module: "src/actions.ts", exportName: "saveOrder" }]);
+    expect(relativeFileDependencies(cwd, analysis.fileDependencies)).toEqual([
+      "src/actions.ts",
+    ]);
+  });
+
   it("collects page route declarations", async () => {
     const cwd = await createFixture({
       "src/main.tsx": "console.log('app');",

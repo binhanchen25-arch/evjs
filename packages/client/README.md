@@ -168,8 +168,8 @@ Standalone/manual clients can import the same query hooks directly from
 
 ### Runtime
 - Page runtime bootstrap is framework-owned and imported through `@evjs/client/internal`.
-- Page runtime loads the embedded `__EVJS_MANIFEST__` first. When it falls back
-  to `manifestUrl`, `data-evjs-manifest`, or `/manifest.json`, the response
+- Page runtime loads the embedded `__EVJS_CLIENT_RUNTIME__` first. When it falls
+  back to `runtimeUrl`, `data-evjs-runtime`, or `/runtime.json`, the response
   must be successful JSON with `Content-Type: application/json`, allowing
   optional content-type parameters.
 - `fetchRscFlight()`, `createReactRscModel()`, `mountReactRscPage()`,
@@ -182,7 +182,7 @@ Standalone/manual clients can import the same query hooks directly from
   `Content-Type: application/json` with optional parameters, `version: 1`,
   `type: "evjs.rsc"`, a build-identifier `buildId`, and well-formed asset
   lists before any diagnostic HTML is mounted.
-- Manifest shell primitives such as `createShell()`, `createPageDriver()`, and `createHistoryDriver()` are framework-owned and imported through `@evjs/client/internal`.
+- Runtime shell primitives such as `createShell()`, `createPageDriver()`, and `createHistoryDriver()` are framework-owned and imported through `@evjs/client/internal`.
 - Shell activation request URLs must be HTTP(S) URLs or pathnames starting with `/`.
 - Generated component-page bootstrap APIs are also framework-owned and imported through `@evjs/client/internal`.
 

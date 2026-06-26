@@ -2,7 +2,6 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import { matchPageRouteParams, parsePageSearch } from "@evjs/shared";
-import type { BuildOutput } from "@evjs/shared/manifest";
 import { type ComponentType, createElement } from "react";
 import { renderToReadableStream } from "react-server-dom-webpack/server.node";
 import type { PageProps } from "./page-context.js";
@@ -15,8 +14,20 @@ import type {
 
 const storage = new AsyncLocalStorage<PageProps>();
 
+interface RscPageRuntime {
+  buildId: string;
+  routes?: Array<{
+    id: string;
+    path: string;
+    pageId?: string;
+  }>;
+  rsc?: {
+    clientReferenceManifest?: Record<string, unknown>;
+  };
+}
+
 export interface RscPageFlightRenderContext {
-  manifest: BuildOutput;
+  runtime: RscPageRuntime;
   pageId?: string;
   pageUrl?: string;
   request: Request;
@@ -30,7 +41,7 @@ export function createRscPageFlightRenderer(
   Component: ComponentType<Record<string, unknown>>,
 ): (ctx: RscPageFlightRenderContext) => Promise<Response> {
   return async function renderFlight(ctx) {
-    const clientReferenceManifest = ctx.manifest.rsc?.clientReferenceManifest;
+    const clientReferenceManifest = ctx.runtime.rsc?.clientReferenceManifest;
     if (!clientReferenceManifest) {
       return new Response(
         "[evjs] RSC client reference manifest is not available.",
@@ -109,11 +120,11 @@ export function usePageLoaderData(_path?: string): unknown {
 }
 
 function findRouteForPage(
-  manifest: BuildOutput,
+  runtime: RscPageRuntime,
   pageId: string | undefined,
 ): { id: string; path: string } | undefined {
   if (!pageId) return undefined;
-  const route = manifest.routes?.find(
+  const route = runtime.routes?.find(
     (candidate) => candidate.pageId === pageId,
   );
   return route
@@ -125,16 +136,16 @@ function findRouteForPage(
 }
 
 function createRscPageProps(ctx: RscPageFlightRenderContext): PageProps & {
-  manifest: { buildId: string };
+  runtime: { buildId: string };
   pageId?: string;
   route?: { id: string; path: string };
 } {
   return {
-    manifest: {
-      buildId: ctx.manifest.buildId,
+    runtime: {
+      buildId: ctx.runtime.buildId,
     },
     pageId: ctx.pageId,
-    route: findRouteForPage(ctx.manifest, ctx.pageId),
+    route: findRouteForPage(ctx.runtime, ctx.pageId),
     params: {},
     search: {},
     loaderData: undefined,

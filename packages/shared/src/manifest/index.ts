@@ -324,10 +324,22 @@ export interface BuildOutput {
 }
 
 export interface FrameworkManifestValidationOptions {
+  server?: "required" | "optional";
   serverFunctionModules?: "required" | "optional";
   pageRendererReferences?: "required" | "optional";
   pprRendererReferences?: "required" | "optional";
   rscRendererReferences?: "required" | "optional";
+}
+
+export interface PublicManifestOutput {
+  version: 1;
+  buildId: string;
+  publicPath: PublicPathOutput;
+  assets?: Record<string, AssetGroup>;
+  apps: Record<string, PublicAppOutput>;
+  pages: Record<string, PublicPageOutput>;
+  routes: PublicRouteOutput[];
+  rsc?: PublicRscOutput;
 }
 
 export interface BuildOutputPaths {
@@ -360,6 +372,10 @@ export interface AppOutput {
   module?: RuntimeModuleOutput;
 }
 
+export interface PublicAppOutput extends Omit<AppOutput, "entry" | "module"> {
+  module?: PublicRuntimeModuleOutput;
+}
+
 export interface PageOutput {
   assets: AssetGroup;
   document?: HtmlDocumentOutput;
@@ -376,6 +392,12 @@ export interface PageOutput {
   prerender?: PrerenderConfig;
   module?: RuntimeModuleOutput;
   ppr?: PprPageOutput;
+}
+
+export interface PublicPageOutput
+  extends Omit<PageOutput, "entry" | "component" | "app" | "module" | "ppr"> {
+  module?: PublicRuntimeModuleOutput;
+  ppr?: PublicPprPageOutput;
 }
 
 export interface HtmlDocumentOutput {
@@ -401,6 +423,10 @@ export interface PprPageOutput {
   regions: Record<string, PprRegionOutput>;
 }
 
+export interface PublicPprPageOutput extends Omit<PprPageOutput, "regions"> {
+  regions: Record<string, PublicPprRegionOutput>;
+}
+
 export interface PprRegionOutput {
   id: string;
   assets: AssetGroup;
@@ -410,11 +436,17 @@ export interface PprRegionOutput {
   hydrate?: HydrationMode;
 }
 
+export type PublicPprRegionOutput = Omit<
+  PprRegionOutput,
+  "component" | "fallback"
+>;
+
 export interface RuntimeModuleOutput {
   type: "entry" | "lifecycle" | "react-component";
   href?: string;
-  source?: string;
 }
+
+export type PublicRuntimeModuleOutput = RuntimeModuleOutput;
 
 export interface RouteOutput {
   id: string;
@@ -424,10 +456,12 @@ export interface RouteOutput {
   appId?: string;
   pageId?: string;
   module?: string;
-  render?: RenderMode;
-  hydrate?: HydrationMode;
-  runtime?: ServerRuntime;
 }
+
+export type PublicRouteOutput = Pick<
+  RouteOutput,
+  "id" | "path" | "appId" | "pageId"
+>;
 
 export interface ServerOutput {
   entry?: string;
@@ -465,12 +499,19 @@ export interface RscOutput {
   serverConsumerManifest?: Record<string, unknown>;
 }
 
+export interface PublicRscOutput {
+  endpoint?: string;
+  pages?: Record<string, PublicRscPageOutput>;
+}
+
 export interface RscPageOutput {
   renderer: string;
   assets: AssetGroup;
   component?: string;
   routeId?: string;
 }
+
+export type PublicRscPageOutput = Omit<RscPageOutput, "component">;
 
 export interface RscReferenceOutput {
   module: string;
@@ -665,8 +706,24 @@ function joinPaths(parent: string, child: string): string {
 export function assertFrameworkManifestShape(
   value: unknown,
   source: string,
+  options?: FrameworkManifestValidationOptions & { server?: "required" },
+): asserts value is BuildOutput;
+export function assertFrameworkManifestShape(
+  value: unknown,
+  source: string,
+  options: FrameworkManifestValidationOptions & { server: "optional" },
+): asserts value is PublicManifestOutput;
+export function assertFrameworkManifestShape(
+  value: unknown,
+  source: string,
+  options?: FrameworkManifestValidationOptions,
+): asserts value is BuildOutput | PublicManifestOutput;
+export function assertFrameworkManifestShape(
+  value: unknown,
+  source: string,
   options: FrameworkManifestValidationOptions = {},
-): asserts value is BuildOutput {
+): asserts value is BuildOutput | PublicManifestOutput {
+  const requireServer = options.server !== "optional";
   const requireServerFunctionModules =
     options.serverFunctionModules !== "optional";
   const requirePageRendererReferences =
@@ -680,14 +737,28 @@ export function assertFrameworkManifestShape(
     throw new Error(`[evjs] ${source}.version must be 1.`);
   }
   assertManifestBuildId(value.buildId, `${source}.buildId`);
-  assertManifestString(value.distDir, `${source}.distDir`);
+  if (value.distDir === undefined) {
+    if (requireServer) {
+      throw new Error(`[evjs] ${source}.distDir must be a non-empty string.`);
+    }
+  } else {
+    assertManifestString(value.distDir, `${source}.distDir`);
+  }
   assertPublicPathOutput(value.publicPath, `${source}.publicPath`);
   if (value.paths !== undefined) {
     assertBuildOutputPaths(value.paths, `${source}.paths`);
   }
-  assertObject(value.runtime, `${source}.runtime`);
-  assertObject(value.assets, `${source}.assets`);
-  assertAssetGroupRecord(value.assets, `${source}.assets`);
+  if (value.runtime === undefined) {
+    if (requireServer) {
+      throw new Error(`[evjs] ${source}.runtime must be an object.`);
+    }
+  } else {
+    assertObject(value.runtime, `${source}.runtime`);
+  }
+  if (value.assets !== undefined) {
+    assertObject(value.assets, `${source}.assets`);
+    assertAssetGroupRecord(value.assets, `${source}.assets`);
+  }
   assertObject(value.apps, `${source}.apps`);
   assertAppOutputs(value.apps, `${source}.apps`);
   assertObject(value.pages, `${source}.pages`);
@@ -697,67 +768,76 @@ export function assertFrameworkManifestShape(
   }
   assertRouteOutputs(value.routes, `${source}.routes`, value.pages, value.apps);
 
-  assertObject(value.runtime.server, `${source}.runtime.server`);
-  assertManifestPathname(
-    value.runtime.server.basePath,
-    `${source}.runtime.server.basePath`,
-    true,
-  );
-  assertManifestPathname(
-    value.runtime.server.fn,
-    `${source}.runtime.server.fn`,
-    true,
-  );
-  assertManifestPathname(
-    value.runtime.server.ppr,
-    `${source}.runtime.server.ppr`,
-  );
-  assertManifestPathname(
-    value.runtime.server.rsc,
-    `${source}.runtime.server.rsc`,
-  );
-  if (value.runtime.transport !== undefined) {
-    assertObject(value.runtime.transport, `${source}.runtime.transport`);
-    assertManifestTransportBaseUrl(
-      value.runtime.transport.baseUrl,
-      `${source}.runtime.transport.baseUrl`,
+  if (value.runtime !== undefined) {
+    assertObject(value.runtime.server, `${source}.runtime.server`);
+    assertManifestPathname(
+      value.runtime.server.basePath,
+      `${source}.runtime.server.basePath`,
+      true,
     );
-  }
-  assertObject(value.server, `${source}.server`);
-  if (value.server.entry !== undefined) {
-    assertManifestString(value.server.entry, `${source}.server.entry`);
-  }
-  if (value.server.renderers !== undefined) {
-    assertObject(value.server.renderers, `${source}.server.renderers`);
-    assertServerRendererOutputs(
-      value.server.renderers,
-      `${source}.server.renderers`,
-      value.pages,
-      value.routes,
+    assertManifestPathname(
+      value.runtime.server.fn,
+      `${source}.runtime.server.fn`,
+      true,
     );
+    assertManifestPathname(
+      value.runtime.server.ppr,
+      `${source}.runtime.server.ppr`,
+    );
+    assertManifestPathname(
+      value.runtime.server.rsc,
+      `${source}.runtime.server.rsc`,
+    );
+    if (value.runtime.transport !== undefined) {
+      assertObject(value.runtime.transport, `${source}.runtime.transport`);
+      assertManifestTransportBaseUrl(
+        value.runtime.transport.baseUrl,
+        `${source}.runtime.transport.baseUrl`,
+      );
+    }
   }
-  assertAssetGroup(value.server.assets, `${source}.server.assets`);
-  assertObject(value.server.functions, `${source}.server.functions`);
-  assertServerFunctionOutputs(
-    value.server.functions,
-    `${source}.server.functions`,
-    requireServerFunctionModules,
-  );
-  if (!Array.isArray(value.server.routes)) {
-    throw new Error(`[evjs] ${source}.server.routes must be an array.`);
+  if (value.server === undefined) {
+    if (requireServer) {
+      throw new Error(`[evjs] ${source}.server must be an object.`);
+    }
+  } else {
+    assertObject(value.server, `${source}.server`);
+    if (value.server.entry !== undefined) {
+      assertManifestString(value.server.entry, `${source}.server.entry`);
+    }
+    if (value.server.renderers !== undefined) {
+      assertObject(value.server.renderers, `${source}.server.renderers`);
+      assertServerRendererOutputs(
+        value.server.renderers,
+        `${source}.server.renderers`,
+        value.pages,
+        value.routes,
+      );
+    }
+    assertAssetGroup(value.server.assets, `${source}.server.assets`);
+    assertObject(value.server.functions, `${source}.server.functions`);
+    assertServerFunctionOutputs(
+      value.server.functions,
+      `${source}.server.functions`,
+      requireServerFunctionModules,
+    );
+    if (!Array.isArray(value.server.routes)) {
+      throw new Error(`[evjs] ${source}.server.routes must be an array.`);
+    }
+    assertServerRouteOutputs(value.server.routes, `${source}.server.routes`);
   }
-  assertServerRouteOutputs(value.server.routes, `${source}.server.routes`);
+  const serverRenderers = getServerRendererOutputs(value.server);
   assertPageServerRendererReferences(
     value.pages,
     `${source}.pages`,
-    getServerRendererOutputs(value.server),
+    serverRenderers,
     value.routes,
     requirePageRendererReferences,
   );
   assertPprPageOutputReferences(
     value.pages,
     `${source}.pages`,
-    getServerRendererOutputs(value.server),
+    serverRenderers,
     requirePprRendererReferences,
   );
   if (value.rsc !== undefined) {
@@ -765,7 +845,7 @@ export function assertFrameworkManifestShape(
       value.rsc,
       `${source}.rsc`,
       value.pages,
-      getServerRendererOutputs(value.server),
+      serverRenderers,
       value.routes,
       requireRscRendererReferences,
     );
@@ -1053,9 +1133,6 @@ function assertRuntimeModuleOutput(value: unknown, source: string): void {
   assertObject(value, source);
   assertRuntimeModuleType(value.type, `${source}.type`);
   assertManifestString(value.href, `${source}.href`);
-  if (value.source !== undefined) {
-    assertManifestString(value.source, `${source}.source`);
-  }
 }
 
 function assertRuntimeModuleType(value: unknown, source: string): void {
@@ -1130,11 +1207,6 @@ function assertHydrationMode(value: unknown, source: string): void {
   throw new Error(
     `[evjs] ${source} must be "none", "load", "visible", or "idle".`,
   );
-}
-
-function assertServerRuntime(value: unknown, source: string): void {
-  if (value === "node" || value === "edge") return;
-  throw new Error(`[evjs] ${source} must be "node" or "edge".`);
 }
 
 function assertRscPageOutputContract(
@@ -1251,15 +1323,6 @@ function assertRouteOutputs(
     if (route.module !== undefined) {
       assertManifestString(route.module, `${routeSource}.module`);
     }
-    if (route.render !== undefined) {
-      assertRenderMode(route.render, `${routeSource}.render`);
-    }
-    if (route.hydrate !== undefined) {
-      assertHydrationMode(route.hydrate, `${routeSource}.hydrate`);
-    }
-    if (route.runtime !== undefined) {
-      assertServerRuntime(route.runtime, `${routeSource}.runtime`);
-    }
     if (page) {
       assertPageRouteOutputContract(route, page, routeSource);
     }
@@ -1278,11 +1341,6 @@ function assertPageRouteOutputContract(
   ) {
     throw new Error(
       `[evjs] ${routeSource}.path "${route.path as string}" must match manifest.pages.${route.pageId as string}.path "${page.path}".`,
-    );
-  }
-  if (route.render !== undefined && route.render !== page.render) {
-    throw new Error(
-      `[evjs] ${routeSource}.render must match manifest.pages.${route.pageId as string}.render "${page.render as string}".`,
     );
   }
 }
@@ -1919,7 +1977,7 @@ export {
   createPublicManifest,
   createServerManifest,
   linkBuildOutput,
-  type ServerManifestFnOutput,
+  type ServerManifestFunctionOutput,
   type ServerManifestOutput,
   type ServerManifestRouteOutput,
 } from "./linker.js";

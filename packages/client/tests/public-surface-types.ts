@@ -90,9 +90,9 @@ export type HiddenCreateServerReference = typeof Client.createServerReference;
 // @ts-expect-error callServer is internal to generated server-function stubs.
 export type HiddenCallServer = typeof Client.callServer;
 
-export type HiddenInitTransportFromManifest =
-  // @ts-expect-error initTransportFromManifest is internal to generated bootstrap.
-  typeof Client.initTransportFromManifest;
+export type HiddenInitTransportFromRuntime =
+  // @ts-expect-error initTransportFromRuntime is internal to generated bootstrap.
+  typeof Client.initTransportFromRuntime;
 
 export type HiddenGetRscFetchResponseContentType =
   // @ts-expect-error getRscFetchResponseContentType is an internal runtime helper.
@@ -101,9 +101,9 @@ export type HiddenGetRscFetchResponseContentType =
 // @ts-expect-error FileRoute is a router implementation detail.
 export type HiddenFileRoute = Client.FileRoute;
 
-export type HiddenPublicTransportManifestInit =
-  // @ts-expect-error initTransportFromManifest is framework bootstrap-only.
-  typeof ClientTransport.initTransportFromManifest;
+export type HiddenPublicTransportRuntimeInit =
+  // @ts-expect-error initTransportFromRuntime is framework bootstrap-only.
+  typeof ClientTransport.initTransportFromRuntime;
 
 export type HiddenPublicTransportGetServerFunction =
   // @ts-expect-error getServerFunction is internal query runtime plumbing.

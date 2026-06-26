@@ -362,27 +362,6 @@ describe("assertFrameworkManifestShape", () => {
           pages: {
             home: {
               assets: { js: [], css: [] },
-              module: {
-                type: "lifecycle",
-                href: "home.js",
-                source: "",
-              },
-            },
-          },
-        },
-        "manifest",
-      ),
-    ).toThrow(
-      "[evjs] manifest.pages.home.module.source must be a non-empty string.",
-    );
-
-    expect(() =>
-      assertFrameworkManifestShape(
-        {
-          ...createMinimalBuildOutput(),
-          pages: {
-            home: {
-              assets: { js: [], css: [] },
               render: "spa",
               rendering: {
                 component: "client",
@@ -1304,40 +1283,6 @@ describe("assertFrameworkManifestShape", () => {
       assertFrameworkManifestShape(
         {
           ...createMinimalBuildOutput(),
-          routes: [{ id: "home", path: "/home", render: "spa" }],
-        },
-        "manifest",
-      ),
-    ).toThrow(
-      '[evjs] manifest.routes[0].render must be "csr", "ssr", or "ssg".',
-    );
-
-    expect(() =>
-      assertFrameworkManifestShape(
-        {
-          ...createMinimalBuildOutput(),
-          routes: [{ id: "home", path: "/home", hydrate: "hover" }],
-        },
-        "manifest",
-      ),
-    ).toThrow(
-      '[evjs] manifest.routes[0].hydrate must be "none", "load", "visible", or "idle".',
-    );
-
-    expect(() =>
-      assertFrameworkManifestShape(
-        {
-          ...createMinimalBuildOutput(),
-          routes: [{ id: "home", path: "/home", runtime: "worker" }],
-        },
-        "manifest",
-      ),
-    ).toThrow('[evjs] manifest.routes[0].runtime must be "node" or "edge".');
-
-    expect(() =>
-      assertFrameworkManifestShape(
-        {
-          ...createMinimalBuildOutput(),
           pages: {
             home: {
               assets: { js: [], css: [] },
@@ -1357,33 +1302,6 @@ describe("assertFrameworkManifestShape", () => {
       ),
     ).toThrow(
       '[evjs] manifest.routes[0].path "/home" must match manifest.pages.home.path "/actual-home".',
-    );
-
-    expect(() =>
-      assertFrameworkManifestShape(
-        {
-          ...createMinimalBuildOutput(),
-          pages: {
-            home: {
-              assets: { js: [], css: [] },
-              render: "csr",
-              rendering: {
-                component: "client",
-                html: "client",
-                streaming: false,
-                hydrate: "load",
-              },
-              path: "/home",
-            },
-          },
-          routes: [
-            { id: "home", path: "/home", pageId: "home", render: "ssr" },
-          ],
-        },
-        "manifest",
-      ),
-    ).toThrow(
-      '[evjs] manifest.routes[0].render must match manifest.pages.home.render "csr".',
     );
 
     expect(() =>
@@ -2706,7 +2624,6 @@ describe("linkBuildOutput", () => {
     expect(output.apps.admin.module).toEqual({
       type: "entry",
       href: "admin.js",
-      source: "./src/main.tsx",
     });
     expect(output.apps.admin.document).toEqual({ fileName: "admin.html" });
 
@@ -3295,7 +3212,6 @@ describe("createPublicManifest", () => {
           module: {
             type: "entry",
             href: "admin.js",
-            source: "./src/main.tsx",
           },
         },
       },
@@ -3317,7 +3233,6 @@ describe("createPublicManifest", () => {
           module: {
             type: "react-component",
             href: "evjs-rsc-client.js",
-            source: "./src/pages/Insights.tsx",
           },
         },
         campaign: {
@@ -3355,7 +3270,6 @@ describe("createPublicManifest", () => {
           path: "/insights",
           pageId: "insights",
           module: "./src/pages/Insights.tsx",
-          render: "ssr",
         },
       ],
       server: {
@@ -3418,6 +3332,7 @@ describe("createPublicManifest", () => {
 
     expect(() =>
       assertFrameworkManifestShape(manifest, "public manifest", {
+        server: "optional",
         serverFunctionModules: "optional",
         pageRendererReferences: "optional",
         pprRendererReferences: "optional",
@@ -3436,6 +3351,15 @@ describe("createPublicManifest", () => {
       type: "react-component",
       href: "evjs-rsc-client.js",
     });
+    expect("runtime" in manifest).toBe(false);
+    expect(manifest.routes).toContainEqual({
+      id: "insights",
+      path: "/insights",
+      pageId: "insights",
+    });
+    expect(manifest.routes.flatMap((route) => Object.keys(route))).not.toEqual(
+      expect.arrayContaining(["module", "render", "hydrate", "runtime"]),
+    );
     expect(manifest.apps.admin.document).toEqual({ fileName: "admin.html" });
     expect(manifest.pages.insights.document).toEqual({
       fileName: "insights.html",
@@ -3452,23 +3376,21 @@ describe("createPublicManifest", () => {
       assets: { js: [], css: [] },
       cache: "no-store",
     });
-    expect(manifest.server?.entry).toBeUndefined();
-    expect(manifest.server?.renderers).toBeUndefined();
-    expect(manifest.server?.functions["fn:refund"]).toEqual({
-      assets: { js: [], css: [] },
-      exportName: "refund",
-    });
-    expect(manifest.rsc?.clientReferenceManifest).toBeUndefined();
-    expect(manifest.rsc?.clientReferences).toBeUndefined();
+    expect("server" in manifest).toBe(false);
+    expect(
+      manifest.rsc ? "clientReferenceManifest" in manifest.rsc : false,
+    ).toBe(false);
+    expect(manifest.rsc ? "clientReferences" in manifest.rsc : false).toBe(
+      false,
+    );
     expect(manifest.rsc?.pages?.insights).toEqual({
       renderer: "insights-rsc",
       assets: { js: [], css: ["insights.css"] },
       routeId: "insights",
     });
-    expect(manifest.deployment).toEqual({
-      platform: "node",
-      publicAsset: "dashboard.js",
-    });
+    expect("distDir" in manifest).toBe(false);
+    expect("paths" in manifest).toBe(false);
+    expect("deployment" in manifest).toBe(false);
   });
 });
 
@@ -3508,7 +3430,7 @@ describe("createServerManifest", () => {
       version: 1,
       entry: "server.js",
       assets: { js: ["server.js"], css: ["server.css"] },
-      fns: {
+      functions: {
         "fn:getUser": {
           assets: { js: ["users.server.js"], css: [] },
         },
@@ -3528,7 +3450,8 @@ describe("createServerManifest", () => {
       version: 1,
       entry: "server.js",
       assets: { js: ["server.js"], css: [] },
-      fns: {},
+      functions: {},
+      routes: [],
     });
   });
 });

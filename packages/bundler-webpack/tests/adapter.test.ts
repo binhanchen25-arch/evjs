@@ -25,6 +25,11 @@ import {
   generateHtml,
 } from "@evjs/ev/build-tools";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  createClientRuntime,
+  createFrameworkRuntime,
+  type FrameworkRuntimeOutput,
+} from "../../ev/src/framework-runtime.js";
 import type { WebpackConfig } from "../src/adapter/create-config.js";
 import { __testing as webpackAdapterTesting } from "../src/adapter/index.js";
 import { webpackAdapter } from "../src/index.js";
@@ -46,7 +51,7 @@ const WEBPACK_DEV_TEST_NAMES = {
 const allocatedDevPorts = new Set<number>();
 
 type ServerRuntimeGlobals = typeof globalThis & {
-  __EVJS_MANIFEST__?: BuildOutput;
+  __EVJS_FRAMEWORK_RUNTIME__?: FrameworkRuntimeOutput;
   __EVJS_SERVER_MODULE_LOADER__?: (
     asset: string,
   ) => Promise<Record<string, unknown>>;
@@ -200,6 +205,11 @@ async function emitFrameworkArtifacts(options: {
   await fs.writeFile(
     path.join(clientDir, "manifest.json"),
     JSON.stringify(createPublicManifest(output), null, 2),
+    "utf-8",
+  );
+  await fs.writeFile(
+    path.join(clientDir, "runtime.json"),
+    JSON.stringify(createClientRuntime(output), null, 2),
     "utf-8",
   );
 
@@ -564,7 +574,6 @@ describe("webpackAdapter build", () => {
         module: {
           type: "entry",
           href: "main.js",
-          source: "./src/main.ts",
         },
       });
       expect(manifest.pages.dashboard).toMatchObject({
@@ -583,8 +592,6 @@ describe("webpackAdapter build", () => {
         appId: "default",
         pageId: "dashboard",
         module: "./src/pages/Dashboard !page 中文.ts",
-        render: "ssr",
-        hydrate: "load",
       });
       expect(manifest.assets["dashboard-server"]).toEqual({
         js: ["dashboard-server.cjs"],
@@ -994,12 +1001,20 @@ describe("webpackAdapter dev", () => {
     try {
       const manifest = JSON.parse(
         await fs.readFile(path.join(cwd, "dist/manifest.json"), "utf-8"),
-      ) as BuildOutput;
+      ) as { pages: BuildOutput["pages"] };
+      const runtime = JSON.parse(
+        await fs.readFile(path.join(cwd, "dist/runtime.json"), "utf-8"),
+      ) as { pages: Record<string, Record<string, unknown>> };
       const html = await fetchDevText(`http://127.0.0.1:${port}/home.html`);
 
       expect(onBuildOutput).toHaveBeenCalledTimes(1);
-      expect(manifest.distDir).toBe("dist");
+      expect("distDir" in manifest).toBe(false);
       expect(manifest.pages.home.assets.js).toEqual(["home.js"]);
+      expect(runtime.pages.home).not.toHaveProperty("assets");
+      expect(runtime.pages.home).toEqual({
+        module: { type: "react-component", href: "home.js" },
+        mount: "#root",
+      });
       expect(html).toContain('data-evjs-kind="page"');
       expect(html).toContain('data-evjs-id="home"');
       expect(html).toContain('src="/home.js"');
@@ -1478,7 +1493,7 @@ async function requestServerEntry(
   );
   const serverDir = path.dirname(serverEntryPath);
   const runtimeGlobals = globalThis as ServerRuntimeGlobals;
-  runtimeGlobals.__EVJS_MANIFEST__ = manifest;
+  runtimeGlobals.__EVJS_FRAMEWORK_RUNTIME__ = createFrameworkRuntime(manifest);
   runtimeGlobals.__EVJS_SERVER_MODULE_LOADER__ = async (asset: string) => {
     const mod = await import(
       pathToFileURL(path.resolve(serverDir, asset)).href
@@ -1494,7 +1509,7 @@ async function requestServerEntry(
       serverModule.default?.default ?? serverModule.default ?? serverModule;
     return await handler.fetch(new Request(`https://example.com${pathname}`));
   } finally {
-    delete runtimeGlobals.__EVJS_MANIFEST__;
+    delete runtimeGlobals.__EVJS_FRAMEWORK_RUNTIME__;
     delete runtimeGlobals.__EVJS_SERVER_MODULE_LOADER__;
   }
 }

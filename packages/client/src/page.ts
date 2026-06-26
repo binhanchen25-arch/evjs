@@ -4,10 +4,6 @@ import {
   isBuildIdentifier,
 } from "@evjs/shared";
 import {
-  assertFrameworkManifestShape,
-  type BuildOutput,
-} from "@evjs/shared/manifest";
-import {
   assertFetchErrorResponseStatus,
   assertFetchResponseJson,
   assertFetchResponseJsonContentType,
@@ -16,6 +12,7 @@ import {
   formatFetchErrorResponseDetail,
   readFetchErrorResponseBody,
 } from "./fetch-response.js";
+import { assertClientRuntime, type ClientRuntime } from "./runtime-config.js";
 import {
   type AppContext,
   type AppModule,
@@ -23,16 +20,18 @@ import {
   createShell,
   type Shell,
 } from "./shell.js";
-import { initTransportFromManifest } from "./transport-runtime.js";
+import { initTransportFromRuntime } from "./transport-runtime.js";
 import { formatErrorDetail, isRecord } from "./validation.js";
 
 export interface PageRuntimeOptions {
   document?: Document;
-  manifest?: BuildOutput;
-  manifestUrl?: string;
+  runtime?: ClientRuntime;
+  runtimeUrl?: string;
   mount?: string | Element;
   loadModule?: (href: string, ctx: AppContext) => Promise<AppModule>;
 }
+
+const CLIENT_RUNTIME_SCRIPT_ID = "__EVJS_CLIENT_RUNTIME__";
 
 export async function startPageRuntime(
   options: PageRuntimeOptions = {},
@@ -41,14 +40,14 @@ export async function startPageRuntime(
   const doc = resolveRuntimeDocument(options.document);
   const request = createPageDriver({ document: doc }).current();
   assertRuntimeHtmlTarget(doc);
-  const manifest =
-    options.manifest === undefined
-      ? await loadManifest(doc, options)
-      : options.manifest;
-  assertLoadedManifest(manifest, "provided manifest");
-  initTransportFromManifest(manifest);
+  const runtime =
+    options.runtime === undefined
+      ? await loadRuntime(doc, options)
+      : options.runtime;
+  assertLoadedRuntime(runtime, "provided runtime");
+  initTransportFromRuntime(runtime);
   const shell = createShell({
-    manifest,
+    runtime,
     loadModule: options.loadModule,
     resolveMountPoint(ctx) {
       return resolveMountPoint(doc, options.mount ?? outputMount(ctx));
@@ -59,15 +58,15 @@ export async function startPageRuntime(
   return shell;
 }
 
-async function loadManifest(
+async function loadRuntime(
   document: Document,
   options: PageRuntimeOptions,
-): Promise<BuildOutput> {
-  const embedded = readEmbeddedManifest(document);
+): Promise<ClientRuntime> {
+  const embedded = readEmbeddedRuntime(document);
   if (embedded) return embedded;
 
-  const manifestUrl = resolveManifestUrl(document, options);
-  const errorPrefix = getManifestFetchErrorPrefix(manifestUrl);
+  const runtimeUrl = resolveRuntimeUrl(document, options);
+  const errorPrefix = getRuntimeFetchErrorPrefix(runtimeUrl);
   const fetchImpl = globalThis.fetch;
   if (typeof fetchImpl !== "function") {
     throw new Error(`${errorPrefix}: fetch is not available.`);
@@ -75,7 +74,7 @@ async function loadManifest(
 
   let response: unknown;
   try {
-    response = await fetchImpl(manifestUrl);
+    response = await fetchImpl(runtimeUrl);
   } catch (error) {
     throw new Error(`${errorPrefix}${formatErrorDetail(error)}`);
   }
@@ -92,98 +91,91 @@ async function loadManifest(
   }
   assertFetchResponseJson(response, errorPrefix);
   assertFetchResponseJsonContentType(response, errorPrefix);
-  return parseFetchedManifest(response, manifestUrl);
+  return parseFetchedRuntime(response, runtimeUrl);
 }
 
-function resolveManifestUrl(
+function resolveRuntimeUrl(
   document: Document,
   options: PageRuntimeOptions,
 ): string {
-  if (options.manifestUrl !== undefined) return options.manifestUrl;
+  if (options.runtimeUrl !== undefined) return options.runtimeUrl;
 
-  const attribute =
-    document.documentElement?.getAttribute("data-evjs-manifest");
-  if (attribute === null || attribute === undefined) return "/manifest.json";
-  return assertRuntimeManifestUrl(
-    attribute,
-    "data-evjs-manifest",
-    "manifest URL",
-  );
+  const attribute = document.documentElement?.getAttribute("data-evjs-runtime");
+  if (attribute === null || attribute === undefined) return "/runtime.json";
+  return assertRuntimeUrl(attribute, "data-evjs-runtime", "runtime URL");
 }
 
-function readEmbeddedManifest(document: Document): BuildOutput | undefined {
-  const script = document.getElementById("__EVJS_MANIFEST__");
+function readEmbeddedRuntime(document: Document): ClientRuntime | undefined {
+  const script = document.getElementById(CLIENT_RUNTIME_SCRIPT_ID);
   const scriptText = script?.textContent;
   if (scriptText !== null && scriptText !== undefined) {
     if (typeof scriptText !== "string") {
       throw new Error(
-        '[evjs] Embedded manifest "__EVJS_MANIFEST__" textContent must be a string when provided.',
+        `[evjs] Embedded runtime "${CLIENT_RUNTIME_SCRIPT_ID}" textContent must be a string when provided.`,
       );
     }
   }
   const text = scriptText?.trim();
   if (!text) return undefined;
 
-  let manifest: unknown;
+  let runtime: unknown;
   try {
-    manifest = JSON.parse(text);
+    runtime = JSON.parse(text);
   } catch (error) {
     throw new Error(
-      `[evjs] Failed to parse embedded manifest "__EVJS_MANIFEST__" as JSON${formatErrorDetail(error)}`,
+      `[evjs] Failed to parse embedded runtime "${CLIENT_RUNTIME_SCRIPT_ID}" as JSON${formatErrorDetail(error)}`,
     );
   }
-  assertLoadedManifest(manifest, 'embedded manifest "__EVJS_MANIFEST__"');
-  return manifest;
+  assertLoadedRuntime(
+    runtime,
+    `embedded runtime "${CLIENT_RUNTIME_SCRIPT_ID}"`,
+  );
+  return runtime;
 }
 
-async function parseFetchedManifest(
+async function parseFetchedRuntime(
   response: FetchResponseObject & { json: () => Promise<unknown> },
-  manifestUrl: string,
-): Promise<BuildOutput> {
-  let manifest: unknown;
+  runtimeUrl: string,
+): Promise<ClientRuntime> {
+  let runtime: unknown;
   try {
-    manifest = await response.json();
+    runtime = await response.json();
   } catch (error) {
     throw new Error(
-      `[evjs] Failed to parse manifest "${manifestUrl}" as JSON${formatErrorDetail(error)}`,
+      `[evjs] Failed to parse runtime "${runtimeUrl}" as JSON${formatErrorDetail(error)}`,
     );
   }
-  assertLoadedManifest(manifest, `manifest "${manifestUrl}"`);
-  return manifest;
+  assertLoadedRuntime(runtime, `runtime "${runtimeUrl}"`);
+  return runtime;
 }
 
-function getManifestFetchErrorPrefix(manifestUrl: string): string {
-  return `[evjs] Failed to load manifest "${manifestUrl}"`;
+function getRuntimeFetchErrorPrefix(runtimeUrl: string): string {
+  return `[evjs] Failed to load runtime "${runtimeUrl}"`;
 }
 
-function assertLoadedManifest(
-  manifest: unknown,
+function assertLoadedRuntime(
+  runtime: unknown,
   source: string,
-): asserts manifest is BuildOutput {
-  if (!isRecord(manifest)) {
+): asserts runtime is ClientRuntime {
+  if (!isRecord(runtime)) {
     throw new Error(`[evjs] Loaded ${source} must be a JSON object.`);
   }
-  if (manifest.version !== 1) {
+  if (runtime.version !== 1) {
     throw new Error(`[evjs] Loaded ${source} version must be 1.`);
   }
-  if (!isRecord(manifest.runtime)) {
+  if (!isRecord(runtime.runtime)) {
     throw new Error(`[evjs] Loaded ${source} runtime must be an object.`);
   }
-  if (!isRecord(manifest.pages)) {
+  if (!isRecord(runtime.pages)) {
     throw new Error(`[evjs] Loaded ${source} pages must be an object.`);
   }
-  if (!isRecord(manifest.apps)) {
+  if (!isRecord(runtime.apps)) {
     throw new Error(`[evjs] Loaded ${source} apps must be an object.`);
   }
-  if (!Array.isArray(manifest.routes)) {
+  if (!Array.isArray(runtime.routes)) {
     throw new Error(`[evjs] Loaded ${source} routes must be an array.`);
   }
-  assertFrameworkManifestShape(manifest, `Loaded ${source}`, {
-    serverFunctionModules: "optional",
-    pageRendererReferences: "optional",
-    pprRendererReferences: "optional",
-    rscRendererReferences: "optional",
-  });
+  assertClientRuntime(runtime, `Loaded ${source}`);
 }
 
 function assertPageRuntimeOptions(
@@ -192,8 +184,8 @@ function assertPageRuntimeOptions(
   if (!isRecord(options)) {
     throw new Error("[evjs] startPageRuntime() options must be an object.");
   }
-  if (options.manifestUrl !== undefined) {
-    assertRuntimeManifestUrl(options.manifestUrl, "manifestUrl", "string");
+  if (options.runtimeUrl !== undefined) {
+    assertRuntimeUrl(options.runtimeUrl, "runtimeUrl", "string");
   }
   if (options.mount !== undefined) {
     assertMountOption(options.mount);
@@ -206,7 +198,7 @@ function assertPageRuntimeOptions(
   }
 }
 
-function assertRuntimeManifestUrl(
+function assertRuntimeUrl(
   value: unknown,
   name: string,
   emptyDescription: string,
