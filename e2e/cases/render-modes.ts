@@ -254,6 +254,7 @@ test.describe("render-modes", () => {
   test("emits a manifest with app, page, route, and server data", async () => {
     const manifestPath = getRenderModesPublicManifestPath();
     const manifest = readRenderModesPublicManifest();
+    const buildOutput = readRenderModesBuildOutput();
 
     expect(manifest.apps.default).toEqual(
       expect.objectContaining({
@@ -371,14 +372,14 @@ test.describe("render-modes", () => {
         }),
       ]),
     );
-    expect(Object.values(manifest.server.functions)).toEqual(
+    expect(Object.values(buildOutput.server.functions)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           exportName: "getMerchantOperationsSnapshot",
         }),
       ]),
     );
-    expect(manifest.server.routes).toEqual(
+    expect(buildOutput.server.routes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           path: "/api/render-modes/health",
@@ -386,7 +387,7 @@ test.describe("render-modes", () => {
         }),
       ]),
     );
-    expect(manifest.runtime.server).toEqual(
+    expect(buildOutput.runtime.server).toEqual(
       expect.objectContaining({
         basePath: "/__evjs",
         fn: "/__evjs/fn",
@@ -394,7 +395,7 @@ test.describe("render-modes", () => {
         rsc: "/__evjs/rsc",
       }),
     );
-    expect(manifest.rsc.pages.insights).toEqual(
+    expect(buildOutput.rsc.pages.insights).toEqual(
       expect.objectContaining({
         renderer: "insights-rsc",
         routeId: "insights",
@@ -439,6 +440,15 @@ function getRenderModesPublicManifestPath(): string {
 function readRenderModesPublicManifest() {
   return JSON.parse(
     fs.readFileSync(getRenderModesPublicManifestPath(), "utf-8"),
+  );
+}
+
+function readRenderModesBuildOutput() {
+  return JSON.parse(
+    fs.readFileSync(
+      path.join(exampleDir, "dist", "build-output.json"),
+      "utf-8",
+    ),
   );
 }
 

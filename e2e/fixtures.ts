@@ -34,7 +34,7 @@ interface WorkerFixture {
   _exampleApp: { webPort: number; apiPort: number };
 }
 
-type ClientRuntimeFixture = Pick<
+type RoutingFixture = Pick<
   BuildOutput,
   "apps" | "pages" | "routes" | "runtime"
 >;
@@ -210,28 +210,26 @@ function pathMatchesPrefix(pathname: string, prefix: string): boolean {
   );
 }
 
-function getServerProxyPrefixes(runtime: ClientRuntimeFixture): string[] {
+function getServerProxyPrefixes(output: RoutingFixture): string[] {
   return compactUnique([
     "/api",
     "/__evjs",
-    runtime.runtime?.server?.basePath,
-    runtime.runtime?.server?.fn,
-    runtime.runtime?.server?.ppr,
-    runtime.runtime?.server?.rsc,
-    ...getServerRenderedPaths(runtime),
+    output.runtime?.server?.basePath,
+    output.runtime?.server?.fn,
+    output.runtime?.server?.ppr,
+    output.runtime?.server?.rsc,
+    ...getServerRenderedPaths(output),
   ]);
 }
 
-function getClientPathRewrites(
-  runtime: ClientRuntimeFixture,
-): Record<string, string> {
+function getClientPathRewrites(output: RoutingFixture): Record<string, string> {
   const rewrites = Object.fromEntries(
-    Object.entries(runtime.pages ?? {}).flatMap(([pageId, page]) =>
+    Object.entries(output.pages ?? {}).flatMap(([pageId, page]) =>
       page.path && page.render === "csr" ? [[page.path, `${pageId}.html`]] : [],
     ),
   );
 
-  for (const { path, target } of getClientRouteMatches(runtime)) {
+  for (const { path, target } of getClientRouteMatches(output)) {
     rewrites[path] ??= getClientRouteHtmlFileName(target);
   }
 
@@ -363,16 +361,9 @@ export function createExampleTest(exampleName: string) {
 
         await buildExample(exampleDir, bundlerName);
 
-        // Read the client runtime for client routing and the server manifest
+        // Read BuildOutput for fixture routing and the server manifest
         // for the bundle entry. BuildOutput stays in the fixture process and
         // is projected before the server bootstrap sees it.
-        const runtimePath = path.join(
-          exampleDir,
-          "dist",
-          "client",
-          "runtime.json",
-        );
-        const runtime = JSON.parse(fs.readFileSync(runtimePath, "utf-8"));
         const serverManifestPath = path.join(
           exampleDir,
           "dist",
@@ -455,8 +446,8 @@ export function createExampleTest(exampleName: string) {
         const distDir = path.join(exampleDir, "dist", "client");
         const staticServer = createStaticServer(distDir, {
           apiPort,
-          proxyPrefixes: getServerProxyPrefixes(runtime),
-          pathRewrites: getClientPathRewrites(runtime),
+          proxyPrefixes: getServerProxyPrefixes(buildOutput),
+          pathRewrites: getClientPathRewrites(buildOutput),
         });
 
         await new Promise<void>((resolve) => {
