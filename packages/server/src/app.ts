@@ -18,7 +18,6 @@ import {
   type ServerRouteParamSegmentValidationError,
   serverRoutePathShapeFromPath,
 } from "@evjs/shared";
-import { assertFrameworkManifestShape } from "@evjs/shared/manifest";
 import type {
   Context as HonoContext,
   Env as HonoEnv,
@@ -29,6 +28,7 @@ import { bodyLimit } from "hono/body-limit";
 import { contextStorage } from "hono/context-storage";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
+  assertFrameworkRuntime,
   type FrameworkServerOptions,
   handleFrameworkRenderRequest,
   handlePprRegionRequest,
@@ -72,7 +72,7 @@ export function createApp(options?: CreateAppOptions): Hono {
   assertCreateAppOptions(options);
   const { routes = [], middlewares = [], framework } = options ?? {};
   const endpoint =
-    framework?.manifest.runtime.server?.fn ?? getFunctionEndpoint();
+    framework?.runtime.runtime.server.fn ?? getFunctionEndpoint();
   const maxServerFunctionBodySize = 1024 * 1024;
 
   const app = new Hono();
@@ -173,8 +173,7 @@ export function createApp(options?: CreateAppOptions): Hono {
   });
 
   const rscPath = framework?.rsc
-    ? (framework.manifest.rsc?.endpoint ??
-      framework.manifest.runtime.server?.rsc)
+    ? framework.runtime.runtime.server.rsc
     : undefined;
   if (framework?.rsc && rscPath) {
     app.all(rscPath, async (c, next) => {
@@ -186,8 +185,8 @@ export function createApp(options?: CreateAppOptions): Hono {
 
   if (framework?.render) {
     const pprPath =
-      framework.manifest.runtime.server?.ppr ??
-      joinPath(framework.manifest.runtime.server?.basePath ?? "/__evjs", "ppr");
+      framework.runtime.runtime.server.ppr ??
+      joinPath(framework.runtime.runtime.server.basePath, "ppr");
     app.on(["GET", "HEAD"], [`${pprPath}/*`], async (c, next) => {
       const response = await handlePprRegionRequest(framework, c.req.raw);
       if (!response) return next();
@@ -366,21 +365,12 @@ function assertFrameworkServerOptions(value: unknown): void {
     );
   }
 
-  if (!isRecord(value.manifest)) {
+  if (!isRecord(value.runtime)) {
     throw new Error(
-      "[evjs] createApp() framework.manifest must be a framework manifest object.",
+      "[evjs] createApp() framework.runtime must be a framework runtime object.",
     );
   }
-  assertFrameworkManifestShape(
-    value.manifest,
-    "createApp() framework.manifest",
-    {
-      serverFunctionModules: "optional",
-      pageRendererReferences: "optional",
-      pprRendererReferences: "optional",
-      rscRendererReferences: "optional",
-    },
-  );
+  assertFrameworkRuntime(value.runtime, "createApp() framework.runtime");
   assertOptionalRenderCoordinator(value.render, "framework.render");
   assertOptionalRscCoordinator(value.rsc, "framework.rsc");
   assertOptionalPprRuntimeOptions(value.ppr, "framework.ppr");

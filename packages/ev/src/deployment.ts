@@ -9,6 +9,7 @@ import type {
   RuntimeOutput,
   ServerRuntime,
 } from "@evjs/shared/manifest";
+import { createFrameworkRuntime } from "./framework-runtime.js";
 import type { Plugin } from "./plugin.js";
 
 export interface DeploymentArtifactOptions {
@@ -435,6 +436,7 @@ function createNodeServerModule(
   const clientRoot = getPublicDirRelativeToRoot(output);
   const portEnv = options.portEnv ?? "PORT";
   const defaultPort = options.defaultPort ?? 3000;
+  const frameworkRuntime = createFrameworkRuntime(output);
 
   return `import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -451,8 +453,7 @@ const frameworkRoutes = ${JSON.stringify(frameworkRoutes, null, 2)};
 const staticRoutes = ${JSON.stringify(staticRoutes, null, 2)};
 const staticFallback = ${JSON.stringify(staticFallback ?? "")};
 const staticAssetPrefix = ${JSON.stringify(staticAssetPrefix ?? "")};
-const manifest = ${JSON.stringify(output, null, 2)};
-globalThis.__EVJS_MANIFEST__ = manifest;
+globalThis.__EVJS_FRAMEWORK_RUNTIME__ = ${JSON.stringify(frameworkRuntime, null, 2)};
 globalThis.__EVJS_SERVER_MODULE_LOADER__ = async (asset) => {
   const mod = await import(pathToFileURL(path.resolve(serverDir, asset)).href);
   return normalizeServerModule(mod);
@@ -614,10 +615,10 @@ function createEdgeWorkerModule(
   const frameworkRequestCondition = serverEntry
     ? "isFrameworkRequest(url.pathname)"
     : "false";
+  const frameworkRuntime = createFrameworkRuntime(output);
 
   return [
-    `const manifest = ${JSON.stringify(output, null, 2)};`,
-    "globalThis.__EVJS_MANIFEST__ = manifest;",
+    `globalThis.__EVJS_FRAMEWORK_RUNTIME__ = ${JSON.stringify(frameworkRuntime, null, 2)};`,
     "globalThis.__EVJS_SERVER_MODULE_LOADER__ = async (asset) => {",
     '  return normalizeServerModule(await import("./server/" + asset));',
     "};",

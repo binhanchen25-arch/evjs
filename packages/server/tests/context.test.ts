@@ -1,4 +1,3 @@
-import type { BuildOutput } from "@evjs/shared/manifest";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import {
@@ -10,6 +9,7 @@ import {
   setCookie,
   waitUntil,
 } from "../src/context.js";
+import type { FrameworkRuntime } from "../src/framework.js";
 import {
   registerServerReference,
   registry,
@@ -130,7 +130,7 @@ describe("Server Request Context", () => {
       ],
       routes: [route],
       framework: {
-        manifest: createFrameworkManifest(),
+        runtime: createFrameworkManifest(),
         render(ctx) {
           observed.push(
             `framework-render:${headers().get("x-context-test")}:${ctx.pageId}`,
@@ -176,7 +176,7 @@ describe("Server Request Context", () => {
     configurePprManifest(pprManifest);
     const pprApp = createApp({
       framework: {
-        manifest: pprManifest,
+        runtime: pprManifest,
         render(ctx) {
           if (ctx.regionId) {
             observed.push(`ppr-region:${headers().get("x-context-test")}`);
@@ -196,7 +196,7 @@ describe("Server Request Context", () => {
     configureRscManifest(rscManifest);
     const rscApp = createApp({
       framework: {
-        manifest: rscManifest,
+        runtime: rscManifest,
         rsc(ctx) {
           observed.push(
             `rsc-flight:${headers().get("x-context-test")}:${ctx.pageId}`,
@@ -225,11 +225,10 @@ describe("Server Request Context", () => {
   });
 });
 
-function createFrameworkManifest(): BuildOutput {
+function createFrameworkManifest(): FrameworkRuntime {
   return {
     version: 1,
     buildId: "test",
-    distDir: "dist",
     publicPath: "/",
     runtime: {
       server: {
@@ -238,8 +237,6 @@ function createFrameworkManifest(): BuildOutput {
         rsc: "/__evjs/rsc",
       },
     },
-    assets: {},
-    apps: {},
     pages: {
       dashboard: {
         assets: { js: [], css: [] },
@@ -260,14 +257,10 @@ function createFrameworkManifest(): BuildOutput {
       },
     ],
     server: {
-      assets: { js: ["server.js"], css: [] },
-      functions: {},
-      routes: [],
       renderers: {
         "dashboard-server": {
           kind: "page-server",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-server.js"], css: [] },
         },
       },
@@ -275,8 +268,7 @@ function createFrameworkManifest(): BuildOutput {
   };
 }
 
-function configurePprManifest(manifest: BuildOutput): void {
-  manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
+function configurePprManifest(manifest: FrameworkRuntime): void {
   manifest.pages.dashboard.ppr = {
     delivery: "merge",
     shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -284,7 +276,6 @@ function configurePprManifest(manifest: BuildOutput): void {
       hero: {
         id: "hero",
         assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-        component: "./src/pages/Hero.region.tsx",
       },
     },
   };
@@ -297,7 +288,7 @@ function configurePprManifest(manifest: BuildOutput): void {
   };
 }
 
-function configureRscManifest(manifest: BuildOutput): void {
+function configureRscManifest(manifest: FrameworkRuntime): void {
   manifest.pages.dashboard.componentModel = "rsc";
   manifest.pages.dashboard.rendering = {
     component: "rsc",
@@ -306,7 +297,6 @@ function configureRscManifest(manifest: BuildOutput): void {
     hydrate: "none",
   };
   manifest.rsc = {
-    endpoint: "/__evjs/rsc",
     pages: {
       dashboard: {
         renderer: "dashboard-rsc",
@@ -324,7 +314,6 @@ function configureRscManifest(manifest: BuildOutput): void {
   renderers["dashboard-rsc"] = {
     kind: "rsc-page",
     owner: { pageId: "dashboard" },
-    module: "./src/pages/Dashboard.tsx",
     assets: { js: ["dashboard-rsc.js"], css: [] },
   };
 }

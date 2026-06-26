@@ -151,9 +151,9 @@ export interface ServerManifest {
   /** Server bundle asset paths. */
   assets: ManifestAssets;
   /** Registered server functions. */
-  fns: Record<string, ServerFnEntry>;
+  functions: Record<string, ServerFnEntry>;
   /** Registered server route handlers. */
-  routes?: ServerRouteEntry[];
+  routes: ServerRouteEntry[];
 }
 
 /** Base context passed to plugin bundler hooks. */

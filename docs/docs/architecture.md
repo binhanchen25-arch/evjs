@@ -2,10 +2,11 @@
 
 evjs is a React framework built around file conventions, explicit source
 declarations, a framework graph, a bundler-independent build plan, and one
-runtime manifest. The framework-owned route model is file-based: client pages
-come from `src/pages`, server file routes come from `src/apis`, and server
-middleware is split between framework request middleware in `src/middleware.ts`
-and API route middleware in `src/apis/**/middleware.ts`.
+private build output contract with generated runtime projections. The
+framework-owned route model is file-based: client pages come from `src/pages`,
+server file routes come from `src/apis`, and server middleware is split between
+framework request middleware in `src/middleware.ts` and API route middleware in
+`src/apis/**/middleware.ts`.
 
 ```txt
 src/pages + src/apis + src/middleware.ts + ev.config.ts
@@ -164,10 +165,17 @@ sequenceDiagram
 ```
 
 Builds emit the complete private `BuildOutput` handoff artifact at
-`dist/build-output.json`. The public manifest path comes from `output.client`;
-the server manifest path comes from `output.server`. Deployment adapters may
-embed equivalent runtime data into platform files, so deployed server runtimes
-do not have to read `dist/build-output.json` at startup.
+`dist/build-output.json`. The client and server manifest paths come from
+`output.client` and `output.server`; those files are deployment/tooling
+metadata. Browser bootstraps consume a generated `runtime.json` projection, and
+deployment adapters embed equivalent `FrameworkRuntime` data into platform
+server files, so deployed server runtimes do not read `dist/build-output.json`
+or manifest files at startup.
+The browser runtime projection is intentionally smaller than the public
+manifest: it keeps only the build id, transport base URL, RSC endpoint,
+app/page module targets, mount selectors, and route lookup data needed to boot
+or navigate. Asset indexes, deployment metadata, source references, and
+renderer bundle metadata stay in manifests or `BuildOutput`.
 
 TanStack Router is available through the `@evjs/client` standalone CSR surface
 for manual browser applications. In framework-managed apps, `@evjs/ev` owns
@@ -183,12 +191,13 @@ sequenceDiagram
   participant Shell as "@evjs/ev/internal/client"
   participant Runtime as "@evjs/ev/page"
   participant Server as "@evjs/ev/internal/server"
-  participant Manifest as "BuildOutput"
+  participant ClientRuntime as "ClientRuntime"
+  participant FrameworkRuntime as "FrameworkRuntime"
 
   Browser->>Runtime: page/app boot
-  Runtime->>Manifest: load embedded or /manifest.json
+  Runtime->>ClientRuntime: load embedded or /runtime.json
   Runtime->>Shell: create internal shell
-  Shell->>Manifest: resolve app/page target
+  Shell->>ClientRuntime: resolve app/page target
   Shell->>Browser: import JS/CSS module assets
   Shell->>Runtime: mount/hydrate/unmount lifecycle
 
@@ -197,16 +206,16 @@ sequenceDiagram
   Server-->>Browser: JSON result/error
 
   Browser->>Server: GET page route
-  Server->>Manifest: match route/page/renderer
+  Server->>FrameworkRuntime: match route/page/renderer
   Server-->>Browser: SSR HTML
 
   Browser->>Server: GET PPR page route
-  Server->>Manifest: match shell and region renderers
+  Server->>FrameworkRuntime: match shell and region renderers
   Server->>Server: render/cache internal regions
   Server-->>Browser: PPR HTML in the same route response
 
   Browser->>Server: GET runtime.server.rsc?page=id
-  Server->>Manifest: read RSC renderer and reference manifests
+  Server->>FrameworkRuntime: read RSC renderer and reference manifests
   Server-->>Browser: React Flight stream
 ```
 
@@ -257,7 +266,7 @@ boundaries is not implemented yet, and the current compatibility splitter only
 creates internal region renderers for the limited `Suspense` + direct
 `lazy(() => import(...))` shape. Region ids are opaque framework details.
 
-PPR page hydration is page-level `none` in the public manifest. Client
+PPR page hydration is page-level `none` in the client runtime. Client
 interactivity should be introduced through explicit client islands or
 region-level hydration metadata, not by hydrating the whole PPR shell.
 
@@ -389,9 +398,9 @@ Platform-specific adapters should derive their routing, framework endpoint, SSR,
 PPR, RSC, and asset metadata from `BuildOutput` instead of reading bundler stats.
 Build-pipeline adapters receive that object in memory; post-build tools can read
 `dist/build-output.json`.
-Full BuildOutput manifests retain source modules and server renderer references;
-public/browser manifests keep the same routing and asset shape but redact those
-server-only fields, so client-side validation treats them as optional.
+Full BuildOutput manifests retain source modules and server renderer references.
+Client/server manifests are deployment metadata; generated browser and server
+runtimes consume minimal ClientRuntime and FrameworkRuntime contracts.
 
 The deployment model is capability-driven:
 

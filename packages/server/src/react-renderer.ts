@@ -7,16 +7,17 @@ import {
   matchPageRouteParams,
   parsePageSearch,
 } from "@evjs/shared";
-import type {
-  AssetGroup,
-  BuildOutput,
-  PageOutput,
-  RouteOutput,
-  ServerRendererOutput,
-} from "@evjs/shared/manifest";
 import { type ComponentType, createElement, type ReactNode } from "react";
 import * as ReactDomServer from "react-dom/server";
-import type { RscCoordinator, RscFlightContext } from "./framework.js";
+import type {
+  FrameworkAssetGroup,
+  FrameworkPageRuntime,
+  FrameworkRouteRuntime,
+  FrameworkRuntime,
+  FrameworkServerRenderer,
+  RscCoordinator,
+  RscFlightContext,
+} from "./framework.js";
 import { textResponse } from "./responses.js";
 import {
   formatUnknownError,
@@ -39,10 +40,10 @@ export interface PageProviderProps<
 
 export interface ReactServerRenderContext {
   request: Request;
-  manifest: BuildOutput;
+  runtime: FrameworkRuntime;
   pageUrl?: string;
-  route?: RouteOutput;
-  page?: PageOutput;
+  route?: FrameworkRouteRuntime;
+  page?: FrameworkPageRuntime;
   pageId?: string;
   regionId?: string;
 }
@@ -71,7 +72,7 @@ export interface ReactServerRenderAdapterOptions {
 export interface ReactRscFlightAdapterOptions {
   loadModule?: (
     asset: string,
-    renderer: ServerRendererOutput,
+    renderer: FrameworkServerRenderer,
   ) => Promise<ReactServerRendererModule>;
   createProps?(
     ctx: RscFlightContext,
@@ -89,10 +90,8 @@ export interface ReactRscDebugPayload {
   pageId?: string;
   renderer?: string;
   html?: string;
-  assets: AssetGroup;
-  clientReferences?: Record<string, unknown>;
-  serverReferences?: Record<string, unknown>;
-  pages?: NonNullable<BuildOutput["rsc"]>["pages"];
+  assets: FrameworkAssetGroup;
+  pages?: NonNullable<FrameworkRuntime["rsc"]>["pages"];
 }
 
 export function createReactServerRenderAdapter(
@@ -192,7 +191,7 @@ export function createReactRscFlightAdapter(
   return {
     match(ctx) {
       return Boolean(
-        getRscEndpoint(ctx.manifest) &&
+        getRscEndpoint(ctx.runtime) &&
           ctx.pageId &&
           ctx.page?.componentModel === "rsc" &&
           ctx.rscPage &&
@@ -391,21 +390,19 @@ async function renderDefaultRscDebugPayload(
   return {
     version: 1,
     type: "evjs.rsc",
-    buildId: ctx.manifest.buildId,
-    endpoint: getRscEndpoint(ctx.manifest),
+    buildId: ctx.runtime.buildId,
+    endpoint: getRscEndpoint(ctx.runtime),
     pageId: ctx.pageId,
     renderer: rendererName,
     html,
     assets: ctx.rscPage?.assets ?? emptyAssets(),
-    clientReferences: ctx.manifest.rsc?.clientReferences,
-    serverReferences: ctx.manifest.rsc?.serverReferences,
-    pages: ctx.manifest.rsc?.pages ?? {},
+    pages: ctx.runtime.rsc?.pages ?? {},
   };
 }
 
 async function renderRscRendererModule(
   ctx: RscFlightContext,
-  renderer: ServerRendererOutput,
+  renderer: FrameworkServerRenderer,
   options: ReactRscFlightAdapterOptions,
 ): Promise<string | Response | undefined> {
   const asset = renderer.assets.js[0];
@@ -472,20 +469,20 @@ function isReactServerRenderResult(
 
 function defaultRscProps(ctx: RscFlightContext): Record<string, unknown> {
   return {
-    manifest: {
-      buildId: ctx.manifest.buildId,
+    runtime: {
+      buildId: ctx.runtime.buildId,
     },
     pageId: ctx.pageId,
     route: findRouteForPage(
-      ctx.manifest,
+      ctx.runtime,
       ctx.pageId,
       readUrlPathname(ctx.pageUrl),
     ),
   };
 }
 
-function getRscEndpoint(manifest: BuildOutput): string | undefined {
-  return manifest.rsc?.endpoint ?? manifest.runtime.server?.rsc;
+function getRscEndpoint(runtime: FrameworkRuntime): string | undefined {
+  return runtime.runtime.server.rsc;
 }
 
 async function resolveRscRenderProps(
@@ -501,8 +498,8 @@ async function resolveRscRenderProps(
 
 function defaultProps(ctx: ReactServerRenderContext): Record<string, unknown> {
   return {
-    manifest: {
-      buildId: ctx.manifest.buildId,
+    runtime: {
+      buildId: ctx.runtime.buildId,
     },
     route: ctx.route
       ? {
@@ -565,13 +562,13 @@ function assertHeadersInit(
 }
 
 function findRouteForPage(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   pageId: string | undefined,
   pathname?: string,
 ): { id: string; path: string } | undefined {
   if (!pageId) return undefined;
 
-  const pageRoutes = manifest.routes.filter(
+  const pageRoutes = runtime.routes.filter(
     (candidate) => candidate.pageId === pageId,
   );
   const route = pathname
@@ -587,9 +584,9 @@ function findRouteForPage(
 
 interface PageElementContext {
   request: Request;
-  manifest: BuildOutput;
+  runtime: FrameworkRuntime;
   pageUrl?: string;
-  route?: RouteOutput;
+  route?: FrameworkRouteRuntime;
   pageId?: string;
 }
 
@@ -655,7 +652,7 @@ function resolveRouteContext(
   return (
     ctx.route ??
     readRouteContext(props.route) ??
-    findRouteForPage(ctx.manifest, ctx.pageId, readPageElementPathname(ctx))
+    findRouteForPage(ctx.runtime, ctx.pageId, readPageElementPathname(ctx))
   );
 }
 
@@ -711,11 +708,11 @@ function renderDefaultDocument(
 
   return [
     "<!doctype html>",
-    `<html data-evjs-kind="page" data-evjs-id="${escapeHtmlAttr(ctx.pageId ?? "")}" data-evjs-build="${escapeHtmlAttr(ctx.manifest.buildId)}">`,
+    `<html data-evjs-kind="page" data-evjs-id="${escapeHtmlAttr(ctx.pageId ?? "")}" data-evjs-build="${escapeHtmlAttr(ctx.runtime.buildId)}">`,
     "<head>",
     ...assets.css.map(
       (asset) =>
-        `<link rel="stylesheet" href="${escapeHtmlAttr(assetHref(ctx.manifest, asset))}">`,
+        `<link rel="stylesheet" href="${escapeHtmlAttr(assetHref(ctx.runtime, asset))}">`,
     ),
     "</head>",
     "<body>",
@@ -728,7 +725,7 @@ function renderDefaultDocument(
       : []),
     ...assets.js.map(
       (asset) =>
-        `<script defer src="${escapeHtmlAttr(assetHref(ctx.manifest, asset))}"></script>`,
+        `<script defer src="${escapeHtmlAttr(assetHref(ctx.runtime, asset))}"></script>`,
     ),
     "</body>",
     "</html>",
@@ -748,26 +745,26 @@ function createRscBootstrap(
       pageId: string;
       endpoint: string;
       basePath?: string;
-      publicPath: BuildOutput["publicPath"];
+      publicPath: FrameworkRuntime["publicPath"];
       mount: string;
       page: {
-        assets: AssetGroup;
+        assets: FrameworkAssetGroup;
         routeId?: string;
       };
     }
   | undefined {
   if (ctx.page?.componentModel !== "rsc" || !ctx.pageId) return undefined;
 
-  const endpoint = getRscEndpoint(ctx.manifest);
+  const endpoint = getRscEndpoint(ctx.runtime);
   if (!endpoint) return undefined;
 
   return {
     version: 1,
-    buildId: ctx.manifest.buildId,
+    buildId: ctx.runtime.buildId,
     pageId: ctx.pageId,
     endpoint,
-    basePath: ctx.manifest.runtime.server?.basePath,
-    publicPath: ctx.manifest.publicPath,
+    basePath: ctx.runtime.runtime.server?.basePath,
+    publicPath: ctx.runtime.publicPath,
     mount:
       mount.attribute === "id"
         ? `#${mount.value}`
@@ -813,8 +810,8 @@ function serializePageProps(props: Record<string, unknown>): string {
   }
 }
 
-function assetHref(manifest: BuildOutput, asset: string): string {
-  const publicPath = manifest.publicPath;
+function assetHref(runtime: FrameworkRuntime, asset: string): string {
+  const publicPath = runtime.publicPath;
   if (publicPath === "auto") {
     return /^(?:https?:)?\/\//.test(asset) || asset.startsWith("/")
       ? asset
@@ -825,7 +822,7 @@ function assetHref(manifest: BuildOutput, asset: string): string {
   return `${base}${asset}`;
 }
 
-function emptyAssets(): AssetGroup {
+function emptyAssets(): FrameworkAssetGroup {
   return { js: [], css: [] };
 }
 

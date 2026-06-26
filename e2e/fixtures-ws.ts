@@ -2,7 +2,9 @@ import { execSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
+import type { BuildOutput } from "@evjs/shared/manifest";
 import { test as base, expect } from "@playwright/test";
+import { createFrameworkRuntime } from "../packages/ev/src/framework-runtime";
 
 export { expect };
 
@@ -52,8 +54,8 @@ export function createWebSocketExampleTest() {
           stdio: "pipe",
         });
 
-        // 2. Read the server manifest for the bundle entry and the full
-        // BuildOutput for framework bootstrap.
+        // 2. Read the server manifest for the bundle entry and project the
+        // BuildOutput into the framework runtime for bootstrap.
         const serverManifestPath = path.join(
           exampleDir,
           "dist",
@@ -73,6 +75,19 @@ export function createWebSocketExampleTest() {
           exampleDir,
           "dist",
           "build-output.json",
+        );
+        const buildOutput = JSON.parse(
+          fs.readFileSync(buildOutputPath, "utf-8"),
+        ) as BuildOutput;
+        const frameworkRuntimePath = path.join(
+          exampleDir,
+          "dist",
+          "_e2e_framework_runtime.json",
+        );
+        fs.writeFileSync(
+          frameworkRuntimePath,
+          JSON.stringify(createFrameworkRuntime(buildOutput), null, 2),
+          "utf-8",
         );
         const serverEntryPath = path.join(
           exampleDir,
@@ -95,7 +110,7 @@ export function createWebSocketExampleTest() {
             ...process.env,
             SERVER_ENTRY: serverEntryPath,
             CLIENT_DIR: clientDir,
-            MANIFEST_PATH: buildOutputPath,
+            FRAMEWORK_RUNTIME_PATH: frameworkRuntimePath,
             PORT: String(webPort),
           },
         });

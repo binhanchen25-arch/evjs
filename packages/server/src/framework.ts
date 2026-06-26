@@ -2,35 +2,131 @@ import {
   BUILD_IDENTIFIER_DESCRIPTION,
   findBestPageRoute,
   formatContentTypeHeaderValue,
+  getPageRouteParamSegmentValidationError,
+  getPathPatternValidationError,
+  getUrlStringValidationError,
   isBuildIdentifier,
   isHeadersInit,
   isHttpBodyStatus,
   isRscFlightContentType,
   isTextHtmlContentType,
   normalizeRoutePathname,
+  type PageRouteParamSegmentValidationError,
+  type PathPatternValidationError,
   pageRoutePathMatches,
+  pageRoutePathShapeFromPath,
   RSC_FLIGHT_CONTENT_TYPE,
   type RscFlightRequestPageUrlError,
   resolveRscFlightRequestPageUrl,
   TEXT_HTML_UTF8_CONTENT_TYPE,
+  type UrlStringValidationError,
 } from "@evjs/shared";
-import type {
-  BuildEntryOwner,
-  BuildOutput,
-  PageOutput,
-  PprCachePolicy,
-  RouteOutput,
-  RscPageOutput,
-  ServerRendererOutput,
-  ServerRenderPlan,
-} from "@evjs/shared/manifest";
-import { assertFrameworkManifestShape } from "@evjs/shared/manifest";
 import { tryGetContext } from "hono/context-storage";
 import { textResponse } from "./responses.js";
 import { formatUnknownError, isRecord } from "./validation.js";
 
+export interface FrameworkRuntime {
+  version: 1;
+  buildId: string;
+  publicPath: string;
+  runtime: {
+    server: FrameworkRuntimeServer;
+    transport?: FrameworkRuntimeTransport;
+  };
+  pages: Record<string, FrameworkPageRuntime>;
+  routes: FrameworkRouteRuntime[];
+  server: FrameworkServerRuntime;
+  rsc?: FrameworkRscRuntime;
+}
+
+export interface FrameworkRuntimeServer {
+  basePath: string;
+  fn: string;
+  ppr?: string;
+  rsc?: string;
+}
+
+export interface FrameworkRuntimeTransport {
+  baseUrl?: string;
+}
+
+export interface FrameworkAssetGroup {
+  js: string[];
+  css: string[];
+}
+
+export interface FrameworkPageRuntime {
+  assets: FrameworkAssetGroup;
+  render: "csr" | "ssr" | "ssg";
+  rendering: {
+    component: "client" | "server" | "rsc";
+    html: "client" | "server" | "static" | "partial";
+    prerender?: "full" | "partial";
+    streaming: boolean;
+    hydrate: "none" | "load" | "visible" | "idle";
+  };
+  path?: string;
+  routeId?: string;
+  componentModel?: "client" | "rsc";
+  mount?: string;
+  ppr?: FrameworkPprPageRuntime;
+}
+
+export interface FrameworkPprPageRuntime {
+  delivery: "merge" | "stream";
+  shell: FrameworkAssetGroup;
+  regions: Record<string, FrameworkPprRegionRuntime>;
+}
+
+export interface FrameworkPprRegionRuntime {
+  id: string;
+  assets: FrameworkAssetGroup;
+  cache?: "no-store" | { revalidate: number };
+}
+
+type PprCachePolicy = NonNullable<FrameworkPprRegionRuntime["cache"]>;
+
+export interface FrameworkRouteRuntime {
+  id: string;
+  path: string;
+  pageId?: string;
+}
+
+export interface FrameworkServerRuntime {
+  renderers?: Record<string, FrameworkServerRenderer>;
+}
+
+export interface FrameworkServerRenderer {
+  kind: FrameworkServerRendererKind;
+  owner?: FrameworkRuntimeOwner;
+  assets: FrameworkAssetGroup;
+}
+
+export type FrameworkServerRendererKind =
+  | "page-server"
+  | "rsc-page"
+  | "ppr-shell"
+  | "ppr-region";
+
+export interface FrameworkRuntimeOwner {
+  pageId?: string;
+  routeId?: string;
+  regionId?: string;
+}
+
+export interface FrameworkRscRuntime {
+  pages?: Record<string, FrameworkRscPageRuntime>;
+  clientReferenceManifest?: Record<string, unknown>;
+}
+
+export interface FrameworkRscPageRuntime {
+  renderer: string;
+  assets: FrameworkAssetGroup;
+  routeId?: string;
+}
+
 export interface FrameworkServerOptions {
-  manifest: BuildOutput;
+  runtime: FrameworkRuntime;
   render?: ServerRenderHandler | ServerRenderCoordinator;
   rsc?: RscFlightHandler | RscCoordinator;
   ppr?: PprRuntimeOptions;
@@ -46,10 +142,10 @@ export interface PprRuntimeOptions {
 
 export interface ServerRenderContext {
   request: Request;
-  manifest: BuildOutput;
+  runtime: FrameworkRuntime;
   pageUrl?: string;
-  route?: RouteOutput;
-  page?: PageOutput;
+  route?: FrameworkRouteRuntime;
+  page?: FrameworkPageRuntime;
   pageId?: string;
   regionId?: string;
 }
@@ -79,8 +175,8 @@ export type ServerRenderHandler = (
 export type ServerRendererModule = Record<string, unknown>;
 
 export interface ServerRendererRegistryEntry {
-  kind: ServerRenderPlan["kind"];
-  owner?: BuildEntryOwner;
+  kind: FrameworkServerRendererKind;
+  owner?: FrameworkRuntimeOwner;
   load(): Promise<ServerRendererModule>;
 }
 
@@ -104,26 +200,26 @@ export type ServerModuleRenderHandler = (
   },
 ) => ServerRenderResult | undefined | Promise<ServerRenderResult | undefined>;
 
-export type ManifestServerModuleLoader = (
+export type FrameworkServerModuleLoader = (
   asset: string,
-  renderer: ServerRendererOutput,
+  renderer: FrameworkServerRenderer,
 ) => Promise<ServerRendererModule>;
 
-export interface ManifestRenderCoordinatorOptions {
-  manifest: BuildOutput;
-  loadModule: ManifestServerModuleLoader;
+export interface FrameworkRenderCoordinatorOptions {
+  runtime: FrameworkRuntime;
+  loadModule: FrameworkServerModuleLoader;
   renderModule?: ServerModuleRenderHandler;
   fallback?: ServerRenderHandler | ServerRenderCoordinator;
 }
 
 export interface RscFlightContext {
   request: Request;
-  manifest: BuildOutput;
+  runtime: FrameworkRuntime;
   pageUrl?: string;
   pageId?: string;
-  page?: PageOutput;
-  rscPage?: RscPageOutput;
-  renderer?: ServerRendererOutput;
+  page?: FrameworkPageRuntime;
+  rscPage?: FrameworkRscPageRuntime;
+  renderer?: FrameworkServerRenderer;
 }
 
 export type RscFlightHandler = (
@@ -249,14 +345,14 @@ export function createModuleRenderCoordinator(
   };
 }
 
-export function createManifestRenderCoordinator(
-  options: ManifestRenderCoordinatorOptions,
+export function createFrameworkRenderCoordinator(
+  options: FrameworkRenderCoordinatorOptions,
 ): ServerRenderCoordinator {
-  assertManifestRenderCoordinatorOptions(options);
+  assertFrameworkRenderCoordinatorOptions(options);
 
   return createModuleRenderCoordinator({
-    renderers: createRendererRegistryFromManifest(
-      options.manifest,
+    renderers: createRendererRegistryFromRuntime(
+      options.runtime,
       options.loadModule,
     ),
     renderModule: options.renderModule,
@@ -287,30 +383,30 @@ function assertModuleRenderCoordinatorOptions(
   );
 }
 
-function assertManifestRenderCoordinatorOptions(
+function assertFrameworkRenderCoordinatorOptions(
   value: unknown,
-): asserts value is ManifestRenderCoordinatorOptions {
+): asserts value is FrameworkRenderCoordinatorOptions {
   if (!isRecord(value)) {
     throw new Error(
-      "[evjs] createManifestRenderCoordinator() options must be an object.",
+      "[evjs] createFrameworkRenderCoordinator() options must be an object.",
     );
   }
 
-  assertFrameworkManifestShape(
-    value.manifest,
-    "createManifestRenderCoordinator() manifest",
+  assertFrameworkRuntime(
+    value.runtime,
+    "createFrameworkRenderCoordinator() runtime",
   );
   assertFunction(
     value.loadModule,
-    "createManifestRenderCoordinator() loadModule",
+    "createFrameworkRenderCoordinator() loadModule",
   );
   assertOptionalFunction(
     value.renderModule,
-    "createManifestRenderCoordinator() renderModule",
+    "createFrameworkRenderCoordinator() renderModule",
   );
   assertOptionalRenderCoordinator(
     value.fallback,
-    "createManifestRenderCoordinator() fallback",
+    "createFrameworkRenderCoordinator() fallback",
   );
 }
 
@@ -357,6 +453,627 @@ function assertObject(
   }
 }
 
+export function assertFrameworkRuntime(
+  value: unknown,
+  source: string,
+): asserts value is FrameworkRuntime {
+  assertObject(value, source);
+  if (value.version !== 1) {
+    throw new Error(`[evjs] ${source}.version must be 1.`);
+  }
+  assertBuildIdentifier(value.buildId, `${source}.buildId`);
+  assertRuntimeString(value.publicPath, `${source}.publicPath`);
+  assertObject(value.runtime, `${source}.runtime`);
+  assertObject(value.runtime.server, `${source}.runtime.server`);
+  assertRuntimePathname(
+    value.runtime.server.basePath,
+    `${source}.runtime.server.basePath`,
+    true,
+  );
+  assertRuntimePathname(
+    value.runtime.server.fn,
+    `${source}.runtime.server.fn`,
+    true,
+  );
+  assertRuntimePathname(
+    value.runtime.server.ppr,
+    `${source}.runtime.server.ppr`,
+  );
+  assertRuntimePathname(
+    value.runtime.server.rsc,
+    `${source}.runtime.server.rsc`,
+  );
+  if (value.runtime.transport !== undefined) {
+    assertObject(value.runtime.transport, `${source}.runtime.transport`);
+    assertRuntimeTransportBaseUrl(
+      value.runtime.transport.baseUrl,
+      `${source}.runtime.transport.baseUrl`,
+    );
+  }
+  assertObject(value.pages, `${source}.pages`);
+  assertFrameworkRuntimePages(value.pages, `${source}.pages`);
+  if (!Array.isArray(value.routes)) {
+    throw new Error(`[evjs] ${source}.routes must be an array.`);
+  }
+  assertFrameworkRuntimeRoutes(value.routes, `${source}.routes`, value.pages);
+  assertObject(value.server, `${source}.server`);
+  if (
+    value.server.renderers !== undefined &&
+    !isRecord(value.server.renderers)
+  ) {
+    throw new Error(`[evjs] ${source}.server.renderers must be an object.`);
+  }
+  if (isRecord(value.server.renderers)) {
+    assertFrameworkRuntimeRenderers(
+      value.server.renderers,
+      `${source}.server.renderers`,
+      value.pages,
+      value.routes,
+    );
+  }
+  if (value.rsc !== undefined) {
+    assertFrameworkRuntimeRsc(value.rsc, `${source}.rsc`, value.pages);
+  }
+}
+
+function assertBuildIdentifier(value: unknown, source: string): void {
+  assertString(value, source);
+  if (!isBuildIdentifier(value)) {
+    throw new Error(
+      `[evjs] ${source} must contain only ${BUILD_IDENTIFIER_DESCRIPTION}.`,
+    );
+  }
+}
+
+function assertString(value: unknown, source: string): asserts value is string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`[evjs] ${source} must be a non-empty string.`);
+  }
+}
+
+function assertRuntimeString(
+  value: unknown,
+  source: string,
+): asserts value is string {
+  assertString(value, source);
+  if (value.trim() !== value) {
+    throw new Error(
+      `[evjs] ${source} must not contain leading or trailing whitespace.`,
+    );
+  }
+}
+
+function assertFrameworkRuntimePages(
+  value: Record<string, unknown>,
+  source: string,
+): void {
+  for (const [name, page] of Object.entries(value)) {
+    assertRuntimeBuildIdentifierKey(name, source);
+    const pageSource = `${source}.${name}`;
+    assertObject(page, pageSource);
+    assertAssetGroup(page.assets, `${pageSource}.assets`);
+    assertRenderMode(page.render, `${pageSource}.render`);
+    assertPageRendering(page.rendering, `${pageSource}.rendering`);
+    if (page.path !== undefined) {
+      assertRuntimePathname(page.path, `${pageSource}.path`);
+    }
+    if (page.routeId !== undefined) {
+      assertRuntimeString(page.routeId, `${pageSource}.routeId`);
+    }
+    if (page.componentModel !== undefined) {
+      assertComponentModel(page.componentModel, `${pageSource}.componentModel`);
+    }
+    if (page.mount !== undefined) {
+      assertRuntimeString(page.mount, `${pageSource}.mount`);
+    }
+    if (page.ppr !== undefined) {
+      assertPprPageRuntime(page.ppr, `${pageSource}.ppr`);
+      assertPprPageRuntimeContract(page, pageSource);
+    }
+  }
+}
+
+function assertPageRendering(value: unknown, source: string): void {
+  assertObject(value, source);
+  assertComponentModel(value.component, `${source}.component`);
+  assertHtmlRendering(value.html, `${source}.html`);
+  if (value.prerender !== undefined) {
+    assertPrerenderMode(value.prerender, `${source}.prerender`);
+  }
+  if (typeof value.streaming !== "boolean") {
+    throw new Error(`[evjs] ${source}.streaming must be a boolean.`);
+  }
+  assertHydrationMode(value.hydrate, `${source}.hydrate`);
+}
+
+function assertPprPageRuntime(value: unknown, source: string): void {
+  assertObject(value, source);
+  assertPprDeliveryMode(value.delivery, `${source}.delivery`);
+  assertAssetGroup(value.shell, `${source}.shell`);
+  assertObject(value.regions, `${source}.regions`);
+  for (const [name, region] of Object.entries(value.regions)) {
+    assertRuntimeBuildIdentifierKey(name, `${source}.regions`);
+    const regionSource = `${source}.regions.${name}`;
+    assertObject(region, regionSource);
+    assertRuntimeString(region.id, `${regionSource}.id`);
+    if (region.id !== name) {
+      throw new Error(
+        `[evjs] ${regionSource}.id must match region key "${name}".`,
+      );
+    }
+    assertAssetGroup(region.assets, `${regionSource}.assets`);
+    if (region.cache !== undefined) {
+      assertPprRegionCache(region.cache, `${regionSource}.cache`);
+    }
+  }
+}
+
+function assertPprPageRuntimeContract(
+  page: Record<string, unknown>,
+  source: string,
+): void {
+  if (page.ppr === undefined) return;
+  const rendering = page.rendering;
+  if (!isRecord(rendering) || !isRecord(page.ppr)) return;
+
+  if (page.componentModel === "rsc" || rendering.component === "rsc") {
+    throw new Error(`[evjs] ${source}.ppr is not supported for RSC pages.`);
+  }
+  if (page.render !== "ssr") {
+    throw new Error(`[evjs] ${source}.render must be "ssr" for PPR pages.`);
+  }
+  if (rendering.component !== "server") {
+    throw new Error(
+      `[evjs] ${source}.rendering.component must be "server" for PPR pages.`,
+    );
+  }
+  if (rendering.html !== "partial") {
+    throw new Error(
+      `[evjs] ${source}.rendering.html must be "partial" for PPR pages.`,
+    );
+  }
+  if (rendering.prerender !== "partial") {
+    throw new Error(
+      `[evjs] ${source}.rendering.prerender must be "partial" for PPR pages.`,
+    );
+  }
+  const streams = page.ppr.delivery === "stream";
+  if (rendering.streaming !== streams) {
+    throw new Error(
+      `[evjs] ${source}.rendering.streaming must be ${String(streams)} when ${source}.ppr.delivery is "${page.ppr.delivery}".`,
+    );
+  }
+  if (rendering.hydrate !== "none") {
+    throw new Error(
+      `[evjs] ${source}.rendering.hydrate must be "none" for PPR pages.`,
+    );
+  }
+}
+
+function assertFrameworkRuntimeRoutes(
+  value: unknown[],
+  source: string,
+  pages: Record<string, unknown>,
+): void {
+  const idOwners = new Map<string, string>();
+  const pathOwners = new Map<string, { path: string; source: string }>();
+  const shapeOwners = new Map<string, { path: string; source: string }>();
+
+  value.forEach((route, index) => {
+    const routeSource = `${source}[${index}]`;
+    assertObject(route, routeSource);
+    assertRuntimeString(route.id, `${routeSource}.id`);
+    assertUniqueRuntimeRouteId(route.id, `${routeSource}.id`, idOwners);
+    assertRuntimePathname(route.path, `${routeSource}.path`, true);
+    const path = route.path as string;
+    assertPageRouteParamSegments(path, `${routeSource}.path`);
+    assertUniquePageRoutePath(path, `${routeSource}.path`, pathOwners);
+    assertUniquePageRouteShape(path, `${routeSource}.path`, shapeOwners);
+    const page = assertOptionalPageReference(
+      route.pageId,
+      `${routeSource}.pageId`,
+      pages,
+    );
+    if (page) {
+      assertPageRouteContract(route, page, routeSource);
+    }
+  });
+}
+
+function assertFrameworkRuntimeRenderers(
+  value: Record<string, unknown>,
+  source: string,
+  pages: Record<string, unknown>,
+  routes: unknown[],
+): void {
+  const routesById = createRouteRuntimeMap(routes);
+  for (const [name, renderer] of Object.entries(value)) {
+    assertRuntimeBuildIdentifierKey(name, source);
+    const rendererSource = `${source}.${name}`;
+    assertObject(renderer, rendererSource);
+    assertServerRendererKind(renderer.kind, `${rendererSource}.kind`);
+    assertAssetGroup(renderer.assets, `${rendererSource}.assets`);
+    assertServerRendererOwner(
+      renderer.owner,
+      `${rendererSource}.owner`,
+      renderer.kind,
+      pages,
+      routesById,
+    );
+  }
+}
+
+function assertFrameworkRuntimeRsc(
+  value: unknown,
+  source: string,
+  pages: Record<string, unknown>,
+): void {
+  assertObject(value, source);
+  if (value.pages !== undefined) {
+    assertObject(value.pages, `${source}.pages`);
+    for (const [name, page] of Object.entries(value.pages)) {
+      const pageSource = `${source}.pages.${name}`;
+      assertObject(page, pageSource);
+      assertAssetGroup(page.assets, `${pageSource}.assets`);
+      assertOptionalPageReference(name, pageSource, pages);
+      const frameworkPage = pages[name];
+      if (
+        isRecord(frameworkPage) &&
+        frameworkPage.componentModel !== "rsc" &&
+        isRecord(frameworkPage.rendering) &&
+        frameworkPage.rendering.component !== "rsc"
+      ) {
+        throw new Error(
+          `[evjs] ${pageSource} requires ${source.replace(/\.rsc$/, "")}.pages.${name}.componentModel to be "rsc".`,
+        );
+      }
+      assertRuntimeString(page.renderer, `${pageSource}.renderer`);
+      if (page.routeId !== undefined) {
+        assertRuntimeString(page.routeId, `${pageSource}.routeId`);
+      }
+    }
+  }
+  if (value.clientReferenceManifest !== undefined) {
+    assertObject(
+      value.clientReferenceManifest,
+      `${source}.clientReferenceManifest`,
+    );
+  }
+}
+
+function assertOptionalPageReference(
+  value: unknown,
+  source: string,
+  pages: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (value === undefined) return undefined;
+  assertRuntimeString(value, source);
+  if (!Object.hasOwn(pages, value)) {
+    throw new Error(
+      `[evjs] ${source} "${value}" does not match any runtime.pages entry.`,
+    );
+  }
+  const page = pages[value];
+  return isRecord(page) ? page : undefined;
+}
+
+function assertPageRouteContract(
+  route: Record<string, unknown>,
+  page: Record<string, unknown>,
+  routeSource: string,
+): void {
+  if (
+    typeof page.path === "string" &&
+    normalizeRoutePathname(route.path as string) !==
+      normalizeRoutePathname(page.path)
+  ) {
+    throw new Error(
+      `[evjs] ${routeSource}.path "${route.path as string}" must match runtime.pages.${route.pageId as string}.path "${page.path}".`,
+    );
+  }
+}
+
+function assertUniqueRuntimeRouteId(
+  id: string,
+  source: string,
+  idOwners: Map<string, string>,
+): void {
+  const existingSource = idOwners.get(id);
+  if (existingSource) {
+    throw new Error(
+      `[evjs] ${source} duplicates ${existingSource} "${id}". Route ids must be unique.`,
+    );
+  }
+  idOwners.set(id, source);
+}
+
+function assertUniquePageRoutePath(
+  path: string,
+  source: string,
+  pathOwners: Map<string, { path: string; source: string }>,
+): void {
+  const normalizedPath = normalizeRoutePathname(path);
+  const existing = pathOwners.get(normalizedPath);
+  if (existing) {
+    throw new Error(
+      `[evjs] ${source} duplicates ${existing.source} "${existing.path}". Page route paths must be unique.`,
+    );
+  }
+  pathOwners.set(normalizedPath, { path, source });
+}
+
+function assertUniquePageRouteShape(
+  path: string,
+  source: string,
+  shapeOwners: Map<string, { path: string; source: string }>,
+): void {
+  const shape = pageRoutePathShapeFromPath(path);
+  const existing = shapeOwners.get(shape);
+  if (existing) {
+    throw new Error(
+      `[evjs] ${source} has the same route shape as ${existing.source} "${existing.path}". Use one page route per URL shape.`,
+    );
+  }
+  shapeOwners.set(shape, { path, source });
+}
+
+function assertPageRouteParamSegments(path: string, source: string): void {
+  const error = getPageRouteParamSegmentValidationError(path);
+  if (!error) return;
+  throw new Error(
+    `[evjs] ${source} ${formatPageRouteParamSegmentError(error)}`,
+  );
+}
+
+function formatPageRouteParamSegmentError(
+  error: PageRouteParamSegmentValidationError,
+): string {
+  if (error.error === "empty") {
+    return `contains dynamic segment "${error.segment}" without a param name.`;
+  }
+  if (error.error === "reserved") {
+    return `uses reserved dynamic param name "${error.name}" in segment "${error.segment}". Use a safe application-specific name.`;
+  }
+  if (error.error === "duplicate") {
+    return `uses duplicate dynamic param name "${error.name}" in segment "${error.segment}". Use unique param names within one route path.`;
+  }
+  return `contains more than one wildcard segment "${error.segment}". Use at most one wildcard segment in a route path.`;
+}
+
+function createRouteRuntimeMap(
+  routes: unknown[],
+): Map<string, Record<string, unknown>> {
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const route of routes) {
+    if (!isRecord(route) || typeof route.id !== "string") continue;
+    byId.set(route.id, route);
+  }
+  return byId;
+}
+
+function assertServerRendererOwner(
+  value: unknown,
+  source: string,
+  kind: unknown,
+  pages: Record<string, unknown>,
+  routesById: Map<string, Record<string, unknown>>,
+): void {
+  if (value === undefined) {
+    if (kind === "ppr-region") {
+      throw new Error(`[evjs] ${source} is required for ppr-region renderers.`);
+    }
+    return;
+  }
+
+  assertObject(value, source);
+  const supportedKeys = new Set(["pageId", "routeId", "regionId"]);
+  for (const key of Object.keys(value)) {
+    if (supportedKeys.has(key)) continue;
+    throw new Error(
+      `[evjs] ${source}.${key} is not supported for server renderers. Use pageId, routeId, or regionId.`,
+    );
+  }
+  if (value.pageId !== undefined) {
+    assertOptionalPageReference(value.pageId, `${source}.pageId`, pages);
+  }
+  if (value.routeId !== undefined) {
+    assertRuntimeString(value.routeId, `${source}.routeId`);
+    const route = routesById.get(value.routeId);
+    if (!route) {
+      throw new Error(
+        `[evjs] ${source}.routeId "${value.routeId}" does not match any runtime.routes entry.`,
+      );
+    }
+  }
+  if (value.regionId !== undefined) {
+    assertRuntimeString(value.regionId, `${source}.regionId`);
+  }
+}
+
+function assertAssetGroup(value: unknown, source: string): void {
+  assertObject(value, source);
+  assertStringArray(value.js, `${source}.js`);
+  assertStringArray(value.css, `${source}.css`);
+}
+
+function assertStringArray(value: unknown, source: string): void {
+  if (!Array.isArray(value)) {
+    throw new Error(`[evjs] ${source} must be an array.`);
+  }
+  for (const item of value) {
+    if (typeof item !== "string" || !item.trim()) {
+      throw new Error(`[evjs] ${source} must contain only non-empty strings.`);
+    }
+    if (item.trim() !== item) {
+      throw new Error(
+        `[evjs] ${source} item "${item}" must not contain leading or trailing whitespace.`,
+      );
+    }
+  }
+}
+
+function assertRenderMode(value: unknown, source: string): void {
+  if (value === "csr" || value === "ssr" || value === "ssg") return;
+  throw new Error(`[evjs] ${source} must be "csr", "ssr", or "ssg".`);
+}
+
+function assertComponentModel(value: unknown, source: string): void {
+  if (value === "client" || value === "server" || value === "rsc") return;
+  throw new Error(`[evjs] ${source} must be "client", "server", or "rsc".`);
+}
+
+function assertHtmlRendering(value: unknown, source: string): void {
+  if (
+    value === "client" ||
+    value === "server" ||
+    value === "static" ||
+    value === "partial"
+  ) {
+    return;
+  }
+  throw new Error(
+    `[evjs] ${source} must be "client", "server", "static", or "partial".`,
+  );
+}
+
+function assertPrerenderMode(value: unknown, source: string): void {
+  if (value === "full" || value === "partial") return;
+  throw new Error(`[evjs] ${source} must be "full" or "partial".`);
+}
+
+function assertHydrationMode(value: unknown, source: string): void {
+  if (
+    value === "none" ||
+    value === "load" ||
+    value === "visible" ||
+    value === "idle"
+  ) {
+    return;
+  }
+  throw new Error(
+    `[evjs] ${source} must be "none", "load", "visible", or "idle".`,
+  );
+}
+
+function assertPprDeliveryMode(value: unknown, source: string): void {
+  if (value === "merge" || value === "stream") return;
+  throw new Error(`[evjs] ${source} must be "merge" or "stream".`);
+}
+
+function assertPprRegionCache(value: unknown, source: string): void {
+  if (value === "no-store") return;
+  if (!isRecord(value)) {
+    throw new Error(
+      `[evjs] ${source} must be "no-store" or an object with a positive integer revalidate.`,
+    );
+  }
+  const keys = Object.keys(value);
+  if (keys.length !== 1 || keys[0] !== "revalidate") {
+    throw new Error(`[evjs] ${source} can only contain revalidate.`);
+  }
+  if (
+    typeof value.revalidate !== "number" ||
+    !Number.isInteger(value.revalidate) ||
+    value.revalidate <= 0
+  ) {
+    throw new Error(
+      `[evjs] ${source}.revalidate must be a positive integer number of seconds.`,
+    );
+  }
+}
+
+function assertServerRendererKind(value: unknown, source: string): void {
+  if (
+    value === "page-server" ||
+    value === "ppr-shell" ||
+    value === "ppr-region" ||
+    value === "rsc-page"
+  ) {
+    return;
+  }
+  throw new Error(
+    `[evjs] ${source} must be "page-server", "ppr-shell", "ppr-region", or "rsc-page".`,
+  );
+}
+
+function assertRuntimeBuildIdentifierKey(key: string, source: string): void {
+  if (!isBuildIdentifier(key)) {
+    throw new Error(
+      `[evjs] ${source} key "${key}" must contain only ${BUILD_IDENTIFIER_DESCRIPTION}.`,
+    );
+  }
+  if (key.trim() !== key) {
+    throw new Error(
+      `[evjs] ${source} key "${key}" must not contain leading or trailing whitespace.`,
+    );
+  }
+}
+
+function assertRuntimePathname(
+  value: unknown,
+  source: string,
+  required = false,
+): void {
+  if (value === undefined) {
+    if (required) {
+      throw new Error(`[evjs] ${source} must be a non-empty pathname.`);
+    }
+    return;
+  }
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`[evjs] ${source} must be a non-empty pathname.`);
+  }
+  if (value.trim() !== value) {
+    throw new Error(
+      `[evjs] ${source} must not contain leading or trailing whitespace.`,
+    );
+  }
+
+  const error = getPathPatternValidationError(value);
+  if (error) {
+    throw new Error(`[evjs] ${source} ${formatRuntimePathnameError(error)}`);
+  }
+}
+
+function assertRuntimeTransportBaseUrl(value: unknown, source: string): void {
+  if (value === undefined) return;
+
+  const error = getUrlStringValidationError(value, {
+    baseUrl: "http://evjs.local/",
+  });
+  if (error) {
+    throw new Error(
+      `[evjs] ${source} ${formatRuntimeTransportBaseUrlError(error)}`,
+    );
+  }
+}
+
+function formatRuntimeTransportBaseUrlError(
+  error: UrlStringValidationError,
+): string {
+  switch (error) {
+    case "empty":
+      return "must be a non-empty URL string.";
+    case "whitespace":
+      return "must not contain leading or trailing whitespace.";
+    case "invalid-url":
+      return "must be a valid URL string.";
+  }
+}
+
+function formatRuntimePathnameError(error: PathPatternValidationError): string {
+  switch (error) {
+    case "empty":
+      return "must be a non-empty pathname.";
+    case "missing-leading-slash":
+      return 'must start with "/".';
+    case "whitespace":
+      return "must not contain whitespace.";
+    case "query-or-hash":
+      return "must not include a query string or hash.";
+  }
+}
+
 export async function handleFrameworkRenderRequest(
   options: FrameworkServerOptions,
   request: Request,
@@ -372,15 +1089,15 @@ export async function handleFrameworkRenderRequest(
   }
 
   const url = new URL(request.url);
-  const route = matchRoute(options.manifest.routes, url.pathname);
-  const pageId = route?.pageId ?? inferPageId(options.manifest, url.pathname);
-  const page = pageId ? options.manifest.pages[pageId] : undefined;
+  const route = matchRoute(options.runtime.routes, url.pathname);
+  const pageId = route?.pageId ?? inferPageId(options.runtime, url.pathname);
+  const page = pageId ? options.runtime.pages[pageId] : undefined;
 
   if (!route && !page) return undefined;
 
   const ctx: ServerRenderContext = {
     request,
-    manifest: options.manifest,
+    runtime: options.runtime,
     pageUrl: url.toString(),
     route,
     page,
@@ -470,9 +1187,9 @@ export async function handlePprRegionRequest(
   const url = new URL(request.url);
   let match: PprRegionMatch | undefined;
   try {
-    match = matchPprRegion(options.manifest, url.pathname);
+    match = matchPprRegion(options.runtime, url.pathname);
     if (match) {
-      match = withPprRegionPageUrl(options.manifest, match, url);
+      match = withPprRegionPageUrl(options.runtime, match, url);
     }
   } catch (error) {
     if (error instanceof PprRegionRequestError) {
@@ -485,7 +1202,7 @@ export async function handlePprRegionRequest(
   }
   if (!match) return undefined;
 
-  const page = options.manifest.pages[match.pageId];
+  const page = options.runtime.pages[match.pageId];
   if (!page?.ppr) return undefined;
   const region = page.ppr?.regions[match.regionId];
   if (!region) return undefined;
@@ -509,7 +1226,7 @@ async function renderPprPageResponse(
   coordinator: ServerRenderCoordinator,
 ): Promise<Response> {
   const pageId = ctx.pageId;
-  const page = pageId ? options.manifest.pages[pageId] : undefined;
+  const page = pageId ? options.runtime.pages[pageId] : undefined;
   if (!pageId || !page?.ppr) {
     return request.method === "HEAD" ? withoutResponseBody(response) : response;
   }
@@ -553,7 +1270,7 @@ async function renderPprMergedPageResponse(
   response: Response,
   coordinator: ServerRenderCoordinator,
 ): Promise<Response> {
-  const page = options.manifest.pages[pageId];
+  const page = options.runtime.pages[pageId];
   if (!page?.ppr) return response;
 
   let html = await response.text();
@@ -605,7 +1322,7 @@ async function renderPprStreamingPageResponse(
   response: Response,
   coordinator: ServerRenderCoordinator,
 ): Promise<Response> {
-  const page = options.manifest.pages[pageId];
+  const page = options.runtime.pages[pageId];
   if (!page?.ppr) return response;
 
   const html = await response.text();
@@ -663,7 +1380,7 @@ async function renderPprRegionResponse(
   match: PprRegionMatch,
   coordinator: ServerRenderCoordinator,
 ): Promise<Response | undefined> {
-  const page = options.manifest.pages[match.pageId];
+  const page = options.runtime.pages[match.pageId];
   if (!page?.ppr) return undefined;
   const region = page.ppr?.regions[match.regionId];
   if (!region) return undefined;
@@ -726,11 +1443,11 @@ async function renderFreshPprRegionResponse(
   match: PprRegionMatch,
   coordinator: ServerRenderCoordinator,
 ): Promise<Response | undefined> {
-  const page = options.manifest.pages[match.pageId];
+  const page = options.runtime.pages[match.pageId];
   if (!page?.ppr) return undefined;
   const ctx: ServerRenderContext = {
     request,
-    manifest: options.manifest,
+    runtime: options.runtime,
     pageUrl: match.pageUrl,
     page,
     pageId: match.pageId,
@@ -767,8 +1484,7 @@ export async function handleRscFlightRequest(
 ): Promise<Response | undefined> {
   if (!options.rsc) return undefined;
 
-  const rscPath =
-    options.manifest.rsc?.endpoint ?? options.manifest.runtime.server?.rsc;
+  const rscPath = options.runtime.runtime.server.rsc;
   if (!rscPath) return undefined;
 
   const url = new URL(request.url);
@@ -788,8 +1504,8 @@ export async function handleRscFlightRequest(
   try {
     ctx = {
       request,
-      manifest: options.manifest,
-      ...createRscFlightPageContext(options.manifest, url),
+      runtime: options.runtime,
+      ...createRscFlightPageContext(options.runtime, url),
     };
   } catch (error) {
     if (error instanceof RscFlightRequestError) {
@@ -853,17 +1569,17 @@ export async function handleRscFlightRequest(
 }
 
 function createRscFlightPageContext(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   url: URL,
 ): Pick<
   RscFlightContext,
   "pageUrl" | "pageId" | "page" | "rscPage" | "renderer"
 > {
   const pageId = url.searchParams.get("page") ?? undefined;
-  const page = pageId ? manifest.pages[pageId] : undefined;
-  const rscPage = pageId ? manifest.rsc?.pages?.[pageId] : undefined;
+  const page = pageId ? runtime.pages[pageId] : undefined;
+  const rscPage = pageId ? runtime.rsc?.pages?.[pageId] : undefined;
   const renderer = rscPage?.renderer
-    ? manifest.server?.renderers?.[rscPage.renderer]
+    ? runtime.server?.renderers?.[rscPage.renderer]
     : undefined;
   const pageUrl = resolveRscFlightPageUrl(url);
 
@@ -887,20 +1603,20 @@ function resolveRscFlightPageUrl(url: URL): string | undefined {
 }
 
 function withPprRegionPageUrl(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   match: PprRegionMatch,
   url: URL,
 ): PprRegionMatch {
-  const page = manifest.pages[match.pageId];
+  const page = runtime.pages[match.pageId];
   const explicitPageUrl = resolvePprRegionPageUrl(url);
   const pageUrl =
-    explicitPageUrl ?? inferStaticPprRegionPageUrl(manifest, match, page, url);
-  if (!pageUrl && shouldRequirePprRegionPageUrl(manifest, match, page)) {
+    explicitPageUrl ?? inferStaticPprRegionPageUrl(runtime, match, page, url);
+  if (!pageUrl && shouldRequirePprRegionPageUrl(runtime, match, page)) {
     throw new PprRegionRequestError(
       `[evjs] PPR region request url is required for page "${match.pageId}" because its route cannot be inferred from the direct region endpoint.`,
     );
   }
-  if (pageUrl && !pageUrlMatchesPage(manifest, match.pageId, page, pageUrl)) {
+  if (pageUrl && !pageUrlMatchesPage(runtime, match.pageId, page, pageUrl)) {
     throw new PprRegionRequestError(
       `[evjs] PPR region request url does not match page "${match.pageId}".`,
     );
@@ -909,34 +1625,34 @@ function withPprRegionPageUrl(
 }
 
 function inferStaticPprRegionPageUrl(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   match: PprRegionMatch,
-  page: PageOutput | undefined,
+  page: FrameworkPageRuntime | undefined,
   requestUrl: URL,
 ): string | undefined {
-  const paths = getPprRegionPagePaths(manifest, match.pageId, page);
+  const paths = getPprRegionPagePaths(runtime, match.pageId, page);
   return paths.length === 1 && isStaticPagePath(paths[0])
     ? new URL(paths[0], requestUrl).toString()
     : undefined;
 }
 
 function shouldRequirePprRegionPageUrl(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   match: PprRegionMatch,
-  page: PageOutput | undefined,
+  page: FrameworkPageRuntime | undefined,
 ): boolean {
-  const paths = getPprRegionPagePaths(manifest, match.pageId, page);
+  const paths = getPprRegionPagePaths(runtime, match.pageId, page);
   return (
     paths.length > 0 && !(paths.length === 1 && isStaticPagePath(paths[0]))
   );
 }
 
 function getPprRegionPagePaths(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   pageId: string,
-  page: PageOutput | undefined,
+  page: FrameworkPageRuntime | undefined,
 ): string[] {
-  const routePaths = manifest.routes
+  const routePaths = runtime.routes
     .filter((route) => route.pageId === pageId)
     .map((route) => route.path);
   return routePaths.length > 0 ? routePaths : page?.path ? [page.path] : [];
@@ -1000,7 +1716,7 @@ function validateRscFlightContext(ctx: RscFlightContext): Response | undefined {
 
   if (!ctx.page) {
     return textResponse(
-      `[evjs] RSC page "${ctx.pageId}" is not in the manifest.`,
+      `[evjs] RSC page "${ctx.pageId}" is not in the runtime.`,
       404,
     );
   }
@@ -1021,7 +1737,7 @@ function validateRscFlightContext(ctx: RscFlightContext): Response | undefined {
 
   if (!ctx.rscPage) {
     return textResponse(
-      `[evjs] RSC page "${ctx.pageId}" has no RSC manifest metadata.`,
+      `[evjs] RSC page "${ctx.pageId}" has no RSC runtime metadata.`,
       501,
     );
   }
@@ -1038,17 +1754,17 @@ function validateRscFlightContext(ctx: RscFlightContext): Response | undefined {
 
 function rscFlightPageUrlMatchesPage(ctx: RscFlightContext): boolean {
   if (!ctx.pageUrl || !ctx.pageId) return true;
-  return pageUrlMatchesPage(ctx.manifest, ctx.pageId, ctx.page, ctx.pageUrl);
+  return pageUrlMatchesPage(ctx.runtime, ctx.pageId, ctx.page, ctx.pageUrl);
 }
 
 function pageUrlMatchesPage(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   pageId: string,
-  page: PageOutput | undefined,
+  page: FrameworkPageRuntime | undefined,
   pageUrl: string,
 ): boolean {
   const pathname = normalizeRoutePathname(new URL(pageUrl).pathname);
-  const pageRoutes = manifest.routes.filter((route) => route.pageId === pageId);
+  const pageRoutes = runtime.routes.filter((route) => route.pageId === pageId);
 
   if (pageRoutes.length > 0) {
     return pageRoutes.some((route) =>
@@ -1125,11 +1841,11 @@ function withoutResponseBody(response: Response): Response {
   });
 }
 
-function createRendererRegistryFromManifest(
-  manifest: BuildOutput,
-  loadModule: ManifestServerModuleLoader,
+function createRendererRegistryFromRuntime(
+  runtime: FrameworkRuntime,
+  loadModule: FrameworkServerModuleLoader,
 ): ServerRendererRegistry {
-  const renderers = manifest.server?.renderers ?? {};
+  const renderers = runtime.server?.renderers ?? {};
   return Object.fromEntries(
     Object.entries(renderers).map(([name, renderer]) => {
       const asset = renderer.assets.js[0];
@@ -1320,39 +2036,39 @@ function isServerRenderContext(value: unknown): value is ServerRenderContext {
   return (
     isRecord(value) &&
     value.request instanceof Request &&
-    isRecord(value.manifest)
+    isRecord(value.runtime)
   );
 }
 
 function matchRoute(
-  routes: RouteOutput[],
+  routes: FrameworkRouteRuntime[],
   pathname: string,
-): RouteOutput | undefined {
+): FrameworkRouteRuntime | undefined {
   return findBestPageRoute(routes, pathname);
 }
 
 function inferPageId(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   pathname: string,
 ): string | undefined {
   const normalized = normalizeRoutePathname(pathname);
   const directId = normalized === "/" ? "index" : normalized.slice(1);
   const withoutHtml = directId.replace(/\.html$/, "");
 
-  if (manifest.pages[withoutHtml]) return withoutHtml;
-  if (manifest.pages[directId]) return directId;
+  if (runtime.pages[withoutHtml]) return withoutHtml;
+  if (runtime.pages[directId]) return directId;
 
   const dotted = withoutHtml.replaceAll("/", ".");
-  return manifest.pages[dotted] ? dotted : undefined;
+  return runtime.pages[dotted] ? dotted : undefined;
 }
 
 function matchPprRegion(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   pathname: string,
 ): PprRegionMatch | undefined {
   const endpoint = normalizeRoutePathname(
-    manifest.runtime.server?.ppr ??
-      joinPath(manifest.runtime.server?.basePath ?? "/__evjs", "ppr"),
+    runtime.runtime.server?.ppr ??
+      joinPath(runtime.runtime.server?.basePath ?? "/__evjs", "ppr"),
   );
   const normalized = normalizeRoutePathname(pathname);
   if (normalized === endpoint || !normalized.startsWith(`${endpoint}/`)) {
@@ -1629,7 +2345,7 @@ function waitUntilPprRegionRevalidation(promise: Promise<unknown>): void {
 
 function applyDefaultPprPageCacheHeaders(
   headers: Headers,
-  page: PageOutput,
+  page: FrameworkPageRuntime,
   options: FrameworkServerOptions,
 ): void {
   if (headers.has("Cache-Control")) return;
@@ -1641,7 +2357,7 @@ function applyDefaultPprPageCacheHeaders(
 }
 
 function getPprPageCacheControl(
-  page: PageOutput,
+  page: FrameworkPageRuntime,
   options: FrameworkServerOptions,
 ): string | undefined {
   if (!page.ppr) return undefined;

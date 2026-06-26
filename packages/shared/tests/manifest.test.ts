@@ -3418,6 +3418,7 @@ describe("createPublicManifest", () => {
 
     expect(() =>
       assertFrameworkManifestShape(manifest, "public manifest", {
+        server: "optional",
         serverFunctionModules: "optional",
         pageRendererReferences: "optional",
         pprRendererReferences: "optional",
@@ -3452,23 +3453,21 @@ describe("createPublicManifest", () => {
       assets: { js: [], css: [] },
       cache: "no-store",
     });
-    expect(manifest.server?.entry).toBeUndefined();
-    expect(manifest.server?.renderers).toBeUndefined();
-    expect(manifest.server?.functions["fn:refund"]).toEqual({
-      assets: { js: [], css: [] },
-      exportName: "refund",
-    });
-    expect(manifest.rsc?.clientReferenceManifest).toBeUndefined();
-    expect(manifest.rsc?.clientReferences).toBeUndefined();
+    expect("server" in manifest).toBe(false);
+    expect(
+      manifest.rsc ? "clientReferenceManifest" in manifest.rsc : false,
+    ).toBe(false);
+    expect(manifest.rsc ? "clientReferences" in manifest.rsc : false).toBe(
+      false,
+    );
     expect(manifest.rsc?.pages?.insights).toEqual({
       renderer: "insights-rsc",
       assets: { js: [], css: ["insights.css"] },
       routeId: "insights",
     });
-    expect(manifest.deployment).toEqual({
-      platform: "node",
-      publicAsset: "dashboard.js",
-    });
+    expect("distDir" in manifest).toBe(false);
+    expect("paths" in manifest).toBe(false);
+    expect("deployment" in manifest).toBe(false);
   });
 });
 
@@ -3508,7 +3507,7 @@ describe("createServerManifest", () => {
       version: 1,
       entry: "server.js",
       assets: { js: ["server.js"], css: ["server.css"] },
-      fns: {
+      functions: {
         "fn:getUser": {
           assets: { js: ["users.server.js"], css: [] },
         },
@@ -3528,7 +3527,8 @@ describe("createServerManifest", () => {
       version: 1,
       entry: "server.js",
       assets: { js: ["server.js"], css: [] },
-      fns: {},
+      functions: {},
+      routes: [],
     });
   });
 });

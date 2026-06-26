@@ -1,14 +1,14 @@
 import { findBestPageRoute } from "@evjs/shared";
-import type { BuildOutput } from "@evjs/shared/manifest";
+import type { ClientRuntime } from "../runtime-config.js";
 import type { ActivationRequest } from "./types.js";
 
 export function createActivationRequestFromUrl(
-  manifest: BuildOutput,
+  runtime: ClientRuntime,
   url: string | URL,
 ): ActivationRequest {
   const href = url.toString();
   const pathname = getPathname(href);
-  const route = findBestPageRoute(manifest.routes, pathname);
+  const route = findBestPageRoute(runtime.routes, pathname);
 
   return {
     url: href,

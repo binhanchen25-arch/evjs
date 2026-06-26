@@ -324,10 +324,23 @@ export interface BuildOutput {
 }
 
 export interface FrameworkManifestValidationOptions {
+  server?: "required" | "optional";
   serverFunctionModules?: "required" | "optional";
   pageRendererReferences?: "required" | "optional";
   pprRendererReferences?: "required" | "optional";
   rscRendererReferences?: "required" | "optional";
+}
+
+export interface PublicManifestOutput {
+  version: 1;
+  buildId: string;
+  publicPath: PublicPathOutput;
+  runtime: RuntimeOutput;
+  assets?: Record<string, AssetGroup>;
+  apps: Record<string, PublicAppOutput>;
+  pages: Record<string, PublicPageOutput>;
+  routes: PublicRouteOutput[];
+  rsc?: PublicRscOutput;
 }
 
 export interface BuildOutputPaths {
@@ -360,6 +373,10 @@ export interface AppOutput {
   module?: RuntimeModuleOutput;
 }
 
+export interface PublicAppOutput extends Omit<AppOutput, "entry" | "module"> {
+  module?: PublicRuntimeModuleOutput;
+}
+
 export interface PageOutput {
   assets: AssetGroup;
   document?: HtmlDocumentOutput;
@@ -376,6 +393,12 @@ export interface PageOutput {
   prerender?: PrerenderConfig;
   module?: RuntimeModuleOutput;
   ppr?: PprPageOutput;
+}
+
+export interface PublicPageOutput
+  extends Omit<PageOutput, "entry" | "component" | "app" | "module" | "ppr"> {
+  module?: PublicRuntimeModuleOutput;
+  ppr?: PublicPprPageOutput;
 }
 
 export interface HtmlDocumentOutput {
@@ -401,6 +424,10 @@ export interface PprPageOutput {
   regions: Record<string, PprRegionOutput>;
 }
 
+export interface PublicPprPageOutput extends Omit<PprPageOutput, "regions"> {
+  regions: Record<string, PublicPprRegionOutput>;
+}
+
 export interface PprRegionOutput {
   id: string;
   assets: AssetGroup;
@@ -410,11 +437,18 @@ export interface PprRegionOutput {
   hydrate?: HydrationMode;
 }
 
+export type PublicPprRegionOutput = Omit<
+  PprRegionOutput,
+  "component" | "fallback"
+>;
+
 export interface RuntimeModuleOutput {
   type: "entry" | "lifecycle" | "react-component";
   href?: string;
   source?: string;
 }
+
+export type PublicRuntimeModuleOutput = Omit<RuntimeModuleOutput, "source">;
 
 export interface RouteOutput {
   id: string;
@@ -428,6 +462,8 @@ export interface RouteOutput {
   hydrate?: HydrationMode;
   runtime?: ServerRuntime;
 }
+
+export type PublicRouteOutput = Omit<RouteOutput, "module">;
 
 export interface ServerOutput {
   entry?: string;
@@ -465,12 +501,19 @@ export interface RscOutput {
   serverConsumerManifest?: Record<string, unknown>;
 }
 
+export interface PublicRscOutput {
+  endpoint?: string;
+  pages?: Record<string, PublicRscPageOutput>;
+}
+
 export interface RscPageOutput {
   renderer: string;
   assets: AssetGroup;
   component?: string;
   routeId?: string;
 }
+
+export type PublicRscPageOutput = Omit<RscPageOutput, "component">;
 
 export interface RscReferenceOutput {
   module: string;
@@ -665,8 +708,24 @@ function joinPaths(parent: string, child: string): string {
 export function assertFrameworkManifestShape(
   value: unknown,
   source: string,
+  options?: FrameworkManifestValidationOptions & { server?: "required" },
+): asserts value is BuildOutput;
+export function assertFrameworkManifestShape(
+  value: unknown,
+  source: string,
+  options: FrameworkManifestValidationOptions & { server: "optional" },
+): asserts value is PublicManifestOutput;
+export function assertFrameworkManifestShape(
+  value: unknown,
+  source: string,
+  options?: FrameworkManifestValidationOptions,
+): asserts value is BuildOutput | PublicManifestOutput;
+export function assertFrameworkManifestShape(
+  value: unknown,
+  source: string,
   options: FrameworkManifestValidationOptions = {},
-): asserts value is BuildOutput {
+): asserts value is BuildOutput | PublicManifestOutput {
+  const requireServer = options.server !== "optional";
   const requireServerFunctionModules =
     options.serverFunctionModules !== "optional";
   const requirePageRendererReferences =
@@ -680,14 +739,22 @@ export function assertFrameworkManifestShape(
     throw new Error(`[evjs] ${source}.version must be 1.`);
   }
   assertManifestBuildId(value.buildId, `${source}.buildId`);
-  assertManifestString(value.distDir, `${source}.distDir`);
+  if (value.distDir === undefined) {
+    if (requireServer) {
+      throw new Error(`[evjs] ${source}.distDir must be a non-empty string.`);
+    }
+  } else {
+    assertManifestString(value.distDir, `${source}.distDir`);
+  }
   assertPublicPathOutput(value.publicPath, `${source}.publicPath`);
   if (value.paths !== undefined) {
     assertBuildOutputPaths(value.paths, `${source}.paths`);
   }
   assertObject(value.runtime, `${source}.runtime`);
-  assertObject(value.assets, `${source}.assets`);
-  assertAssetGroupRecord(value.assets, `${source}.assets`);
+  if (value.assets !== undefined) {
+    assertObject(value.assets, `${source}.assets`);
+    assertAssetGroupRecord(value.assets, `${source}.assets`);
+  }
   assertObject(value.apps, `${source}.apps`);
   assertAppOutputs(value.apps, `${source}.apps`);
   assertObject(value.pages, `${source}.pages`);
@@ -723,41 +790,48 @@ export function assertFrameworkManifestShape(
       `${source}.runtime.transport.baseUrl`,
     );
   }
-  assertObject(value.server, `${source}.server`);
-  if (value.server.entry !== undefined) {
-    assertManifestString(value.server.entry, `${source}.server.entry`);
-  }
-  if (value.server.renderers !== undefined) {
-    assertObject(value.server.renderers, `${source}.server.renderers`);
-    assertServerRendererOutputs(
-      value.server.renderers,
-      `${source}.server.renderers`,
-      value.pages,
-      value.routes,
+  if (value.server === undefined) {
+    if (requireServer) {
+      throw new Error(`[evjs] ${source}.server must be an object.`);
+    }
+  } else {
+    assertObject(value.server, `${source}.server`);
+    if (value.server.entry !== undefined) {
+      assertManifestString(value.server.entry, `${source}.server.entry`);
+    }
+    if (value.server.renderers !== undefined) {
+      assertObject(value.server.renderers, `${source}.server.renderers`);
+      assertServerRendererOutputs(
+        value.server.renderers,
+        `${source}.server.renderers`,
+        value.pages,
+        value.routes,
+      );
+    }
+    assertAssetGroup(value.server.assets, `${source}.server.assets`);
+    assertObject(value.server.functions, `${source}.server.functions`);
+    assertServerFunctionOutputs(
+      value.server.functions,
+      `${source}.server.functions`,
+      requireServerFunctionModules,
     );
+    if (!Array.isArray(value.server.routes)) {
+      throw new Error(`[evjs] ${source}.server.routes must be an array.`);
+    }
+    assertServerRouteOutputs(value.server.routes, `${source}.server.routes`);
   }
-  assertAssetGroup(value.server.assets, `${source}.server.assets`);
-  assertObject(value.server.functions, `${source}.server.functions`);
-  assertServerFunctionOutputs(
-    value.server.functions,
-    `${source}.server.functions`,
-    requireServerFunctionModules,
-  );
-  if (!Array.isArray(value.server.routes)) {
-    throw new Error(`[evjs] ${source}.server.routes must be an array.`);
-  }
-  assertServerRouteOutputs(value.server.routes, `${source}.server.routes`);
+  const serverRenderers = getServerRendererOutputs(value.server);
   assertPageServerRendererReferences(
     value.pages,
     `${source}.pages`,
-    getServerRendererOutputs(value.server),
+    serverRenderers,
     value.routes,
     requirePageRendererReferences,
   );
   assertPprPageOutputReferences(
     value.pages,
     `${source}.pages`,
-    getServerRendererOutputs(value.server),
+    serverRenderers,
     requirePprRendererReferences,
   );
   if (value.rsc !== undefined) {
@@ -765,7 +839,7 @@ export function assertFrameworkManifestShape(
       value.rsc,
       `${source}.rsc`,
       value.pages,
-      getServerRendererOutputs(value.server),
+      serverRenderers,
       value.routes,
       requireRscRendererReferences,
     );
@@ -1919,7 +1993,7 @@ export {
   createPublicManifest,
   createServerManifest,
   linkBuildOutput,
-  type ServerManifestFnOutput,
+  type ServerManifestFunctionOutput,
   type ServerManifestOutput,
   type ServerManifestRouteOutput,
 } from "./linker.js";

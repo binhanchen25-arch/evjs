@@ -8,7 +8,7 @@ import {
   getFnName,
   getServerFunction,
   initTransport,
-  initTransportFromManifest,
+  initTransportFromRuntime,
   type ServerFunction,
   type TransportAdapter,
   type TransportOptions,
@@ -317,38 +317,38 @@ describe("initTransport + callServer", () => {
     );
   });
 
-  it("rejects invalid manifest transport metadata", () => {
-    expect(() => initTransportFromManifest(null as never)).toThrow(
-      "[evjs] initTransportFromManifest() manifest must be a framework manifest object.",
+  it("rejects invalid runtime transport metadata", () => {
+    expect(() => initTransportFromRuntime(null as never)).toThrow(
+      "[evjs] initTransportFromRuntime() runtime must be a client runtime object.",
     );
-    expect(() => initTransportFromManifest({ runtime: null } as never)).toThrow(
-      "[evjs] initTransportFromManifest() manifest.runtime must be an object.",
+    expect(() => initTransportFromRuntime({ runtime: null } as never)).toThrow(
+      "[evjs] initTransportFromRuntime() runtime.runtime must be an object.",
     );
     expect(() =>
-      initTransportFromManifest({ runtime: { transport: [] } } as never),
+      initTransportFromRuntime({ runtime: { transport: [] } } as never),
     ).toThrow(
-      "[evjs] initTransportFromManifest() manifest.runtime.transport must be an object.",
+      "[evjs] initTransportFromRuntime() runtime.runtime.transport must be an object.",
     );
     expect(() =>
-      initTransportFromManifest({
+      initTransportFromRuntime({
         runtime: { transport: { baseUrl: "" } },
       } as never),
     ).toThrow(
-      "[evjs] initTransportFromManifest() manifest.runtime.transport.baseUrl must be a non-empty URL string.",
+      "[evjs] initTransportFromRuntime() runtime.runtime.transport.baseUrl must be a non-empty URL string.",
     );
     expect(() =>
-      initTransportFromManifest({
+      initTransportFromRuntime({
         runtime: { transport: { baseUrl: "https://api.example.com " } },
       } as never),
     ).toThrow(
-      "[evjs] initTransportFromManifest() manifest.runtime.transport.baseUrl must not contain leading or trailing whitespace.",
+      "[evjs] initTransportFromRuntime() runtime.runtime.transport.baseUrl must not contain leading or trailing whitespace.",
     );
     expect(() =>
-      initTransportFromManifest({
+      initTransportFromRuntime({
         runtime: { transport: { baseUrl: "http://[::1" } },
       } as never),
     ).toThrow(
-      "[evjs] initTransportFromManifest() manifest.runtime.transport.baseUrl must be a valid URL string.",
+      "[evjs] initTransportFromRuntime() runtime.runtime.transport.baseUrl must be a valid URL string.",
     );
   });
 
@@ -458,7 +458,7 @@ describe("public transport subpath", () => {
     expect(publicTransport.getFnId).toBe(getFnId);
     expect(publicTransport.getFnName).toBe(getFnName);
     expect(publicTransport.initTransport).toBe(initTransport);
-    expect("initTransportFromManifest" in publicTransport).toBe(false);
+    expect("initTransportFromRuntime" in publicTransport).toBe(false);
     expect("getServerFunction" in publicTransport).toBe(false);
     expect("__resetForTesting" in publicTransport).toBe(false);
   });

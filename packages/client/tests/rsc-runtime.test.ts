@@ -1,4 +1,3 @@
-import type { BuildOutput } from "@evjs/shared/manifest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createReactRscModel,
@@ -7,6 +6,7 @@ import {
   startReactRscPageRuntime,
   unmountReactRscPage,
 } from "../src/rsc.js";
+import type { ClientRuntime } from "../src/runtime-config.js";
 
 const calls: string[] = [];
 const rootElements: unknown[] = [];
@@ -70,7 +70,7 @@ describe("React RSC runtime", () => {
     const fetchMock = vi.fn(async () => createFlightResponse());
 
     const model = (await createReactRscModel({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       pageId: "insights",
       url: "https://example.com/insights",
       moduleBaseURL: "https://assets.example.com/",
@@ -96,7 +96,7 @@ describe("React RSC runtime", () => {
     calls.length = 0;
 
     const wrongTypeModel = (await createReactRscModel({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       pageId: "insights",
       url: "https://example.com/insights",
       fetch: async () =>
@@ -113,7 +113,7 @@ describe("React RSC runtime", () => {
     );
 
     const missingTypeModel = (await createReactRscModel({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       pageId: "insights",
       url: "https://example.com/insights",
       fetch: async () => new Response(null),
@@ -135,7 +135,7 @@ describe("React RSC runtime", () => {
     );
     await expect(
       createReactRscModel({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         pageId: "insights",
         url: "https://example.com/insights",
         moduleBaseURL: "",
@@ -146,7 +146,7 @@ describe("React RSC runtime", () => {
     );
     await expect(
       createReactRscModel({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         pageId: "insights",
         url: "https://example.com/insights",
         moduleBaseURL: " https://assets.example.com/ ",
@@ -164,7 +164,7 @@ describe("React RSC runtime", () => {
     const mount = {} as Element;
 
     await mountReactRscPage({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       pageId: "insights",
       url: "https://example.com/insights",
       mount,
@@ -183,7 +183,7 @@ describe("React RSC runtime", () => {
     const mount = {} as Element;
 
     await mountReactRscPage({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       pageId: "insights",
       url: "https://example.com/insights",
       mount,
@@ -205,7 +205,7 @@ describe("React RSC runtime", () => {
     const mount = {} as Element;
 
     await mountReactRscPage({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       pageId: "insights",
       url: "https://example.com/insights",
       mount,
@@ -213,7 +213,7 @@ describe("React RSC runtime", () => {
       fetch: async () => createFlightResponse(),
     });
     await mountReactRscPage({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       pageId: "insights",
       url: "https://example.com/insights?tab=summary",
       mount,
@@ -241,7 +241,7 @@ describe("React RSC runtime", () => {
     hydrateRootFailure = new Error("hydrate blocked");
     await expect(
       mountReactRscPage({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         pageId: "insights",
         url: "https://example.com/insights",
         mount,
@@ -255,7 +255,7 @@ describe("React RSC runtime", () => {
     createRootFailure = new Error("create blocked");
     await expect(
       mountReactRscPage({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         pageId: "insights",
         url: "https://example.com/insights",
         mount,
@@ -270,7 +270,7 @@ describe("React RSC runtime", () => {
     renderFailure = new Error("render blocked");
     await expect(
       mountReactRscPage({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         pageId: "insights",
         url: "https://example.com/insights",
         mount,
@@ -289,7 +289,7 @@ describe("React RSC runtime", () => {
     renderFailure = undefined;
     unmountFailure = new Error("unmount blocked");
     await mountReactRscPage({
-      manifest: createManifest(),
+      runtime: createRuntime(),
       pageId: "insights",
       url: "https://example.com/insights",
       mount,
@@ -310,14 +310,14 @@ describe("React RSC runtime", () => {
     );
     await expect(
       mountReactRscPage({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         mount: "",
         fetch: async () => createFlightResponse(),
       }),
     ).rejects.toThrow("[evjs] RSC mount must be a non-empty selector string.");
     await expect(
       mountReactRscPage({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         mount: " #app",
         fetch: async () => createFlightResponse(),
       }),
@@ -326,14 +326,14 @@ describe("React RSC runtime", () => {
     );
     await expect(
       mountReactRscPage({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         mount: 42 as never,
         fetch: async () => createFlightResponse(),
       }),
     ).rejects.toThrow("[evjs] RSC mount must be a selector string or Element.");
     await expect(
       mountReactRscPage({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         mount: "#app",
         hydrate: "yes" as never,
         fetch: async () => createFlightResponse(),
@@ -348,7 +348,7 @@ describe("React RSC runtime", () => {
 
     await expect(
       mountReactRscPage({
-        manifest: createManifest(),
+        runtime: createRuntime(),
         mount: "#app",
         fetch: async () => createFlightResponse(),
       }),
@@ -821,28 +821,18 @@ function createBootstrap(
   };
 }
 
-function createManifest(): BuildOutput {
+function createRuntime(): ClientRuntime {
   return {
     version: 1,
     buildId: "test",
-    distDir: "dist",
-    publicPath: "/",
     runtime: {
       server: {
-        basePath: "/__evjs",
-        fn: "/__evjs/fn",
         rsc: "/__evjs/rsc",
       },
     },
-    assets: {},
     apps: {},
     pages: {},
     routes: [],
-    server: {
-      assets: { js: [], css: [] },
-      functions: {},
-      routes: [],
-    },
   };
 }
 

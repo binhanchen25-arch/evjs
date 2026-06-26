@@ -53,5 +53,5 @@ export {
   createServerReference,
   getFnId,
   getFnName,
-  initTransportFromManifest,
+  initTransportFromRuntime,
 } from "./transport-runtime.js";

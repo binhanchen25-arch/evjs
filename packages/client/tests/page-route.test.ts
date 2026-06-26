@@ -36,7 +36,7 @@ describe("page route hooks", () => {
     expect("callServer" in client).toBe(false);
     expect("getFnId" in client).toBe(false);
     expect("getFnName" in client).toBe(true);
-    expect("initTransportFromManifest" in client).toBe(false);
+    expect("initTransportFromRuntime" in client).toBe(false);
   });
 
   it("exposes manual router construction APIs for standalone CSR apps", () => {

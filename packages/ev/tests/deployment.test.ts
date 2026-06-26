@@ -273,7 +273,7 @@ describe("createDeploymentArtifact", () => {
       'import { fileURLToPath, pathToFileURL } from "node:url";',
     );
     expect(files.serverModule).toContain(
-      "globalThis.__EVJS_MANIFEST__ = manifest",
+      "globalThis.__EVJS_FRAMEWORK_RUNTIME__ =",
     );
     expect(files.serverModule).toContain('"buildId": "build-1"');
     expect(files.serverModule).toContain('"renderers": {}');
@@ -825,7 +825,9 @@ describe("createDeploymentArtifact", () => {
     expect(files.artifactFileName).toBe("deployment.edge.json");
     expect(files.workerFileName).toBe("worker.mjs");
     expect(files.artifact.platform).toBe("edge");
-    expect(files.workerModule).toContain("globalThis.__EVJS_MANIFEST__");
+    expect(files.workerModule).toContain(
+      "globalThis.__EVJS_FRAMEWORK_RUNTIME__",
+    );
     expect(files.workerModule).toContain(
       "globalThis.__EVJS_SERVER_MODULE_LOADER__",
     );

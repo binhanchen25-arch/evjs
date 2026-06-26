@@ -438,6 +438,7 @@ describe("build", () => {
     );
 
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(false);
     expect(events).toEqual([
       "bundler.build",
       "bundler.entries:main,server",
@@ -1422,6 +1423,10 @@ describe("build", () => {
       path.join(cwd, "dist/client/manifest.json"),
       "utf-8",
     );
+    const clientRuntime = fs.readFileSync(
+      path.join(cwd, "dist/client/runtime.json"),
+      "utf-8",
+    );
     const serverManifest = fs.readFileSync(
       path.join(cwd, "dist/server/manifest.json"),
       "utf-8",
@@ -1431,16 +1436,61 @@ describe("build", () => {
       "utf-8",
     );
     const serverManifestJson = JSON.parse(serverManifest);
+    const clientRuntimeJson = JSON.parse(clientRuntime);
     const buildOutputJson = JSON.parse(buildOutput);
 
     expect(rawOutputComponents).toEqual(["./src/pages/Dashboard.tsx"]);
     expect(publicManifest).not.toContain(".tsx");
     expect(publicManifest).not.toContain("server.js");
+    expect(clientRuntime).not.toContain(".tsx");
+    expect(clientRuntime).not.toContain("server.js");
+    expect(clientRuntimeJson).not.toHaveProperty("publicPath");
+    expect(clientRuntimeJson).not.toHaveProperty("assets");
+    expect(Object.keys(clientRuntimeJson.runtime.server ?? {})).not.toEqual(
+      expect.arrayContaining(["basePath", "fn", "ppr"]),
+    );
+    expect(
+      Object.values(clientRuntimeJson.apps).flatMap((app) =>
+        Object.keys(app as Record<string, unknown>),
+      ),
+    ).not.toEqual(expect.arrayContaining(["assets", "document", "entry"]));
+    expect(
+      Object.values(clientRuntimeJson.pages).flatMap((page) =>
+        Object.keys(page as Record<string, unknown>),
+      ),
+    ).not.toEqual(
+      expect.arrayContaining([
+        "assets",
+        "document",
+        "render",
+        "rendering",
+        "path",
+        "routeId",
+        "componentModel",
+        "hydrate",
+        "ppr",
+      ]),
+    );
+    expect(clientRuntimeJson).not.toHaveProperty("rsc");
+    expect(
+      clientRuntimeJson.routes.flatMap((route: Record<string, unknown>) =>
+        Object.keys(route),
+      ),
+    ).not.toEqual(
+      expect.arrayContaining([
+        "parentId",
+        "kind",
+        "render",
+        "hydrate",
+        "runtime",
+      ]),
+    );
     expect(serverManifestJson).toEqual({
       version: 1,
       entry: "server.js",
       assets: { js: ["server.js"], css: [] },
-      fns: {},
+      functions: {},
+      routes: [],
     });
     expect(serverManifestJson.server).toBeUndefined();
     expect(serverManifest).not.toContain("./src/pages/Dashboard.tsx");
@@ -1451,6 +1501,7 @@ describe("build", () => {
     expect(buildOutput).toContain("./src/pages/Dashboard.tsx");
     expect(buildOutput).toContain("server.js");
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(false);
     expect(fs.existsSync(path.join(cwd, "dist/build-output.json"))).toBe(true);
     expect(fs.existsSync(path.join(cwd, "dist/server/build-output.json"))).toBe(
       false,
@@ -1466,11 +1517,18 @@ describe("build", () => {
     expect(fs.existsSync(path.join(cwd, "dist/client/manifest.json"))).toBe(
       true,
     );
+    expect(fs.existsSync(path.join(cwd, "dist/client/runtime.json"))).toBe(
+      true,
+    );
 
     await build({ output: { client: "dist" } }, { cwd, bundler });
 
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(true);
     expect(fs.existsSync(path.join(cwd, "dist/client/manifest.json"))).toBe(
+      false,
+    );
+    expect(fs.existsSync(path.join(cwd, "dist/client/runtime.json"))).toBe(
       false,
     );
   });
@@ -2349,6 +2407,7 @@ describe("build", () => {
     );
     expect(events).toContain("bundler.build");
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(true);
     expect(fs.existsSync(path.join(cwd, "dist/server/manifest.json"))).toBe(
       true,
     );

@@ -21,13 +21,14 @@ src/pages + src/apis + src/middleware.ts + ev.config.ts
   -> AppGraph
   -> BuildPlan
   -> selected bundler adapter
-  -> BuildOutput / dist/server/manifest.json or dist/manifest.json
-  -> client runtime, server runtime, deployment adapters
+  -> BuildOutput / dist/client/manifest.json / dist/server/manifest.json
+  -> ClientRuntime / FrameworkRuntime contracts / deployment adapters
 ```
 
 Framework semantics are owned by `@evjs/ev` and `@evjs/shared/manifest`.
 Bundlers own module graphs, chunks, assets, dev HMR, and stats. Runtime packages
-consume `BuildOutput` rather than raw bundler stats.
+consume generated runtime contracts rather than `BuildOutput` or manifest
+artifacts.
 
 ## Package Shape
 
@@ -148,15 +149,16 @@ the bundler dev instance.
   mounts standalone CSR apps and framework-managed React pages
 
 @evjs/client/internal
-  reads BuildOutput, activates app/page modules, preloads modules, and disposes
-  lifecycles
+  reads generated ClientRuntime, activates app/page modules, preloads modules,
+  and disposes lifecycles
 
 @evjs/server
   owns server functions, standalone REST route primitives, SSR document
   rendering, PPR region rendering, and RSC Flight endpoint routing
 
 deployment adapters
-  translate BuildOutput to platform artifacts and bootstraps
+  translate BuildOutput to platform artifacts and injected FrameworkRuntime
+  bootstraps
 ```
 
 TanStack Router is available through the `@evjs/client` standalone CSR surface
@@ -167,15 +169,16 @@ and navigation helpers instead of constructing route trees directly.
 ## Manifest
 
 The framework output contract is `BuildOutput`. Builds serialize the complete
-contract to:
+private contract to:
 
 ```txt
-dist/server/manifest.json
+dist/build-output.json
 ```
 
-They also emit a browser-safe public manifest to `output.client` and a server
-bundle manifest to `output.server`. Deployment plugins and platform adapters
-should consume `BuildOutput`.
+They also emit deployment-focused client/server manifests to `output.client`
+and `output.server`, plus a generated browser `runtime.json`. Deployment
+plugins and platform adapters should consume `BuildOutput`; generated runtimes
+consume minimal `ClientRuntime` and injected `FrameworkRuntime` contracts.
 
 ## Deployment
 

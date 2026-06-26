@@ -29,7 +29,8 @@ dist/
 │   ├── index.html
 │   ├── main.[hash].js
 │   ├── [chunk].[hash].js
-│   └── manifest.json
+│   ├── manifest.json
+│   └── runtime.json
 └── server/
     ├── main.[hash].js
     └── manifest.json
@@ -56,13 +57,15 @@ dist/
 ├── index.html
 ├── main.[hash].js
 ├── [chunk].[hash].js
-└── manifest.json
+├── manifest.json
+└── runtime.json
 dist-server/
 ├── main.[hash].js
 └── manifest.json
 ```
 
-`manifest.json` 是 evjs runtime 和部署工具使用的生成文件。应用代码不应该导入或修改它们。
+`runtime.json` 是只包含启动、导航、transport 和 RSC endpoint 数据的浏览器运行时配置。
+`manifest.json` 和 `build-output.json` 是部署/工具元信息。应用代码不应该导入或修改这些文件。
 
 ## 页面输出
 

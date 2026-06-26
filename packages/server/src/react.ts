@@ -1,12 +1,10 @@
 import {
-  assertFrameworkManifestShape,
-  type BuildOutput,
-  type ServerRendererOutput,
-} from "@evjs/shared/manifest";
-import {
-  createManifestRenderCoordinator,
+  assertFrameworkRuntime,
+  createFrameworkRenderCoordinator,
+  type FrameworkRuntime,
+  type FrameworkServerModuleLoader,
   type FrameworkServerOptions,
-  type ManifestServerModuleLoader,
+  type FrameworkServerRenderer,
   type ServerModuleRenderHandler,
   type ServerRenderCoordinator,
   type ServerRendererModule,
@@ -33,27 +31,27 @@ export {
 } from "./react-renderer.js";
 
 declare global {
-  var __EVJS_MANIFEST__: BuildOutput | undefined;
+  var __EVJS_FRAMEWORK_RUNTIME__: FrameworkRuntime | undefined;
   var __EVJS_DEV_PAGE_RENDER_PROXY_HEADER__: string | undefined;
   var __EVJS_SERVER_MODULE_LOADER__:
     | ((
         asset: string,
-        renderer: ServerRendererOutput,
+        renderer: FrameworkServerRenderer,
       ) => Promise<ServerRendererModule>)
     | undefined;
 }
 
 export interface ReactFrameworkServerOptions {
   /**
-   * Framework manifest to serve. Defaults to the manifest injected by the ev
+   * Framework runtime metadata. Defaults to the runtime injected by the ev
    * dev/build runtime bootstrap.
    */
-  manifest?: BuildOutput;
+  runtime?: FrameworkRuntime;
   /**
    * Server module loader for renderer assets. Defaults to the loader injected by
    * the ev dev/build runtime bootstrap.
    */
-  loadModule?: ManifestServerModuleLoader;
+  loadModule?: FrameworkServerModuleLoader;
   /**
    * Override the module renderer. By default, evjs renders default-exported
    * React components with the built-in server React renderer.
@@ -64,7 +62,7 @@ export interface ReactFrameworkServerOptions {
    */
   react?: ReactServerRenderAdapterOptions;
   /**
-   * Options passed to the default RSC Flight adapter when the manifest declares
+   * Options passed to the default RSC Flight adapter when the runtime declares
    * an RSC endpoint and no custom `rscCoordinator` is provided.
    */
   rsc?: ReactRscFlightAdapterOptions;
@@ -84,20 +82,19 @@ export function createReactFrameworkServer(
 ): FrameworkServerOptions | undefined {
   assertReactFrameworkServerOptions(options);
 
-  const manifest = options.manifest ?? globalThis.__EVJS_MANIFEST__;
-  if (!manifest) return undefined;
-  assertReactFrameworkManifest(manifest);
+  const runtime = options.runtime ?? globalThis.__EVJS_FRAMEWORK_RUNTIME__;
+  if (!runtime) return undefined;
 
-  const hasRenderers = Boolean(manifest.server?.renderers);
+  const hasRenderers = Boolean(runtime.server.renderers);
   const rsc =
-    options.rscCoordinator ?? createDefaultRscCoordinator(manifest, options);
+    options.rscCoordinator ?? createDefaultRscCoordinator(runtime, options);
   if (!hasRenderers && !rsc) return undefined;
 
   return {
-    manifest,
+    runtime,
     render: hasRenderers
-      ? createManifestRenderCoordinator({
-          manifest,
+      ? createFrameworkRenderCoordinator({
+          runtime,
           loadModule: options.loadModule ?? loadModuleFromRuntimeGlobal,
           renderModule:
             options.renderModule ??
@@ -119,7 +116,12 @@ function assertReactFrameworkServerOptions(
     );
   }
 
-  assertOptionalObject(value.manifest, "createReactFrameworkServer() manifest");
+  if (value.runtime !== undefined) {
+    assertFrameworkRuntime(
+      value.runtime,
+      "createReactFrameworkServer() runtime",
+    );
+  }
   assertOptionalFunction(
     value.loadModule,
     "createReactFrameworkServer() loadModule",
@@ -144,12 +146,6 @@ function assertOptionalObject(value: unknown, source: string): void {
   if (value !== undefined && !isRecord(value)) {
     throw new Error(`[evjs] ${source} must be an object.`);
   }
-}
-
-function assertReactFrameworkManifest(
-  value: unknown,
-): asserts value is BuildOutput {
-  assertFrameworkManifestShape(value, "createReactFrameworkServer() manifest");
 }
 
 function assertOptionalFunction(value: unknown, source: string): void {
@@ -184,11 +180,10 @@ function createDevPageRenderGuard():
 }
 
 function createDefaultRscCoordinator(
-  manifest: BuildOutput,
+  runtime: FrameworkRuntime,
   options: ReactFrameworkServerOptions,
 ): FrameworkServerOptions["rsc"] | undefined {
-  if (!manifest.runtime.server?.rsc && !manifest.rsc?.endpoint)
-    return undefined;
+  if (!runtime.runtime.server.rsc) return undefined;
   return createReactRscFlightAdapter({
     loadModule: options.loadModule ?? loadModuleFromRuntimeGlobal,
     ...options.rsc,
@@ -197,7 +192,7 @@ function createDefaultRscCoordinator(
 
 async function loadModuleFromRuntimeGlobal(
   asset: string,
-  renderer: ServerRendererOutput,
+  renderer: FrameworkServerRenderer,
 ): Promise<ServerRendererModule> {
   const loader = globalThis.__EVJS_SERVER_MODULE_LOADER__;
   if (loader) return loader(asset, renderer);

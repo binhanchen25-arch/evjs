@@ -21,12 +21,12 @@ import {
   ServerFunctionError,
   type UrlStringValidationError,
 } from "@evjs/shared";
-import type { BuildOutput } from "@evjs/shared/manifest";
 import {
   type FetchResponseObject,
   getFetchResponseContentType,
   readFetchErrorResponseBody,
 } from "./fetch-response.js";
+import type { ClientRuntime } from "./runtime-config.js";
 import { formatErrorDetail, isRecord } from "./validation.js";
 
 /**
@@ -405,7 +405,7 @@ function readServerFunctionSuccessResult(payload: Record<string, unknown>) {
 }
 
 let _runtime: TransportRuntime | null = null;
-let _runtimeSource: "default" | "manifest" | "user" | null = null;
+let _runtimeSource: "default" | "client-runtime" | "user" | null = null;
 
 function createTransportRuntime(options: TransportOptions): TransportRuntime {
   const endpoint = options.functions?.endpoint ?? getFunctionEndpoint();
@@ -445,22 +445,22 @@ export function initTransport(options: TransportOptions = {}): void {
 }
 
 /**
- * Initialize the default HTTP transport from the framework manifest.
+ * Initialize the default HTTP transport from the generated client runtime.
  *
  * Framework-managed runtimes call this before loading user modules. Explicit
  * initTransport() calls still win, so custom adapters are not overwritten.
  */
-export function initTransportFromManifest(
-  manifest: Pick<BuildOutput, "runtime">,
+export function initTransportFromRuntime(
+  runtime: Pick<ClientRuntime, "runtime">,
 ): void {
-  const transport = getManifestTransport(manifest);
+  const transport = getClientRuntimeTransport(runtime);
   if (!transport?.baseUrl || _runtimeSource === "user") return;
 
   _runtime = createTransportRuntime({
     baseUrl: transport.baseUrl,
     silent: true,
   });
-  _runtimeSource = "manifest";
+  _runtimeSource = "client-runtime";
 }
 
 /**
@@ -793,25 +793,25 @@ function formatTransportBaseUrlError(error: UrlStringValidationError): string {
   }
 }
 
-function getManifestTransport(
-  manifest: unknown,
+function getClientRuntimeTransport(
+  runtime: unknown,
 ): { baseUrl?: string } | undefined {
-  if (!isRecord(manifest)) {
+  if (!isRecord(runtime)) {
     throw new Error(
-      "[evjs] initTransportFromManifest() manifest must be a framework manifest object.",
+      "[evjs] initTransportFromRuntime() runtime must be a client runtime object.",
     );
   }
-  if (!isRecord(manifest.runtime)) {
+  if (!isRecord(runtime.runtime)) {
     throw new Error(
-      "[evjs] initTransportFromManifest() manifest.runtime must be an object.",
+      "[evjs] initTransportFromRuntime() runtime.runtime must be an object.",
     );
   }
 
-  const transport = manifest.runtime.transport;
+  const transport = runtime.runtime.transport;
   if (transport === undefined) return undefined;
   if (!isRecord(transport)) {
     throw new Error(
-      "[evjs] initTransportFromManifest() manifest.runtime.transport must be an object.",
+      "[evjs] initTransportFromRuntime() runtime.runtime.transport must be an object.",
     );
   }
 
@@ -819,7 +819,7 @@ function getManifestTransport(
   return {
     baseUrl: assertTransportBaseUrl(
       transport.baseUrl,
-      "initTransportFromManifest() manifest.runtime.transport.baseUrl",
+      "initTransportFromRuntime() runtime.runtime.transport.baseUrl",
     ),
   };
 }

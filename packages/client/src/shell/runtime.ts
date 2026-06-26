@@ -3,7 +3,7 @@ import {
   getHttpUrlOrAbsolutePathnameValidationError,
   isBuildIdentifier,
 } from "@evjs/shared";
-import { assertFrameworkManifestShape } from "@evjs/shared/manifest";
+import { assertClientRuntime } from "../runtime-config.js";
 import { isRecord } from "../validation.js";
 import { defaultLoadModule } from "./assets.js";
 import { assertAppModule } from "./module-registration.js";
@@ -66,7 +66,7 @@ export function createShell(options: ShellOptions): Shell {
           // Keep later transitions alive even if an earlier activation failed.
         })
         .then(() => {
-          assertActivationRequest(request, "activate()", options.manifest);
+          assertActivationRequest(request, "activate()", options.runtime);
           return activateNow(request);
         });
       activationQueue = run;
@@ -74,7 +74,7 @@ export function createShell(options: ShellOptions): Shell {
     },
     async preload(request) {
       assertNotDisposed("preload()");
-      assertActivationRequest(request, "preload()", options.manifest);
+      assertActivationRequest(request, "preload()", options.runtime);
       const target = await resolve(request);
       if (disposed) return;
       await getModule(target.href, target.ctx);
@@ -111,7 +111,7 @@ export function createShell(options: ShellOptions): Shell {
   async function resolve(
     request: ActivationRequest,
   ): Promise<ResolvedActivation> {
-    const target = await resolveTarget(options.manifest, request);
+    const target = await resolveTarget(options.runtime, request);
     const mountPoint =
       request.mountPoint ?? options.resolveMountPoint?.(target.ctx);
     if (mountPoint === undefined || mountPoint === null) {
@@ -318,7 +318,7 @@ function assertShellOptions(options: unknown): asserts options is ShellOptions {
   if (!isRecord(options)) {
     throw new Error("[evjs] createShell() options must be an object.");
   }
-  assertShellManifest(options.manifest);
+  assertShellRuntime(options.runtime);
 
   if (options.drivers !== undefined) {
     if (!Array.isArray(options.drivers)) {
@@ -336,7 +336,7 @@ function assertShellOptions(options: unknown): asserts options is ShellOptions {
 function assertActivationRequest(
   request: unknown,
   method: "activate()" | "preload()",
-  manifest: ShellOptions["manifest"],
+  runtime: ShellOptions["runtime"],
 ): asserts request is ActivationRequest {
   const prefix = `[evjs] Shell ${method} request`;
   if (!isRecord(request)) {
@@ -346,7 +346,7 @@ function assertActivationRequest(
   assertOptionalRequestString(request.appId, `${prefix}.appId`);
   assertOptionalRequestString(request.pageId, `${prefix}.pageId`);
   assertOptionalRequestBuildId(request.buildId, `${prefix}.buildId`);
-  assertRequestBuildId(request, prefix, manifest);
+  assertRequestBuildId(request, prefix, runtime);
   assertActivationTargetRequest(request, prefix);
 
   if (
@@ -426,12 +426,12 @@ function assertTrimmedRequestString(value: string, path: string): void {
 function assertRequestBuildId(
   request: ActivationRequest,
   prefix: string,
-  manifest: ShellOptions["manifest"],
+  runtime: ShellOptions["runtime"],
 ): void {
   if (request.buildId === undefined) return;
-  if (request.buildId !== manifest.buildId) {
+  if (request.buildId !== runtime.buildId) {
     throw new Error(
-      `${prefix}.buildId "${request.buildId}" does not match manifest.buildId "${manifest.buildId}".`,
+      `${prefix}.buildId "${request.buildId}" does not match runtime.buildId "${runtime.buildId}".`,
     );
   }
 }
@@ -448,41 +448,36 @@ function assertActivationTargetRequest(
   }
 }
 
-function assertShellManifest(manifest: unknown): void {
-  if (!isRecord(manifest)) {
-    throw new Error("[evjs] createShell() manifest must be an object.");
+function assertShellRuntime(runtime: unknown): void {
+  if (!isRecord(runtime)) {
+    throw new Error("[evjs] createShell() runtime must be an object.");
   }
-  if (manifest.version !== 1) {
-    throw new Error("[evjs] createShell() manifest.version must be 1.");
+  if (runtime.version !== 1) {
+    throw new Error("[evjs] createShell() runtime.version must be 1.");
   }
-  if (typeof manifest.buildId !== "string" || !manifest.buildId.trim()) {
+  if (typeof runtime.buildId !== "string" || !runtime.buildId.trim()) {
     throw new Error(
-      "[evjs] createShell() manifest.buildId must be a non-empty string.",
+      "[evjs] createShell() runtime.buildId must be a non-empty string.",
     );
   }
-  if (!isBuildIdentifier(manifest.buildId)) {
+  if (!isBuildIdentifier(runtime.buildId)) {
     throw new Error(
-      `[evjs] createShell() manifest.buildId must contain only ${BUILD_IDENTIFIER_DESCRIPTION}.`,
+      `[evjs] createShell() runtime.buildId must contain only ${BUILD_IDENTIFIER_DESCRIPTION}.`,
     );
   }
-  if (!isRecord(manifest.runtime)) {
-    throw new Error("[evjs] createShell() manifest.runtime must be an object.");
+  if (!isRecord(runtime.runtime)) {
+    throw new Error("[evjs] createShell() runtime.runtime must be an object.");
   }
-  if (!isRecord(manifest.pages)) {
-    throw new Error("[evjs] createShell() manifest.pages must be an object.");
+  if (!isRecord(runtime.pages)) {
+    throw new Error("[evjs] createShell() runtime.pages must be an object.");
   }
-  if (!isRecord(manifest.apps)) {
-    throw new Error("[evjs] createShell() manifest.apps must be an object.");
+  if (!isRecord(runtime.apps)) {
+    throw new Error("[evjs] createShell() runtime.apps must be an object.");
   }
-  if (!Array.isArray(manifest.routes)) {
-    throw new Error("[evjs] createShell() manifest.routes must be an array.");
+  if (!Array.isArray(runtime.routes)) {
+    throw new Error("[evjs] createShell() runtime.routes must be an array.");
   }
-  assertFrameworkManifestShape(manifest, "createShell() manifest", {
-    serverFunctionModules: "optional",
-    pageRendererReferences: "optional",
-    pprRendererReferences: "optional",
-    rscRendererReferences: "optional",
-  });
+  assertClientRuntime(runtime, "createShell() runtime");
 }
 
 function assertShellDriver(driver: unknown, index: number): void {

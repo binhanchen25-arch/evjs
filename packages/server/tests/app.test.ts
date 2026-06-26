@@ -1,13 +1,13 @@
 import { ServerError } from "@evjs/shared";
-import type { BuildOutput } from "@evjs/shared/manifest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import type {
+  FrameworkRuntime,
   PprRegionCacheEntry,
   ServerRenderContext,
 } from "../src/framework.js";
 import {
-  createManifestRenderCoordinator,
+  createFrameworkRenderCoordinator,
   createModuleRenderCoordinator,
 } from "../src/framework.js";
 import {
@@ -41,7 +41,7 @@ describe("createApp", () => {
     expect(await res.json()).toEqual({ result: "ok" });
   });
 
-  it("uses the framework manifest server function endpoint when available", async () => {
+  it("uses the framework runtime server function endpoint when available", async () => {
     vi.stubGlobal("__EVJS_FUNCTION_ENDPOINT__", "/stale/rpc");
     registerServerReference(async () => "ok", "fn1");
     const manifest = createManifest();
@@ -52,7 +52,7 @@ describe("createApp", () => {
 
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
       },
     });
     const stale = await app.request("/stale/rpc", {
@@ -320,7 +320,7 @@ describe("createApp", () => {
     });
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render() {
           return "<h1>framework fallback</h1>";
         },
@@ -361,116 +361,33 @@ describe("createApp", () => {
     expect(() => createApp({ framework: [] as never })).toThrow(
       "[evjs] createApp() framework must be a framework server object.",
     );
-    expect(() => createApp({ framework: { manifest: null } as never })).toThrow(
-      "[evjs] createApp() framework.manifest must be a framework manifest object.",
+    expect(() => createApp({ framework: { runtime: null } as never })).toThrow(
+      "[evjs] createApp() framework.runtime must be a framework runtime object.",
     );
     expect(() =>
       createApp({
-        framework: { manifest: { ...manifest, version: 2 } } as never,
+        framework: { runtime: { ...manifest, version: 2 } } as never,
       }),
-    ).toThrow("[evjs] createApp() framework.manifest.version must be 1.");
+    ).toThrow("[evjs] createApp() framework.runtime.version must be 1.");
     expect(() =>
       createApp({
-        framework: { manifest: { ...manifest, buildId: "build.1" } } as never,
+        framework: { runtime: { ...manifest, buildId: "build.1" } } as never,
       }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.buildId must contain only letters, numbers, underscores, or hyphens.",
+      "[evjs] createApp() framework.runtime.buildId must contain only letters, numbers, underscores, or hyphens.",
     );
     expect(() =>
       createApp({
-        framework: {
-          manifest: {
-            ...manifest,
-            paths: { rootDir: "dist", publicDir: "" },
-          },
-        } as never,
+        framework: { runtime: { ...manifest, runtime: null } } as never,
       }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.paths.publicDir must be a non-empty string.",
+      "[evjs] createApp() framework.runtime.runtime must be an object.",
     );
     expect(() =>
       createApp({
-        framework: { manifest: { ...manifest, runtime: null } } as never,
+        framework: { runtime: { ...manifest, pages: null } } as never,
       }),
-    ).toThrow(
-      "[evjs] createApp() framework.manifest.runtime must be an object.",
-    );
-    expect(() =>
-      createApp({
-        framework: { manifest: { ...manifest, assets: [] } } as never,
-      }),
-    ).toThrow(
-      "[evjs] createApp() framework.manifest.assets must be an object.",
-    );
-    expect(() =>
-      createApp({
-        framework: {
-          manifest: {
-            ...manifest,
-            assets: { main: { js: [" main.js "], css: [] } },
-          },
-        } as never,
-      }),
-    ).toThrow(
-      '[evjs] createApp() framework.manifest.assets.main.js item " main.js " must not contain leading or trailing whitespace.',
-    );
-    expect(() =>
-      createApp({
-        framework: { manifest: { ...manifest, apps: [] } } as never,
-      }),
-    ).toThrow("[evjs] createApp() framework.manifest.apps must be an object.");
-    expect(() =>
-      createApp({
-        framework: {
-          manifest: {
-            ...manifest,
-            apps: {
-              default: { assets: { js: "main.js", css: [] } },
-            },
-          },
-        } as never,
-      }),
-    ).toThrow(
-      "[evjs] createApp() framework.manifest.apps.default.assets.js must be an array.",
-    );
-    expect(() =>
-      createApp({
-        framework: {
-          manifest: {
-            ...manifest,
-            apps: {
-              default: {
-                assets: { js: [], css: [] },
-                module: { type: "lifecycle", href: "" },
-              },
-            },
-          },
-        } as never,
-      }),
-    ).toThrow(
-      "[evjs] createApp() framework.manifest.apps.default.module.href must be a non-empty string.",
-    );
-    expect(() =>
-      createApp({
-        framework: {
-          manifest: {
-            ...manifest,
-            server: {
-              assets: { js: [" server.js "], css: [] },
-              functions: {},
-              routes: [],
-            },
-          },
-        } as never,
-      }),
-    ).toThrow(
-      '[evjs] createApp() framework.manifest.server.assets.js item " server.js " must not contain leading or trailing whitespace.',
-    );
-    expect(() =>
-      createApp({
-        framework: { manifest: { ...manifest, pages: null } } as never,
-      }),
-    ).toThrow("[evjs] createApp() framework.manifest.pages must be an object.");
+    ).toThrow("[evjs] createApp() framework.runtime.pages must be an object.");
 
     const renderingManifest = createManifest();
     renderingManifest.pages.dashboard.rendering = {
@@ -480,9 +397,9 @@ describe("createApp", () => {
       hydrate: "load",
     } as never;
     expect(() =>
-      createApp({ framework: { manifest: renderingManifest } }),
+      createApp({ framework: { runtime: renderingManifest } }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.pages.dashboard.rendering.streaming must be a boolean.",
+      "[evjs] createApp() framework.runtime.pages.dashboard.rendering.streaming must be a boolean.",
     );
 
     const pprManifest = createManifest();
@@ -491,79 +408,79 @@ describe("createApp", () => {
       shell: { js: "dashboard-ppr-shell.js", css: [] } as never,
       regions: {},
     };
-    expect(() => createApp({ framework: { manifest: pprManifest } })).toThrow(
-      "[evjs] createApp() framework.manifest.pages.dashboard.ppr.shell.js must be an array.",
+    expect(() => createApp({ framework: { runtime: pprManifest } })).toThrow(
+      "[evjs] createApp() framework.runtime.pages.dashboard.ppr.shell.js must be an array.",
     );
 
     expect(() =>
       createApp({
-        framework: { manifest: { ...manifest, routes: {} } } as never,
+        framework: { runtime: { ...manifest, routes: {} } } as never,
       }),
-    ).toThrow("[evjs] createApp() framework.manifest.routes must be an array.");
+    ).toThrow("[evjs] createApp() framework.runtime.routes must be an array.");
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             routes: [{ id: "dashboard", path: "dashboard" }],
           },
         } as never,
       }),
     ).toThrow(
-      '[evjs] createApp() framework.manifest.routes[0].path must start with "/".',
+      '[evjs] createApp() framework.runtime.routes[0].path must start with "/".',
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             routes: [{ id: "missing", path: "/missing", pageId: "missing" }],
           },
         } as never,
       }),
     ).toThrow(
-      '[evjs] createApp() framework.manifest.routes[0].pageId "missing" does not match any manifest.pages entry.',
+      '[evjs] createApp() framework.runtime.routes[0].pageId "missing" does not match any runtime.pages entry.',
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             runtime: { server: "runtime" },
           },
         } as never,
       }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.runtime.server must be an object.",
+      "[evjs] createApp() framework.runtime.runtime.server must be an object.",
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             runtime: { ...manifest.runtime, transport: [] },
           },
         } as never,
       }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.runtime.transport must be an object.",
+      "[evjs] createApp() framework.runtime.runtime.transport must be an object.",
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             runtime: { server: { fn: "/__evjs/fn" } },
           },
         } as never,
       }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.runtime.server.basePath must be a non-empty pathname.",
+      "[evjs] createApp() framework.runtime.runtime.server.basePath must be a non-empty pathname.",
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             runtime: {
               server: {
@@ -575,12 +492,12 @@ describe("createApp", () => {
         } as never,
       }),
     ).toThrow(
-      '[evjs] createApp() framework.manifest.runtime.server.fn must start with "/".',
+      '[evjs] createApp() framework.runtime.runtime.server.fn must start with "/".',
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             runtime: {
               server: {
@@ -593,12 +510,12 @@ describe("createApp", () => {
         } as never,
       }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.runtime.server.ppr must not contain leading or trailing whitespace.",
+      "[evjs] createApp() framework.runtime.runtime.server.ppr must not contain leading or trailing whitespace.",
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             runtime: {
               server: {
@@ -611,108 +528,47 @@ describe("createApp", () => {
         } as never,
       }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.runtime.server.rsc must not include a query string or hash.",
+      "[evjs] createApp() framework.runtime.runtime.server.rsc must not include a query string or hash.",
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             server: { renderers: [] },
           },
         } as never,
       }),
     ).toThrow(
-      "[evjs] createApp() framework.manifest.server.renderers must be an object.",
+      "[evjs] createApp() framework.runtime.server.renderers must be an object.",
     );
     expect(() =>
       createApp({
         framework: {
-          manifest: {
+          runtime: {
             ...manifest,
             server: {
               assets: { js: [], css: [] },
               renderers: {
                 "dashboard.server": {
                   kind: "page-server",
-                  module: "./src/pages/Dashboard.tsx",
                   assets: { js: [], css: [] },
                 },
               },
-              functions: {},
-              routes: [],
             },
           },
         } as never,
       }),
     ).toThrow(
-      '[evjs] createApp() framework.manifest.server.renderers key "dashboard.server" must contain only letters, numbers, underscores, or hyphens.',
+      '[evjs] createApp() framework.runtime.server.renderers key "dashboard.server" must contain only letters, numbers, underscores, or hyphens.',
     );
     expect(() =>
       createApp({
-        framework: {
-          manifest: {
-            ...manifest,
-            server: {
-              assets: { js: [], css: [] },
-              functions: {},
-              routes: [
-                {
-                  path: "/api/health",
-                  methods: ["TRACE"],
-                  assets: { js: [], css: [] },
-                },
-              ],
-            },
-          },
-        } as never,
+        framework: { runtime: { ...manifest, rsc: "rsc" } } as never,
       }),
-    ).toThrow(
-      '[evjs] createApp() framework.manifest.server.routes[0].methods item "TRACE" is not a supported HTTP method. Supported methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS.',
-    );
-    expect(() =>
-      createApp({
-        framework: {
-          manifest: {
-            ...manifest,
-            server: {
-              assets: { js: [], css: [] },
-              functions: {},
-              routes: [
-                {
-                  path: "/api/users/:id",
-                  methods: ["GET"],
-                  assets: { js: [], css: [] },
-                },
-                {
-                  path: "/api/users/:userId",
-                  methods: ["GET"],
-                  assets: { js: [], css: [] },
-                },
-              ],
-            },
-          },
-        } as never,
-      }),
-    ).toThrow(
-      '[evjs] createApp() framework.manifest.server.routes[1].path has the same route shape as createApp() framework.manifest.server.routes[0].path "/api/users/:id". Use one server route per URL shape.',
-    );
-    expect(() =>
-      createApp({
-        framework: { manifest: { ...manifest, rsc: "rsc" } } as never,
-      }),
-    ).toThrow("[evjs] createApp() framework.manifest.rsc must be an object.");
-    expect(() =>
-      createApp({
-        framework: { manifest: { ...manifest, rsc: { pages: {} } } } as never,
-      }),
-    ).toThrow(
-      "[evjs] createApp() framework.manifest.rsc.endpoint must be a non-empty pathname.",
-    );
-
+    ).toThrow("[evjs] createApp() framework.runtime.rsc must be an object.");
     const rscManifest = createManifest();
     rscManifest.rsc = {
-      endpoint: "/__evjs/rsc",
       pages: {
         dashboard: {
           renderer: "dashboard-rsc",
@@ -720,14 +576,13 @@ describe("createApp", () => {
         },
       },
     };
-    expect(() => createApp({ framework: { manifest: rscManifest } })).toThrow(
-      "[evjs] createApp() framework.manifest.rsc.pages.dashboard.assets.css must contain only non-empty strings.",
+    expect(() => createApp({ framework: { runtime: rscManifest } })).toThrow(
+      "[evjs] createApp() framework.runtime.rsc.pages.dashboard.assets.css must contain only non-empty strings.",
     );
 
     const publicRscManifest = createManifest();
     configureRscPage(publicRscManifest);
     publicRscManifest.rsc = {
-      endpoint: "/__evjs/rsc",
       pages: {
         dashboard: {
           renderer: "dashboard-rsc",
@@ -738,31 +593,33 @@ describe("createApp", () => {
     expect(() =>
       createApp({
         framework: {
-          manifest: publicRscManifest,
+          runtime: publicRscManifest,
           render: () => new Response("ok"),
         },
       }),
     ).not.toThrow();
 
     expect(() =>
-      createApp({ framework: { manifest, render: "render" } as never }),
+      createApp({
+        framework: { runtime: manifest, render: "render" } as never,
+      }),
     ).toThrow(
       "[evjs] createApp() framework.render must be a render function or coordinator object.",
     );
     expect(() =>
       createApp({
-        framework: { manifest, rsc: { match: () => true } } as never,
+        framework: { runtime: manifest, rsc: { match: () => true } } as never,
       }),
     ).toThrow(
       "[evjs] createApp() framework.rsc must be an RSC Flight function or coordinator object.",
     );
     expect(() =>
-      createApp({ framework: { manifest, ppr: [] } as never }),
+      createApp({ framework: { runtime: manifest, ppr: [] } as never }),
     ).toThrow("[evjs] createApp() framework.ppr must be an object.");
     expect(() =>
       createApp({
         framework: {
-          manifest,
+          runtime: manifest,
           ppr: { regionCache: { get: () => undefined } },
         } as never,
       }),
@@ -772,7 +629,7 @@ describe("createApp", () => {
     expect(() =>
       createApp({
         framework: {
-          manifest,
+          runtime: manifest,
           ppr: {
             regionCache: {
               get: () => undefined,
@@ -788,7 +645,7 @@ describe("createApp", () => {
     expect(() =>
       createApp({
         framework: {
-          manifest,
+          runtime: manifest,
           ppr: { staleWhileRevalidate: 1.5 },
         } as never,
       }),
@@ -798,7 +655,7 @@ describe("createApp", () => {
     expect(() =>
       createApp({
         framework: {
-          manifest,
+          runtime: manifest,
           allowPageRenderRequest: "allow",
         } as never,
       }),
@@ -1086,7 +943,7 @@ describe("createApp", () => {
         }),
       ],
       framework: {
-        manifest,
+        runtime: manifest,
         render(ctx) {
           return `<h1>${ctx.pageId}</h1>`;
         },
@@ -1109,7 +966,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render(ctx) {
           return `<h1>${ctx.pageId}:${ctx.page?.render}</h1>`;
         },
@@ -1127,7 +984,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         allowPageRenderRequest() {
           throw new Error("guard exploded");
         },
@@ -1152,7 +1009,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         allowPageRenderRequest() {
           return new Response("blocked by guard", {
             status: 403,
@@ -1180,7 +1037,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         async allowPageRenderRequest(request) {
           return request.headers.get("x-evjs-render") === "1";
         },
@@ -1204,7 +1061,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         async allowPageRenderRequest() {
           return new Response("async guard blocked", {
             status: 401,
@@ -1232,7 +1089,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         allowPageRenderRequest() {
           return "yes" as never;
         },
@@ -1257,7 +1114,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render() {
           return null as never;
         },
@@ -1276,7 +1133,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render() {
           return { html: "no body status", status: 204 } as never;
         },
@@ -1295,7 +1152,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render(ctx) {
           return {
             html: `<h1>${ctx.pageId}:${ctx.page?.render}</h1>`,
@@ -1318,7 +1175,7 @@ describe("createApp", () => {
     configureRscPage(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-server": {
@@ -1341,7 +1198,7 @@ describe("createApp", () => {
     expect(await res.text()).toBe("<h1>dashboard:ssr:rsc</h1>");
   });
 
-  it("matches dynamic manifest routes for framework rendering", async () => {
+  it("matches dynamic runtime routes for framework rendering", async () => {
     const manifest = createManifest();
     manifest.pages.orderDetail = {
       assets: { js: [], css: [] },
@@ -1360,7 +1217,7 @@ describe("createApp", () => {
     });
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render(ctx) {
           return `<h1>${ctx.route?.id}:${ctx.pageId}</h1>`;
         },
@@ -1373,7 +1230,7 @@ describe("createApp", () => {
     expect(await res.text()).toBe("<h1>order.detail:orderDetail</h1>");
   });
 
-  it("prefers the most specific manifest route for framework rendering", async () => {
+  it("prefers the most specific runtime route for framework rendering", async () => {
     const manifest = createManifest();
     manifest.pages.user = {
       assets: { js: [], css: [] },
@@ -1409,7 +1266,7 @@ describe("createApp", () => {
     );
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render(ctx) {
           return `<h1>${ctx.route?.id}:${ctx.pageId}</h1>`;
         },
@@ -1426,7 +1283,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: {
           match(ctx) {
             if (ctx.pageId !== "dashboard") return undefined;
@@ -1453,7 +1310,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: {
           match() {
             return true as never;
@@ -1477,7 +1334,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: {
           match() {
             throw new Error("match exploded");
@@ -1504,7 +1361,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: {
           render() {
             throw new Error("render exploded");
@@ -1528,7 +1385,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-server": {
@@ -1560,7 +1417,7 @@ describe("createApp", () => {
     let loadCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-server": {
@@ -1601,7 +1458,6 @@ describe("createApp", () => {
 
   it("uses the PPR shell renderer for PPR pages", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -1609,14 +1465,13 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -1683,7 +1538,6 @@ describe("createApp", () => {
           details: {
             id: "details",
             assets: { js: ["order-details-ppr-region.js"], css: [] },
-            component: "./src/pages/orders/Details.region.tsx",
             cache: { revalidate: 60 },
           },
         },
@@ -1697,7 +1551,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "order-details-region": {
@@ -1751,7 +1605,6 @@ describe("createApp", () => {
 
   it("leaves PPR page responses with non-html media types unchanged", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -1759,7 +1612,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
@@ -1767,7 +1619,7 @@ describe("createApp", () => {
     let regionRenderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -1818,7 +1670,6 @@ describe("createApp", () => {
 
   it("merges PPR regions into React Suspense fallback boundaries", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -1826,14 +1677,13 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -1875,7 +1725,6 @@ describe("createApp", () => {
 
   it("streams PPR page shells and patches Suspense fallback boundaries", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "stream" };
     manifest.pages.dashboard.ppr = {
       delivery: "stream",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -1883,14 +1732,13 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -1934,7 +1782,6 @@ describe("createApp", () => {
 
   it("derives merged PPR page cache headers from region revalidate policies", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -1942,13 +1789,11 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: { revalidate: 60 },
         },
         inventory: {
           id: "inventory",
           assets: { js: ["dashboard-inventory-ppr-region.js"], css: [] },
-          component: "./src/pages/Inventory.region.tsx",
           cache: { revalidate: 15 },
         },
       },
@@ -1956,7 +1801,7 @@ describe("createApp", () => {
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -2002,7 +1847,6 @@ describe("createApp", () => {
 
   it("sets no-store cache headers on PPR pages with dynamic regions", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2010,7 +1854,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
@@ -2018,7 +1861,7 @@ describe("createApp", () => {
     let regionRenderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -2057,7 +1900,6 @@ describe("createApp", () => {
 
   it("preserves explicit PPR shell cache headers", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2065,7 +1907,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: { revalidate: 60 },
         },
       },
@@ -2073,7 +1914,7 @@ describe("createApp", () => {
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -2114,7 +1955,6 @@ describe("createApp", () => {
 
   it("derives streamed PPR page cache headers from region revalidate policies", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "stream" };
     manifest.pages.dashboard.ppr = {
       delivery: "stream",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2122,7 +1962,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: { revalidate: 30 },
         },
       },
@@ -2130,7 +1969,7 @@ describe("createApp", () => {
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -2170,7 +2009,6 @@ describe("createApp", () => {
 
   it("adds stale-while-revalidate to PPR page cache headers when configured", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2178,7 +2016,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: { revalidate: 45 },
         },
       },
@@ -2186,7 +2023,7 @@ describe("createApp", () => {
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         ppr: { staleWhileRevalidate: 10 },
         render: createModuleRenderCoordinator({
           renderers: {
@@ -2222,7 +2059,6 @@ describe("createApp", () => {
 
   it("normalizes PPR region document responses into fragments", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2230,7 +2066,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: "no-store",
         },
       },
@@ -2238,7 +2073,7 @@ describe("createApp", () => {
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-hero-region": {
@@ -2273,7 +2108,6 @@ describe("createApp", () => {
 
   it("leaves PPR region responses with non-html media types unchanged", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2281,7 +2115,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: "no-store",
         },
       },
@@ -2295,7 +2128,7 @@ describe("createApp", () => {
     ].join("");
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-hero-region": {
@@ -2326,7 +2159,6 @@ describe("createApp", () => {
 
   it("skips non-html PPR regions during merged page composition", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2334,7 +2166,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: "no-store",
         },
       },
@@ -2343,7 +2174,7 @@ describe("createApp", () => {
     let regionRenderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -2383,7 +2214,6 @@ describe("createApp", () => {
 
   it("skips non-html PPR regions during streamed page composition", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "stream" };
     manifest.pages.dashboard.ppr = {
       delivery: "stream",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2391,7 +2221,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: "no-store",
         },
       },
@@ -2400,7 +2229,7 @@ describe("createApp", () => {
     let regionRenderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-ppr-shell": {
@@ -2442,7 +2271,6 @@ describe("createApp", () => {
 
   it("requires exact PPR region endpoint paths", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2450,7 +2278,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
@@ -2458,7 +2285,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-hero-region": {
@@ -2522,7 +2349,6 @@ describe("createApp", () => {
 
   it("returns 405 for unsupported PPR region methods", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2530,7 +2356,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
@@ -2538,7 +2363,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render() {
           renderCount += 1;
           return "<p>should not render</p>";
@@ -2559,7 +2384,6 @@ describe("createApp", () => {
 
   it("reports PPR region render coordinator match exceptions with evjs context", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2567,14 +2391,13 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: {
           match() {
             throw new Error("region match exploded");
@@ -2601,7 +2424,6 @@ describe("createApp", () => {
 
   it("reports PPR region render coordinator render exceptions with evjs context", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2609,14 +2431,13 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
         },
       },
     };
     configurePprRendering(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: {
           render() {
             throw new Error("region render exploded");
@@ -2640,7 +2461,6 @@ describe("createApp", () => {
 
   it("caches PPR regions with revalidate policy", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2648,7 +2468,6 @@ describe("createApp", () => {
         inventory: {
           id: "inventory",
           assets: { js: ["dashboard-inventory-ppr-region.js"], css: [] },
-          component: "./src/pages/Inventory.region.tsx",
           cache: { revalidate: 60 },
         },
       },
@@ -2657,7 +2476,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-inventory-region": {
@@ -2685,7 +2504,6 @@ describe("createApp", () => {
 
   it("uses a custom PPR region cache when provided", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2693,7 +2511,6 @@ describe("createApp", () => {
         inventory: {
           id: "inventory",
           assets: { js: ["dashboard-inventory-ppr-region.js"], css: [] },
-          component: "./src/pages/Inventory.region.tsx",
           cache: { revalidate: 60 },
         },
       },
@@ -2709,7 +2526,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         ppr: { regionCache },
         render: createModuleRenderCoordinator({
           renderers: {
@@ -2739,7 +2556,6 @@ describe("createApp", () => {
 
   it("serves stale PPR regions while refreshing the cache", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2747,7 +2563,6 @@ describe("createApp", () => {
         inventory: {
           id: "inventory",
           assets: { js: ["dashboard-inventory-ppr-region.js"], css: [] },
-          component: "./src/pages/Inventory.region.tsx",
           cache: { revalidate: 60 },
         },
       },
@@ -2782,7 +2597,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         ppr: { regionCache, staleWhileRevalidate: 30 },
         render: createModuleRenderCoordinator({
           renderers: {
@@ -2819,7 +2634,6 @@ describe("createApp", () => {
       .spyOn(console, "error")
       .mockImplementation(() => {});
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2827,7 +2641,6 @@ describe("createApp", () => {
         inventory: {
           id: "inventory",
           assets: { js: ["dashboard-inventory-ppr-region.js"], css: [] },
-          component: "./src/pages/Inventory.region.tsx",
           cache: { revalidate: 60 },
         },
       },
@@ -2843,7 +2656,7 @@ describe("createApp", () => {
     };
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         ppr: { regionCache },
         render: createModuleRenderCoordinator({
           renderers: {
@@ -2874,7 +2687,6 @@ describe("createApp", () => {
 
   it("does not populate PPR region cache from HEAD misses", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2882,7 +2694,6 @@ describe("createApp", () => {
         inventory: {
           id: "inventory",
           assets: { js: ["dashboard-inventory-ppr-region.js"], css: [] },
-          component: "./src/pages/Inventory.region.tsx",
           cache: { revalidate: 60 },
         },
       },
@@ -2891,7 +2702,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-inventory-region": {
@@ -2926,7 +2737,6 @@ describe("createApp", () => {
 
   it("serves cached PPR region HEAD requests without rerendering", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2934,7 +2744,6 @@ describe("createApp", () => {
         inventory: {
           id: "inventory",
           assets: { js: ["dashboard-inventory-ppr-region.js"], css: [] },
-          component: "./src/pages/Inventory.region.tsx",
           cache: { revalidate: 60 },
         },
       },
@@ -2943,7 +2752,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-inventory-region": {
@@ -2976,7 +2785,6 @@ describe("createApp", () => {
 
   it("does not cache no-store PPR regions", async () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -2984,7 +2792,6 @@ describe("createApp", () => {
         hero: {
           id: "hero",
           assets: { js: ["dashboard-hero-ppr-region.js"], css: [] },
-          component: "./src/pages/Hero.region.tsx",
           cache: "no-store",
         },
       },
@@ -2993,7 +2800,7 @@ describe("createApp", () => {
     let renderCount = 0;
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-hero-region": {
@@ -3019,7 +2826,6 @@ describe("createApp", () => {
 
   it("rejects invalid PPR region revalidate policies", () => {
     const manifest = createManifest();
-    manifest.pages.dashboard.prerender = { partial: true, delivery: "merge" };
     manifest.pages.dashboard.ppr = {
       delivery: "merge",
       shell: { js: ["dashboard-ppr-shell.js"], css: [] },
@@ -3027,21 +2833,19 @@ describe("createApp", () => {
         zero: {
           id: "zero",
           assets: { js: ["dashboard-zero-ppr-region.js"], css: [] },
-          component: "./src/pages/Zero.region.tsx",
           cache: { revalidate: 0 } as never,
         },
         fractional: {
           id: "fractional",
           assets: { js: ["dashboard-fractional-ppr-region.js"], css: [] },
-          component: "./src/pages/Fractional.region.tsx",
           cache: { revalidate: 1.5 } as never,
         },
       },
     };
     configurePprRendering(manifest);
 
-    expect(() => createApp({ framework: { manifest } })).toThrow(
-      "[evjs] createApp() framework.manifest.pages.dashboard.ppr.regions.zero.cache.revalidate must be a positive integer number of seconds.",
+    expect(() => createApp({ framework: { runtime: manifest } })).toThrow(
+      "[evjs] createApp() framework.runtime.pages.dashboard.ppr.regions.zero.cache.revalidate must be a positive integer number of seconds.",
     );
   });
 
@@ -3049,7 +2853,7 @@ describe("createApp", () => {
     const manifest = createManifest();
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         render: createModuleRenderCoordinator({
           renderers: {
             "dashboard-server": {
@@ -3078,7 +2882,7 @@ describe("createApp", () => {
     });
     const ctx: ServerRenderContext = {
       request: new Request("https://example.com/dashboard"),
-      manifest,
+      runtime: manifest,
       route: manifest.routes[0],
       page: manifest.pages.dashboard,
       pageId: "dashboard",
@@ -3141,81 +2945,76 @@ describe("createApp", () => {
       "[evjs] createModuleRenderCoordinator() fallback must be a render function or coordinator object.",
     );
 
-    expect(() => createManifestRenderCoordinator(null as never)).toThrow(
-      "[evjs] createManifestRenderCoordinator() options must be an object.",
+    expect(() => createFrameworkRenderCoordinator(null as never)).toThrow(
+      "[evjs] createFrameworkRenderCoordinator() options must be an object.",
     );
     expect(() =>
-      createManifestRenderCoordinator({ manifest: null } as never),
+      createFrameworkRenderCoordinator({ runtime: null } as never),
     ).toThrow(
-      "[evjs] createManifestRenderCoordinator() manifest must be an object.",
+      "[evjs] createFrameworkRenderCoordinator() runtime must be an object.",
     );
     expect(() =>
-      createManifestRenderCoordinator({
-        manifest: { ...manifest, version: 2 },
+      createFrameworkRenderCoordinator({
+        runtime: { ...manifest, version: 2 },
         loadModule: async () => ({}),
       } as never),
     ).toThrow(
-      "[evjs] createManifestRenderCoordinator() manifest.version must be 1.",
+      "[evjs] createFrameworkRenderCoordinator() runtime.version must be 1.",
     );
     expect(() =>
-      createManifestRenderCoordinator({
-        manifest: { ...manifest, routes: {} },
+      createFrameworkRenderCoordinator({
+        runtime: { ...manifest, routes: {} },
         loadModule: async () => ({}),
       } as never),
     ).toThrow(
-      "[evjs] createManifestRenderCoordinator() manifest.routes must be an array.",
+      "[evjs] createFrameworkRenderCoordinator() runtime.routes must be an array.",
     );
     expect(() =>
-      createManifestRenderCoordinator({
-        manifest: {
+      createFrameworkRenderCoordinator({
+        runtime: {
           ...manifest,
           server: { renderers: [] },
         },
         loadModule: async () => ({}),
       } as never),
     ).toThrow(
-      "[evjs] createManifestRenderCoordinator() manifest.server.renderers must be an object.",
+      "[evjs] createFrameworkRenderCoordinator() runtime.server.renderers must be an object.",
     );
     expect(() =>
-      createManifestRenderCoordinator({
-        manifest,
+      createFrameworkRenderCoordinator({
+        runtime: manifest,
         loadModule: "load",
       } as never),
     ).toThrow(
-      "[evjs] createManifestRenderCoordinator() loadModule must be a function.",
+      "[evjs] createFrameworkRenderCoordinator() loadModule must be a function.",
     );
     expect(() =>
-      createManifestRenderCoordinator({
-        manifest,
+      createFrameworkRenderCoordinator({
+        runtime: manifest,
         loadModule: async () => ({}),
         fallback: "render",
       } as never),
     ).toThrow(
-      "[evjs] createManifestRenderCoordinator() fallback must be a render function or coordinator object.",
+      "[evjs] createFrameworkRenderCoordinator() fallback must be a render function or coordinator object.",
     );
   });
 
-  it("loads renderer modules from manifest assets", async () => {
+  it("loads renderer modules from runtime assets", async () => {
     const manifest = createManifest();
     manifest.server = {
-      entry: "server.js",
-      assets: { js: ["server.js"], css: [] },
       renderers: {
         "dashboard-server": {
           kind: "page-server",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-server.js"], css: [] },
         },
       },
-      functions: {},
-      routes: [],
     };
     const app = createApp({
       framework: {
-        manifest,
-        render: createManifestRenderCoordinator({
-          manifest,
+        runtime: manifest,
+        render: createFrameworkRenderCoordinator({
+          runtime: manifest,
           async loadModule(asset) {
             expect(asset).toBe("dashboard-server.js");
             return {
@@ -3234,23 +3033,18 @@ describe("createApp", () => {
     expect(await res.text()).toBe("<h1>dashboard:manifest</h1>");
   });
 
-  it("creates an explicit React framework server from runtime manifest globals", async () => {
+  it("creates an explicit React framework server from runtime runtime globals", async () => {
     const manifest = createManifest();
     manifest.server = {
-      entry: "server.js",
-      assets: { js: ["server.js"], css: [] },
       renderers: {
         "dashboard-server": {
           kind: "page-server",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-server.js"], css: [] },
         },
       },
-      functions: {},
-      routes: [],
     };
-    vi.stubGlobal("__EVJS_MANIFEST__", manifest);
+    vi.stubGlobal("__EVJS_FRAMEWORK_RUNTIME__", manifest);
     vi.stubGlobal("__EVJS_SERVER_MODULE_LOADER__", async (asset: string) => {
       expect(asset).toBe("dashboard-server.js");
       return {
@@ -3272,7 +3066,7 @@ describe("createApp", () => {
 
   it("reports missing React framework module loaders as plain text", async () => {
     const manifest = createManifest();
-    vi.stubGlobal("__EVJS_MANIFEST__", manifest);
+    vi.stubGlobal("__EVJS_FRAMEWORK_RUNTIME__", manifest);
 
     const framework = createReactFrameworkServer();
     if (!framework) throw new Error("Expected framework options");
@@ -3294,41 +3088,37 @@ describe("createApp", () => {
       "[evjs] createReactFrameworkServer() options must be an object.",
     );
     expect(() =>
-      createReactFrameworkServer({ manifest: null as never }),
-    ).toThrow(
-      "[evjs] createReactFrameworkServer() manifest must be an object.",
-    );
+      createReactFrameworkServer({ runtime: null as never }),
+    ).toThrow("[evjs] createReactFrameworkServer() runtime must be an object.");
     expect(() =>
       createReactFrameworkServer({
-        manifest: { ...manifest, runtime: null } as never,
+        runtime: { ...manifest, runtime: null } as never,
       }),
     ).toThrow(
-      "[evjs] createReactFrameworkServer() manifest.runtime must be an object.",
+      "[evjs] createReactFrameworkServer() runtime.runtime must be an object.",
     );
     expect(() =>
       createReactFrameworkServer({
-        manifest: { ...manifest, version: 2 } as never,
+        runtime: { ...manifest, version: 2 } as never,
+      }),
+    ).toThrow("[evjs] createReactFrameworkServer() runtime.version must be 1.");
+    expect(() =>
+      createReactFrameworkServer({
+        runtime: { ...manifest, pages: null } as never,
       }),
     ).toThrow(
-      "[evjs] createReactFrameworkServer() manifest.version must be 1.",
+      "[evjs] createReactFrameworkServer() runtime.pages must be an object.",
     );
     expect(() =>
       createReactFrameworkServer({
-        manifest: { ...manifest, pages: null } as never,
+        runtime: { ...manifest, routes: {} } as never,
       }),
     ).toThrow(
-      "[evjs] createReactFrameworkServer() manifest.pages must be an object.",
+      "[evjs] createReactFrameworkServer() runtime.routes must be an array.",
     );
     expect(() =>
       createReactFrameworkServer({
-        manifest: { ...manifest, routes: {} } as never,
-      }),
-    ).toThrow(
-      "[evjs] createReactFrameworkServer() manifest.routes must be an array.",
-    );
-    expect(() =>
-      createReactFrameworkServer({
-        manifest: {
+        runtime: {
           ...manifest,
           runtime: {
             ...manifest.runtime,
@@ -3337,49 +3127,58 @@ describe("createApp", () => {
         } as never,
       }),
     ).toThrow(
-      "[evjs] createReactFrameworkServer() manifest.runtime.transport.baseUrl must not contain leading or trailing whitespace.",
+      "[evjs] createReactFrameworkServer() runtime.runtime.transport.baseUrl must not contain leading or trailing whitespace.",
     );
     expect(() =>
       createReactFrameworkServer({
-        manifest: {
+        runtime: {
           ...manifest,
           server: { renderers: [] },
         } as never,
       }),
     ).toThrow(
-      "[evjs] createReactFrameworkServer() manifest.server.renderers must be an object.",
+      "[evjs] createReactFrameworkServer() runtime.server.renderers must be an object.",
     );
     expect(() =>
       createReactFrameworkServer({
-        manifest: { ...manifest, rsc: "rsc" } as never,
+        runtime: { ...manifest, rsc: "rsc" } as never,
       }),
     ).toThrow(
-      "[evjs] createReactFrameworkServer() manifest.rsc must be an object.",
+      "[evjs] createReactFrameworkServer() runtime.rsc must be an object.",
     );
     expect(() =>
-      createReactFrameworkServer({ manifest, loadModule: "load" } as never),
+      createReactFrameworkServer({
+        runtime: manifest,
+        loadModule: "load",
+      } as never),
     ).toThrow(
       "[evjs] createReactFrameworkServer() loadModule must be a function.",
     );
     expect(() =>
-      createReactFrameworkServer({ manifest, renderModule: "render" } as never),
+      createReactFrameworkServer({
+        runtime: manifest,
+        renderModule: "render",
+      } as never),
     ).toThrow(
       "[evjs] createReactFrameworkServer() renderModule must be a function.",
     );
     expect(() =>
-      createReactFrameworkServer({ manifest, react: null as never }),
+      createReactFrameworkServer({ runtime: manifest, react: null as never }),
     ).toThrow("[evjs] createReactFrameworkServer() react must be an object.");
     expect(() =>
-      createReactFrameworkServer({ manifest, rsc: [] as never }),
+      createReactFrameworkServer({ runtime: manifest, rsc: [] as never }),
     ).toThrow("[evjs] createReactFrameworkServer() rsc must be an object.");
     expect(() =>
-      createReactFrameworkServer({ manifest, fallback: "render" } as never),
+      createReactFrameworkServer({
+        runtime: manifest,
+        fallback: "render",
+      } as never),
     ).toThrow(
       "[evjs] createReactFrameworkServer() fallback must be a render function or coordinator object.",
     );
     expect(() =>
       createReactFrameworkServer({
-        manifest,
+        runtime: manifest,
         rscCoordinator: { match: () => true } as never,
       }),
     ).toThrow(
@@ -3390,20 +3189,15 @@ describe("createApp", () => {
   it("can restrict React framework page rendering to dev proxy requests", async () => {
     const manifest = createManifest();
     manifest.server = {
-      entry: "server.js",
-      assets: { js: ["server.js"], css: [] },
       renderers: {
         "dashboard-server": {
           kind: "page-server",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-server.js"], css: [] },
         },
       },
-      functions: {},
-      routes: [],
     };
-    vi.stubGlobal("__EVJS_MANIFEST__", manifest);
+    vi.stubGlobal("__EVJS_FRAMEWORK_RUNTIME__", manifest);
     vi.stubGlobal(
       "__EVJS_DEV_PAGE_RENDER_PROXY_HEADER__",
       "x-evjs-dev-page-render",
@@ -3435,7 +3229,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc(ctx) {
           const pageUrl = ctx.pageUrl ? new URL(ctx.pageUrl) : undefined;
           return new Response(
@@ -3458,37 +3252,32 @@ describe("createApp", () => {
     expect(await res.text()).toBe("/dashboard?tab=stats");
   });
 
-  it("mounts RSC flight handling from the RSC manifest endpoint", async () => {
+  it("does not mount RSC flight handling without a server runtime endpoint", async () => {
     const manifest = createManifest();
     configureRscManifest(manifest);
     if (manifest.runtime.server) {
       delete manifest.runtime.server.rsc;
     }
-    if (!manifest.rsc) {
-      throw new Error("Expected RSC manifest metadata");
-    }
-    manifest.rsc.endpoint = "/__custom/rsc";
+    const rsc = vi.fn(
+      () =>
+        new Response("flight", {
+          headers: { "Content-Type": "text/x-component" },
+        }),
+    );
 
     const app = createApp({
       framework: {
-        manifest,
-        rsc() {
-          return new Response("manifest-endpoint-flight", {
-            headers: { "Content-Type": "text/x-component" },
-          });
-        },
+        runtime: manifest,
+        rsc,
       },
     });
 
     const frameworkEndpoint = await app.request("/__evjs/rsc?page=dashboard");
-    const manifestEndpoint = await app.request("/__custom/rsc?page=dashboard");
+    const customEndpoint = await app.request("/__custom/rsc?page=dashboard");
 
     expect(frameworkEndpoint.status).toBe(404);
-    expect(manifestEndpoint.status).toBe(200);
-    expect(manifestEndpoint.headers.get("Content-Type")).toBe(
-      "text/x-component",
-    );
-    expect(await manifestEndpoint.text()).toBe("manifest-endpoint-flight");
+    expect(customEndpoint.status).toBe(404);
+    expect(rsc).not.toHaveBeenCalled();
   });
 
   it("serves RSC flight HEAD requests without a response body", async () => {
@@ -3496,7 +3285,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response("flight", {
             headers: {
@@ -3524,7 +3313,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response("flight", {
             headers: {
@@ -3549,7 +3338,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response("flight", {
             headers: { "Content-Type": "text/x-component" },
@@ -3572,7 +3361,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc: {
           match(ctx) {
             return new URL(ctx.request.url).searchParams.get("flight") === "1";
@@ -3599,7 +3388,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const invalidMatchApp = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc: {
           match() {
             return "yes" as never;
@@ -3622,7 +3411,7 @@ describe("createApp", () => {
 
     const throwingMatchApp = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc: {
           match() {
             throw new Error("match exploded");
@@ -3649,7 +3438,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return null as never;
         },
@@ -3669,7 +3458,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response("not ready", {
             status: 404,
@@ -3691,7 +3480,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response(JSON.stringify({ ok: true }), {
             headers: { "Content-Type": "application/json" },
@@ -3713,7 +3502,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response(null);
         },
@@ -3733,7 +3522,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response("flight", {
             headers: { "Content-Type": "text/x-component" },
@@ -3763,7 +3552,7 @@ describe("createApp", () => {
     const unknownPage = await app.request("/__evjs/rsc?page=unknown");
     expect(unknownPage.status).toBe(404);
     await expect(unknownPage.text()).resolves.toContain(
-      'RSC page "unknown" is not in the manifest',
+      'RSC page "unknown" is not in the runtime',
     );
 
     manifest.pages.dashboard.render = "ssr";
@@ -3780,7 +3569,7 @@ describe("createApp", () => {
     configureRscManifest(manifest);
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response("flight", {
             headers: { "Content-Type": "text/x-component" },
@@ -3821,11 +3610,10 @@ describe("createApp", () => {
       pageId: "settings",
       path: "/settings",
       renderer: "settings-rsc",
-      module: "./src/pages/Settings.tsx",
     });
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc() {
           return new Response("flight", {
             headers: { "Content-Type": "text/x-component" },
@@ -3849,11 +3637,10 @@ describe("createApp", () => {
       pageId: "user",
       path: "/users/$userId",
       renderer: "user-rsc",
-      module: "./src/pages/User.tsx",
     });
     const app = createApp({
       framework: {
-        manifest,
+        runtime: manifest,
         rsc(ctx) {
           const pageUrl = ctx.pageUrl ? new URL(ctx.pageUrl) : undefined;
           return new Response(pageUrl?.pathname ?? "missing-url", {
@@ -3871,39 +3658,32 @@ describe("createApp", () => {
     await expect(res.text()).resolves.toBe("/users/42");
   });
 
-  it("creates a default RSC coordinator from a React framework manifest", async () => {
+  it("creates a default RSC coordinator from a React framework runtime", async () => {
     const manifest = createManifest();
     configureRscPage(manifest);
     manifest.rsc = {
-      endpoint: "/__evjs/rsc",
       pages: {
         dashboard: {
           renderer: "dashboard-rsc",
           assets: { js: ["dashboard-rsc.js"], css: [] },
-          component: "./src/pages/Dashboard.tsx",
         },
       },
     };
     manifest.server = {
-      assets: { js: ["server.js"], css: [] },
-      functions: {},
-      routes: [],
       renderers: {
         "dashboard-rsc": {
           kind: "rsc-page",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-rsc.js"], css: [] },
         },
         "dashboard-server": {
           kind: "page-server",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-server.js"], css: [] },
         },
       },
     };
-    vi.stubGlobal("__EVJS_MANIFEST__", manifest);
+    vi.stubGlobal("__EVJS_FRAMEWORK_RUNTIME__", manifest);
     vi.stubGlobal("__EVJS_SERVER_MODULE_LOADER__", async () => ({
       renderFlight(ctx: { pageId?: string }) {
         return new Response(`flight:${ctx.pageId}`, {
@@ -3925,42 +3705,35 @@ describe("createApp", () => {
     await expect(res.text()).resolves.toBe("flight:dashboard");
   });
 
-  it("creates a default RSC coordinator from the RSC manifest endpoint", async () => {
+  it("does not create a default RSC coordinator without a server runtime endpoint", async () => {
     const manifest = createManifest();
     configureRscPage(manifest);
     if (manifest.runtime.server) {
       delete manifest.runtime.server.rsc;
     }
     manifest.rsc = {
-      endpoint: "/__custom/rsc",
       pages: {
         dashboard: {
           renderer: "dashboard-rsc",
           assets: { js: ["dashboard-rsc.js"], css: [] },
-          component: "./src/pages/Dashboard.tsx",
         },
       },
     };
     manifest.server = {
-      assets: { js: ["server.js"], css: [] },
-      functions: {},
-      routes: [],
       renderers: {
         "dashboard-rsc": {
           kind: "rsc-page",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-rsc.js"], css: [] },
         },
         "dashboard-server": {
           kind: "page-server",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-server.js"], css: [] },
         },
       },
     };
-    vi.stubGlobal("__EVJS_MANIFEST__", manifest);
+    vi.stubGlobal("__EVJS_FRAMEWORK_RUNTIME__", manifest);
     vi.stubGlobal("__EVJS_SERVER_MODULE_LOADER__", async () => ({
       renderFlight(ctx: { pageId?: string }) {
         return new Response(`manifest-flight:${ctx.pageId}`, {
@@ -3973,27 +3746,21 @@ describe("createApp", () => {
 
     const framework = createReactFrameworkServer();
     if (!framework) throw new Error("Expected framework options");
+    expect(framework.rsc).toBeUndefined();
     const app = createApp({ framework });
 
     const staleEndpoint = await app.request("/__evjs/rsc?page=dashboard");
-    const manifestEndpoint = await app.request("/__custom/rsc?page=dashboard");
+    const customEndpoint = await app.request("/__custom/rsc?page=dashboard");
 
     expect(staleEndpoint.status).toBe(404);
-    expect(manifestEndpoint.status).toBe(200);
-    expect(manifestEndpoint.headers.get("Content-Type")).toContain(
-      "text/x-component",
-    );
-    await expect(manifestEndpoint.text()).resolves.toBe(
-      "manifest-flight:dashboard",
-    );
+    expect(customEndpoint.status).toBe(404);
   });
 });
 
-function createManifest(): BuildOutput {
+function createManifest(): FrameworkRuntime {
   return {
     version: 1,
     buildId: "test",
-    distDir: "dist",
     publicPath: "/",
     runtime: {
       server: {
@@ -4002,8 +3769,6 @@ function createManifest(): BuildOutput {
         rsc: "/__evjs/rsc",
       },
     },
-    assets: {},
-    apps: {},
     pages: {
       dashboard: {
         assets: { js: [], css: [] },
@@ -4024,14 +3789,10 @@ function createManifest(): BuildOutput {
       },
     ],
     server: {
-      assets: { js: ["server.js"], css: [] },
-      functions: {},
-      routes: [],
       renderers: {
         "dashboard-server": {
           kind: "page-server",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-server.js"], css: [] },
         },
       },
@@ -4039,10 +3800,9 @@ function createManifest(): BuildOutput {
   };
 }
 
-function configureRscManifest(manifest: BuildOutput): void {
+function configureRscManifest(manifest: FrameworkRuntime): void {
   configureRscPage(manifest);
   manifest.rsc = {
-    endpoint: "/__evjs/rsc",
     pages: {
       dashboard: {
         renderer: "dashboard-rsc",
@@ -4051,20 +3811,15 @@ function configureRscManifest(manifest: BuildOutput): void {
     },
   };
   manifest.server = {
-    assets: { js: ["server.js"], css: [] },
-    functions: {},
-    routes: [],
     renderers: {
       "dashboard-rsc": {
         kind: "rsc-page",
         owner: { pageId: "dashboard" },
-        module: "./src/pages/Dashboard.tsx",
         assets: { js: ["dashboard-rsc.js"], css: [] },
       },
       "dashboard-server": {
         kind: "page-server",
         owner: { pageId: "dashboard" },
-        module: "./src/pages/Dashboard.tsx",
         assets: { js: ["dashboard-server.js"], css: [] },
       },
     },
@@ -4072,12 +3827,11 @@ function configureRscManifest(manifest: BuildOutput): void {
 }
 
 function addRscManifestPage(
-  manifest: BuildOutput,
+  manifest: FrameworkRuntime,
   options: {
     pageId: string;
     path: string;
     renderer: string;
-    module: string;
   },
 ): void {
   const rscPages = manifest.rsc?.pages;
@@ -4110,18 +3864,16 @@ function addRscManifestPage(
   serverRenderers[options.renderer] = {
     kind: "rsc-page",
     owner: { pageId: options.pageId },
-    module: options.module,
     assets: rendererAssets,
   };
   serverRenderers[`${options.pageId}-server`] = {
     kind: "page-server",
     owner: { pageId: options.pageId },
-    module: options.module,
     assets: { js: [`${options.pageId}-server.js`], css: [] },
   };
 }
 
-function configureRscPage(manifest: BuildOutput): void {
+function configureRscPage(manifest: FrameworkRuntime): void {
   manifest.pages.dashboard.render = "ssr";
   manifest.pages.dashboard.componentModel = "rsc";
   manifest.pages.dashboard.rendering = {
@@ -4132,7 +3884,7 @@ function configureRscPage(manifest: BuildOutput): void {
   };
 }
 
-function configurePprRendering(manifest: BuildOutput): void {
+function configurePprRendering(manifest: FrameworkRuntime): void {
   const delivery = manifest.pages.dashboard.ppr?.delivery ?? "merge";
   manifest.pages.dashboard.rendering = {
     component: "server",

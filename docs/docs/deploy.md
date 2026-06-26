@@ -20,6 +20,7 @@ Typical output:
 dist/
 ├── client/
 │   ├── manifest.json
+│   ├── runtime.json
 │   └── ...
 ├── server/
 │   ├── manifest.json
@@ -30,14 +31,17 @@ dist/
 Important paths:
 
 - `dist/client/`: browser assets and generated HTML.
-- `dist/client/manifest.json`: browser-safe route, asset, and runtime metadata.
+- `dist/client/manifest.json`: browser-safe route and asset metadata for
+  deployment tooling.
+- `dist/client/runtime.json`: minimal browser runtime configuration loaded by
+  generated page bootstraps when it is not embedded in HTML.
 - `dist/server/`: server bundle and server metadata when the app uses server
   functions, server file routes, SSR, PPR, or RSC.
 - `dist/build-output.json`: complete build metadata for tooling and deployment
   adapters. Application code should not import or edit it.
 
-If page HTML does not embed the manifest, the browser runtime fetches it from
-the configured manifest URL or `/manifest.json`. Serve that response as JSON
+If page HTML does not embed the runtime config, the browser runtime fetches it
+from the configured runtime URL or `/runtime.json`. Serve that response as JSON
 with `Content-Type: application/json`.
 
 ## Choose A Target

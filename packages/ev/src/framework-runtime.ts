@@ -1,0 +1,247 @@
+import {
+  type BuildOutput,
+  createPublicManifest,
+  type PublicManifestOutput,
+} from "@evjs/shared/manifest";
+
+export type ClientRuntimeOutput = Pick<
+  PublicManifestOutput,
+  "version" | "buildId"
+> & {
+  runtime: ClientRuntimeOutputRuntime;
+  apps: Record<string, ClientRuntimeTargetOutput>;
+  pages: Record<string, ClientRuntimeTargetOutput>;
+  routes: ClientRuntimeRouteOutput[];
+};
+
+export interface ClientRuntimeOutputRuntime {
+  server?: {
+    rsc?: string;
+  };
+  transport?: PublicManifestOutput["runtime"]["transport"];
+}
+
+export type ClientRuntimeTargetOutput = Pick<
+  PublicManifestOutput["apps"][string],
+  "mount" | "module"
+>;
+
+export type ClientRuntimeRouteOutput = Pick<
+  PublicManifestOutput["routes"][number],
+  "id" | "path" | "appId" | "pageId"
+>;
+
+export interface FrameworkRuntimeOutput {
+  version: 1;
+  buildId: string;
+  publicPath: string;
+  runtime: BuildOutput["runtime"];
+  pages: Record<string, FrameworkRuntimePage>;
+  routes: FrameworkRuntimeRoute[];
+  server: {
+    renderers?: Record<string, FrameworkRuntimeRenderer>;
+  };
+  rsc?: FrameworkRuntimeRsc;
+}
+
+export type FrameworkRuntimePage = Pick<
+  BuildOutput["pages"][string],
+  | "assets"
+  | "render"
+  | "rendering"
+  | "path"
+  | "routeId"
+  | "componentModel"
+  | "mount"
+> & {
+  ppr?: FrameworkRuntimePprPage;
+};
+
+export interface FrameworkRuntimePprPage {
+  delivery: NonNullable<BuildOutput["pages"][string]["ppr"]>["delivery"];
+  shell: NonNullable<BuildOutput["pages"][string]["ppr"]>["shell"];
+  regions: Record<string, FrameworkRuntimePprRegion>;
+}
+
+export type FrameworkRuntimePprRegion = Pick<
+  NonNullable<BuildOutput["pages"][string]["ppr"]>["regions"][string],
+  "id" | "assets" | "cache"
+>;
+
+export type FrameworkRuntimeRoute = Pick<
+  BuildOutput["routes"][number],
+  "id" | "path" | "pageId"
+>;
+
+export interface FrameworkRuntimeRenderer {
+  kind: NonNullable<BuildOutput["server"]["renderers"]>[string]["kind"];
+  owner?: FrameworkRuntimeOwner;
+  assets: NonNullable<BuildOutput["server"]["renderers"]>[string]["assets"];
+}
+
+export type FrameworkRuntimeOwner = Pick<
+  NonNullable<NonNullable<BuildOutput["server"]["renderers"]>[string]["owner"]>,
+  "pageId" | "routeId" | "regionId"
+>;
+
+export interface FrameworkRuntimeRsc {
+  pages?: Record<string, FrameworkRuntimeRscPage>;
+  clientReferenceManifest?: Record<string, unknown>;
+}
+
+export type FrameworkRuntimeRscPage = Pick<
+  NonNullable<NonNullable<BuildOutput["rsc"]>["pages"]>[string],
+  "renderer" | "assets" | "routeId"
+>;
+
+export function createClientRuntime(output: BuildOutput): ClientRuntimeOutput {
+  const manifest = createPublicManifest(output);
+  return pruneUndefined({
+    version: manifest.version,
+    buildId: manifest.buildId,
+    runtime: createClientRuntimeRuntime(manifest.runtime),
+    apps: Object.fromEntries(
+      Object.entries(manifest.apps).map(([id, app]) => [
+        id,
+        pruneUndefined({
+          mount: app.mount,
+          module: app.module,
+        }),
+      ]),
+    ),
+    pages: Object.fromEntries(
+      Object.entries(manifest.pages).map(([id, page]) => [
+        id,
+        pruneUndefined({
+          mount: page.mount,
+          module: page.module,
+        }),
+      ]),
+    ),
+    routes: manifest.routes.map((route) =>
+      pruneUndefined({
+        id: route.id,
+        path: route.path,
+        appId: route.appId,
+        pageId: route.pageId,
+      }),
+    ),
+  });
+}
+
+function createClientRuntimeRuntime(
+  runtime: PublicManifestOutput["runtime"],
+): ClientRuntimeOutputRuntime {
+  return pruneUndefined({
+    server: runtime.server.rsc
+      ? {
+          rsc: runtime.server.rsc,
+        }
+      : undefined,
+    transport: runtime.transport,
+  });
+}
+
+export function createFrameworkRuntime(
+  output: BuildOutput,
+): FrameworkRuntimeOutput {
+  return pruneUndefined({
+    version: 1 as const,
+    buildId: output.buildId,
+    publicPath: output.publicPath,
+    runtime: output.runtime,
+    pages: Object.fromEntries(
+      Object.entries(output.pages).map(([id, page]) => [
+        id,
+        pruneUndefined({
+          assets: page.assets,
+          render: page.render,
+          rendering: page.rendering,
+          path: page.path,
+          routeId: page.routeId,
+          componentModel: page.componentModel,
+          mount: page.mount,
+          ppr: page.ppr
+            ? {
+                delivery: page.ppr.delivery,
+                shell: page.ppr.shell,
+                regions: Object.fromEntries(
+                  Object.entries(page.ppr.regions).map(([regionId, region]) => [
+                    regionId,
+                    pruneUndefined({
+                      id: region.id,
+                      assets: region.assets,
+                      cache: region.cache,
+                    }),
+                  ]),
+                ),
+              }
+            : undefined,
+        }),
+      ]),
+    ),
+    routes: output.routes.map((route) =>
+      pruneUndefined({
+        id: route.id,
+        path: route.path,
+        pageId: route.pageId,
+      }),
+    ),
+    server: pruneUndefined({
+      renderers: output.server.renderers
+        ? Object.fromEntries(
+            Object.entries(output.server.renderers).map(([id, renderer]) => [
+              id,
+              pruneUndefined({
+                kind: renderer.kind,
+                owner: createFrameworkRuntimeOwner(renderer.owner),
+                assets: renderer.assets,
+              }),
+            ]),
+          )
+        : undefined,
+    }),
+    rsc: createFrameworkRuntimeRsc(output.rsc),
+  });
+}
+
+function createFrameworkRuntimeRsc(
+  rsc: BuildOutput["rsc"],
+): FrameworkRuntimeRsc | undefined {
+  if (!rsc) return undefined;
+  const runtimeRsc = pruneUndefined({
+    pages: rsc.pages
+      ? Object.fromEntries(
+          Object.entries(rsc.pages).map(([id, page]) => [
+            id,
+            pruneUndefined({
+              renderer: page.renderer,
+              assets: page.assets,
+              routeId: page.routeId,
+            }),
+          ]),
+        )
+      : undefined,
+    clientReferenceManifest: rsc.clientReferenceManifest,
+  });
+  return Object.keys(runtimeRsc).length > 0 ? runtimeRsc : undefined;
+}
+
+function createFrameworkRuntimeOwner(
+  owner: NonNullable<BuildOutput["server"]["renderers"]>[string]["owner"],
+): FrameworkRuntimeOwner | undefined {
+  if (!owner) return undefined;
+  const runtimeOwner = pruneUndefined({
+    pageId: owner.pageId,
+    routeId: owner.routeId,
+    regionId: owner.regionId,
+  });
+  return Object.keys(runtimeOwner).length > 0 ? runtimeOwner : undefined;
+}
+
+function pruneUndefined<T extends Record<string, unknown>>(value: T): T {
+  for (const key of Object.keys(value)) {
+    if (value[key] === undefined) delete value[key];
+  }
+  return value;
+}

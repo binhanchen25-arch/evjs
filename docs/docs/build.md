@@ -30,7 +30,8 @@ dist/
 │   ├── index.html
 │   ├── main.[hash].js
 │   ├── [chunk].[hash].js
-│   └── manifest.json
+│   ├── manifest.json
+│   └── runtime.json
 └── server/
     ├── main.[hash].js
     └── manifest.json
@@ -58,14 +59,17 @@ dist/
 ├── index.html
 ├── main.[hash].js
 ├── [chunk].[hash].js
-└── manifest.json
+├── manifest.json
+└── runtime.json
 dist-server/
 ├── main.[hash].js
 └── manifest.json
 ```
 
-`manifest.json` files are generated for evjs runtime and deployment tooling.
-Application code should not import or edit them.
+`runtime.json` is generated browser runtime configuration with only boot,
+navigation, transport, and RSC endpoint data. `manifest.json` files and
+`build-output.json` are generated deployment/tooling metadata.
+Application code should not import or edit these files.
 
 ## Page Output
 

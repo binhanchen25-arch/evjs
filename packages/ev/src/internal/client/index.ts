@@ -34,7 +34,7 @@ export {
   createShell,
   getFnId,
   getFnName,
-  initTransportFromManifest,
+  initTransportFromRuntime,
   mountReactPage,
   PageProvider,
   registerShellModule,

@@ -1,8 +1,4 @@
 import {
-  assertFrameworkManifestShape,
-  type BuildOutput,
-} from "@evjs/shared/manifest";
-import {
   createContext,
   createElement,
   lazy,
@@ -11,6 +7,10 @@ import {
   useContext,
 } from "react";
 import { describe, expect, it } from "vitest";
+import {
+  assertFrameworkRuntime,
+  type FrameworkRuntime,
+} from "../src/framework.js";
 import {
   createReactRscFlightAdapter,
   createReactServerRenderAdapter,
@@ -78,7 +78,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/dashboard"),
-        manifest: createManifest(),
+        runtime: createManifest(),
         pageId: "dashboard",
         page: {
           assets: { js: ["dashboard.js"], css: ["dashboard.css"] },
@@ -104,7 +104,7 @@ describe("createReactServerRenderAdapter", () => {
         "<body>",
         '<div id="root"><h1>Page <!-- -->dashboard</h1></div>',
         '<script id="__EVJS_PAGE_PROPS__" type="application/json">',
-        '{"manifest":{"buildId":"test"},"pageId":"dashboard"}',
+        '{"runtime":{"buildId":"test"},"pageId":"dashboard"}',
         "</script>",
         '<script defer src="/assets/dashboard.js"></script>',
         "</body>",
@@ -123,7 +123,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/dashboard"),
-        manifest: {
+        runtime: {
           ...createManifest(),
           publicPath: "auto",
         },
@@ -177,7 +177,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/dashboard"),
-        manifest: createManifest(),
+        runtime: createManifest(),
         pageId: "dashboard",
         page: {
           assets: { js: ["dashboard.js"], css: [] },
@@ -201,7 +201,7 @@ describe("createReactServerRenderAdapter", () => {
     expect(result.html).not.toContain("loading");
   });
 
-  it("does not embed framework manifest internals in default hydration props", async () => {
+  it("does not embed framework runtime internals in default hydration props", async () => {
     const adapter = createReactServerRenderAdapter();
     const manifest = createManifest();
     manifest.pages.dashboard = {
@@ -213,13 +213,11 @@ describe("createReactServerRenderAdapter", () => {
         streaming: false,
         hydrate: "load",
       },
-      component: "./src/pages/Dashboard.tsx",
     };
     manifest.routes.push({
       id: "dashboard",
       path: "/dashboard",
       pageId: "dashboard",
-      module: "./src/pages/Dashboard.tsx",
     });
 
     const result = await adapter(
@@ -230,7 +228,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/dashboard"),
-        manifest,
+        runtime: manifest,
         pageId: "dashboard",
         page: manifest.pages.dashboard,
         route: manifest.routes[0],
@@ -242,7 +240,7 @@ describe("createReactServerRenderAdapter", () => {
     }
 
     expect(result.html).toContain(
-      '<script id="__EVJS_PAGE_PROPS__" type="application/json">{"manifest":{"buildId":"test"},"route":{"id":"dashboard","path":"/dashboard"},"pageId":"dashboard"}</script>',
+      '<script id="__EVJS_PAGE_PROPS__" type="application/json">{"runtime":{"buildId":"test"},"route":{"id":"dashboard","path":"/dashboard"},"pageId":"dashboard"}</script>',
     );
     expect(result.html).not.toContain("Dashboard.tsx");
     expect(result.html).not.toContain('"assets"');
@@ -266,7 +264,7 @@ describe("createReactServerRenderAdapter", () => {
         },
         {
           request: new Request("https://example.com/dashboard"),
-          manifest: createManifest(),
+          runtime: createManifest(),
           pageId: "dashboard",
         },
       ),
@@ -287,13 +285,11 @@ describe("createReactServerRenderAdapter", () => {
         streaming: false,
         hydrate: "load",
       },
-      component: "./src/pages/posts/$postId.tsx",
     };
     manifest.routes.push({
       id: "post",
       path: "/posts/$postId",
       pageId: "post",
-      module: "./src/pages/posts/$postId.tsx",
     });
     let renderedProps: Record<string, unknown> | undefined;
     function PostPage(props: Record<string, unknown>) {
@@ -316,7 +312,7 @@ describe("createReactServerRenderAdapter", () => {
         request: new Request(
           "https://example.com/posts/42?tab=comments&tag=a&tag=b",
         ),
-        manifest,
+        runtime: manifest,
         pageId: "post",
         page: manifest.pages.post,
         route: manifest.routes[0],
@@ -329,13 +325,13 @@ describe("createReactServerRenderAdapter", () => {
 
     expect(result.html).toContain("<h1>42:comments:a,b</h1>");
     expect(renderedProps).toEqual({
-      manifest: { buildId: "test" },
+      runtime: { buildId: "test" },
       route: { id: "post", path: "/posts/$postId" },
       pageId: "post",
     });
   });
 
-  it("uses the most specific manifest route for server page hooks", async () => {
+  it("uses the most specific runtime route for server page hooks", async () => {
     const adapter = createReactServerRenderAdapter();
     const manifest = createManifest();
     manifest.pages.profile = {
@@ -347,20 +343,17 @@ describe("createReactServerRenderAdapter", () => {
         streaming: false,
         hydrate: "load",
       },
-      component: "./src/pages/Profile.tsx",
     };
     manifest.routes.push(
       {
         id: "user",
         path: "/users/$userId",
         pageId: "profile",
-        module: "./src/pages/Profile.tsx",
       },
       {
         id: "settings",
         path: "/users/settings",
         pageId: "profile",
-        module: "./src/pages/Profile.tsx",
       },
     );
     function ProfilePage() {
@@ -380,7 +373,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/users/settings?tab=account"),
-        manifest,
+        runtime: manifest,
         pageId: "profile",
         page: manifest.pages.profile,
       },
@@ -405,13 +398,11 @@ describe("createReactServerRenderAdapter", () => {
         streaming: false,
         hydrate: "load",
       },
-      component: "./src/pages/posts/[postId].tsx",
     };
     manifest.routes.push({
       id: "post",
       path: "/posts/:postId",
       pageId: "post",
-      module: "./src/pages/posts/[postId].tsx",
     });
     function PostPage() {
       const { postId } = usePageParams<{ postId: string }>();
@@ -425,7 +416,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/posts/42"),
-        manifest,
+        runtime: manifest,
         pageId: "post",
         page: manifest.pages.post,
         route: manifest.routes[0],
@@ -451,13 +442,11 @@ describe("createReactServerRenderAdapter", () => {
         streaming: false,
         hydrate: "load",
       },
-      component: "./src/pages/docs.tsx",
     };
     manifest.routes.push({
       id: "docs-fallback",
       path: "/docs/*",
       pageId: "docs",
-      module: "./src/pages/docs.tsx",
     });
     function DocsPage() {
       const { _splat } = usePageParams<{ _splat: string }>();
@@ -471,7 +460,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/docs/guides/install"),
-        manifest,
+        runtime: manifest,
         pageId: "docs",
         page: manifest.pages.docs,
         route: manifest.routes[0],
@@ -518,7 +507,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/posts/42?tab=ignored"),
-        manifest: createManifest(),
+        runtime: createManifest(),
         pageId: "post",
       },
     );
@@ -536,12 +525,10 @@ describe("createReactServerRenderAdapter", () => {
       rsc: "/__evjs/rsc",
     };
     manifest.rsc = {
-      endpoint: "/__evjs/rsc",
       pages: {
         insights: {
           renderer: "insights-rsc",
           assets: { js: ["insights-rsc.js"], css: [] },
-          component: "./src/pages/Insights.tsx",
         },
       },
     };
@@ -555,7 +542,6 @@ describe("createReactServerRenderAdapter", () => {
         streaming: true,
         hydrate: "none",
       },
-      component: "./src/pages/Insights.tsx",
       mount: "#app",
     };
     assertRendererTestManifestShape(manifest);
@@ -568,7 +554,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/insights"),
-        manifest,
+        runtime: manifest,
         pageId: "insights",
         page: manifest.pages.insights,
       },
@@ -602,7 +588,7 @@ describe("createReactServerRenderAdapter", () => {
         { value: "not a component" },
         {
           request: new Request("https://example.com/dashboard"),
-          manifest: createManifest(),
+          runtime: createManifest(),
         },
       ),
     ).resolves.toBeUndefined();
@@ -614,7 +600,7 @@ describe("createReactServerRenderAdapter", () => {
     await expect(
       adapter(null as never, {
         request: new Request("https://example.com/dashboard"),
-        manifest: createManifest(),
+        runtime: createManifest(),
       }),
     ).rejects.toThrow(
       "[evjs] createReactServerRenderAdapter() module must be a renderer module object.",
@@ -642,7 +628,7 @@ describe("createReactServerRenderAdapter", () => {
       },
       {
         request: new Request("https://example.com/dashboard"),
-        manifest: createManifest(),
+        runtime: createManifest(),
         pageId: "dashboard",
       },
     );
@@ -669,7 +655,7 @@ describe("createReactServerRenderAdapter", () => {
         },
         {
           request: new Request("https://example.com/dashboard"),
-          manifest: createManifest(),
+          runtime: createManifest(),
           pageId: "dashboard",
         },
       ),
@@ -694,7 +680,7 @@ describe("createReactServerRenderAdapter", () => {
         },
         {
           request: new Request("https://example.com/dashboard"),
-          manifest: createManifest(),
+          runtime: createManifest(),
           pageId: "dashboard",
         },
       ),
@@ -719,7 +705,7 @@ describe("createReactServerRenderAdapter", () => {
         },
         {
           request: new Request("https://example.com/dashboard"),
-          manifest: createManifest(),
+          runtime: createManifest(),
           pageId: "dashboard",
         },
       ),
@@ -780,30 +766,19 @@ describe("createReactRscFlightAdapter", () => {
       },
     };
     manifest.server = {
-      assets: { js: ["server.js"], css: [] },
-      functions: {},
-      routes: [],
       renderers: {
         "dashboard-rsc": {
           kind: "rsc-page",
           owner: { pageId: "dashboard" },
-          module: "./src/pages/Dashboard.tsx",
           assets: { js: ["dashboard-rsc.js"], css: [] },
         },
       },
     };
     manifest.rsc = {
-      endpoint: "/__evjs/rsc",
       pages: {
         dashboard: {
           renderer: "dashboard-rsc",
           assets: { js: ["dashboard-rsc.js"], css: [] },
-        },
-      },
-      clientReferences: {
-        "src/Client.tsx#default": {
-          module: "src/Client.tsx",
-          exportName: "default",
         },
       },
     };
@@ -826,7 +801,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
       page: manifest.pages.dashboard,
       rscPage: manifest.rsc.pages?.dashboard,
@@ -849,7 +824,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
 
@@ -875,7 +850,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
 
@@ -893,7 +868,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
 
@@ -917,7 +892,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
 
@@ -936,7 +911,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const lookalikeResponse = await lookalikeAdapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
 
@@ -956,7 +931,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
 
@@ -981,7 +956,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
 
@@ -995,7 +970,6 @@ describe("createReactRscFlightAdapter", () => {
     const renderer = {
       kind: "rsc-page" as const,
       owner: { pageId: "dashboard" },
-      module: "./src/pages/Dashboard.tsx",
       assets: { js: ["dashboard-rsc.js"], css: [] },
     };
     const adapter = createReactRscFlightAdapter({
@@ -1013,7 +987,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
       rscPage: {
         renderer: "dashboard-rsc",
@@ -1033,7 +1007,6 @@ describe("createReactRscFlightAdapter", () => {
     const renderer = {
       kind: "rsc-page" as const,
       owner: { pageId: "dashboard" },
-      module: "./src/pages/Dashboard.tsx",
       assets: { js: ["dashboard-rsc.js"], css: [] },
     };
     const adapter = createReactRscFlightAdapter({
@@ -1044,7 +1017,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
       rscPage: {
         renderer: "dashboard-rsc",
@@ -1071,7 +1044,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
     const text = await response.text();
@@ -1106,7 +1079,7 @@ describe("createReactRscFlightAdapter", () => {
 
     const response = await adapter.renderFlight({
       request: new Request("https://example.com/__evjs/rsc?page=dashboard"),
-      manifest,
+      runtime: manifest,
       pageId: "dashboard",
     });
     const text = await response.text();
@@ -1121,11 +1094,10 @@ describe("createReactRscFlightAdapter", () => {
   });
 });
 
-function createManifest(): BuildOutput {
+function createManifest(): FrameworkRuntime {
   return {
     version: 1,
     buildId: "test",
-    distDir: "dist",
     publicPath: "/assets/",
     runtime: {
       server: {
@@ -1133,24 +1105,12 @@ function createManifest(): BuildOutput {
         fn: "/__evjs/fn",
       },
     },
-    assets: {},
-    apps: {},
     pages: {},
     routes: [],
-    server: {
-      entry: "server.js",
-      assets: { js: ["server.js"], css: [] },
-      functions: {},
-      routes: [],
-    },
+    server: {},
   };
 }
 
-function assertRendererTestManifestShape(manifest: BuildOutput): void {
-  assertFrameworkManifestShape(manifest, "react renderer test manifest", {
-    serverFunctionModules: "optional",
-    pageRendererReferences: "optional",
-    pprRendererReferences: "optional",
-    rscRendererReferences: "optional",
-  });
+function assertRendererTestManifestShape(manifest: FrameworkRuntime): void {
+  assertFrameworkRuntime(manifest, "react renderer test runtime");
 }

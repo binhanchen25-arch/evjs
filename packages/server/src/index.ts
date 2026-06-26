@@ -27,9 +27,10 @@ export {
   waitUntil,
 } from "./context.js";
 export type {
+  FrameworkRenderCoordinatorOptions,
+  FrameworkRuntime,
+  FrameworkServerModuleLoader,
   FrameworkServerOptions,
-  ManifestRenderCoordinatorOptions,
-  ManifestServerModuleLoader,
   ModuleRenderCoordinatorOptions,
   PprRegionCache,
   PprRegionCacheEntry,
@@ -46,7 +47,7 @@ export type {
   ServerRenderResult,
 } from "./framework.js";
 export {
-  createManifestRenderCoordinator,
+  createFrameworkRenderCoordinator,
   createModuleRenderCoordinator,
   handleFrameworkRenderRequest,
   handlePprRegionRequest,
