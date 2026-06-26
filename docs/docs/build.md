@@ -68,7 +68,9 @@ dist-server/
 
 `runtime.json` is generated browser runtime configuration with only boot,
 navigation, transport, and RSC endpoint data. `manifest.json` files and
-`build-output.json` are generated deployment/tooling metadata.
+`build-output.json` are generated deployment/tooling metadata. Client route
+entries are URL-to-app/page indexes; page rendering behavior stays on page
+records, and runtime endpoints stay out of the public client manifest.
 Application code should not import or edit these files.
 
 ## Page Output

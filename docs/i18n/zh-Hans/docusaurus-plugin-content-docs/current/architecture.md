@@ -165,6 +165,9 @@ client/server manifest 路径来自 `output.client` 和 `output.server`；这些
 transport base URL、RSC endpoint、app/page module target、mount selector 和 route
 lookup 数据。资源索引、部署元信息、源码引用和 renderer bundle 元信息留在 manifest 或
 `BuildOutput` 中。
+在 `BuildOutput` 和公开 manifest 中，client route 是 URL 到目标的索引。页面渲染、
+hydrate 和 component model 元信息留在 `pages` 下，framework endpoint 留在 runtime/server
+投影下。
 
 ## 运行时流程
 
@@ -365,6 +368,8 @@ Deployment adapter 消费 `BuildOutput`。`@evjs/ev` 提供：
 完整 BuildOutput manifest 会保留源码 module 和 server renderer reference。client/server
 manifest 是部署元信息；生成的浏览器和服务端运行时消费最小化的 ClientRuntime 和
 FrameworkRuntime contract。
+Deployment artifact 会把 framework endpoint 和 transport 数据归到 server 分组下，而不是
+重复携带原始 runtime 对象。
 
 部署模型由能力分类驱动：
 

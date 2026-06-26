@@ -1,13 +1,6 @@
-import {
-  type BuildOutput,
-  createPublicManifest,
-  type PublicManifestOutput,
-} from "@evjs/shared/manifest";
+import type { BuildOutput } from "@evjs/shared/manifest";
 
-export type ClientRuntimeOutput = Pick<
-  PublicManifestOutput,
-  "version" | "buildId"
-> & {
+export type ClientRuntimeOutput = Pick<BuildOutput, "version" | "buildId"> & {
   runtime: ClientRuntimeOutputRuntime;
   apps: Record<string, ClientRuntimeTargetOutput>;
   pages: Record<string, ClientRuntimeTargetOutput>;
@@ -18,16 +11,16 @@ export interface ClientRuntimeOutputRuntime {
   server?: {
     rsc?: string;
   };
-  transport?: PublicManifestOutput["runtime"]["transport"];
+  transport?: BuildOutput["runtime"]["transport"];
 }
 
 export type ClientRuntimeTargetOutput = Pick<
-  PublicManifestOutput["apps"][string],
+  BuildOutput["apps"][string],
   "mount" | "module"
 >;
 
 export type ClientRuntimeRouteOutput = Pick<
-  PublicManifestOutput["routes"][number],
+  BuildOutput["routes"][number],
   "id" | "path" | "appId" | "pageId"
 >;
 
@@ -95,13 +88,12 @@ export type FrameworkRuntimeRscPage = Pick<
 >;
 
 export function createClientRuntime(output: BuildOutput): ClientRuntimeOutput {
-  const manifest = createPublicManifest(output);
   return pruneUndefined({
-    version: manifest.version,
-    buildId: manifest.buildId,
-    runtime: createClientRuntimeRuntime(manifest.runtime),
+    version: output.version,
+    buildId: output.buildId,
+    runtime: createClientRuntimeRuntime(output.runtime),
     apps: Object.fromEntries(
-      Object.entries(manifest.apps).map(([id, app]) => [
+      Object.entries(output.apps).map(([id, app]) => [
         id,
         pruneUndefined({
           mount: app.mount,
@@ -110,7 +102,7 @@ export function createClientRuntime(output: BuildOutput): ClientRuntimeOutput {
       ]),
     ),
     pages: Object.fromEntries(
-      Object.entries(manifest.pages).map(([id, page]) => [
+      Object.entries(output.pages).map(([id, page]) => [
         id,
         pruneUndefined({
           mount: page.mount,
@@ -118,7 +110,7 @@ export function createClientRuntime(output: BuildOutput): ClientRuntimeOutput {
         }),
       ]),
     ),
-    routes: manifest.routes.map((route) =>
+    routes: output.routes.map((route) =>
       pruneUndefined({
         id: route.id,
         path: route.path,
@@ -130,7 +122,7 @@ export function createClientRuntime(output: BuildOutput): ClientRuntimeOutput {
 }
 
 function createClientRuntimeRuntime(
-  runtime: PublicManifestOutput["runtime"],
+  runtime: BuildOutput["runtime"],
 ): ClientRuntimeOutputRuntime {
   return pruneUndefined({
     server: runtime.server.rsc

@@ -179,6 +179,9 @@ They also emit deployment-focused client/server manifests to `output.client`
 and `output.server`, plus a generated browser `runtime.json`. Deployment
 plugins and platform adapters should consume `BuildOutput`; generated runtimes
 consume minimal `ClientRuntime` and injected `FrameworkRuntime` contracts.
+Routes in these artifacts are URL-to-app/page indexes. Page behavior stays
+under page records, and framework endpoint data stays under runtime/server
+projections instead of being repeated on every route.
 
 ## Deployment
 

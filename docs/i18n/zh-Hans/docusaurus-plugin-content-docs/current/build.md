@@ -65,7 +65,9 @@ dist-server/
 ```
 
 `runtime.json` 是只包含启动、导航、transport 和 RSC endpoint 数据的浏览器运行时配置。
-`manifest.json` 和 `build-output.json` 是部署/工具元信息。应用代码不应该导入或修改这些文件。
+`manifest.json` 和 `build-output.json` 是部署/工具元信息。client route 条目只是
+URL 到 app/page 的索引；页面渲染行为保留在 page 记录上，runtime endpoint 不进入公开
+client manifest。应用代码不应该导入或修改这些文件。
 
 ## 页面输出
 

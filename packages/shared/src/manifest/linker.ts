@@ -17,7 +17,6 @@ import type {
   PublicPprRegionOutput,
   PublicRuntimeModuleOutput,
   RscReferenceOutput,
-  RuntimeModuleOutput,
   ServerFunctionOutput,
   ServerRouteOutput,
 } from "./index.js";
@@ -157,7 +156,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
             ? {
                 type: "entry" as const,
                 href,
-                source: app.entry,
               }
             : undefined,
         },
@@ -219,7 +217,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
                     ? ("lifecycle" as const)
                     : ("entry" as const),
                 href,
-                source: page.component ?? page.app ?? page.entry,
               }
             : undefined,
           ppr: isPartialPrerenderPage(page)
@@ -294,16 +291,15 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
     pages,
     routes: input.graph.routes
       .filter((route) => route.kind !== "layout")
-      .map((route) => ({
-        id: route.id,
-        path: route.path,
-        appId: route.appId,
-        pageId: route.pageId,
-        module: route.module,
-        render: route.render,
-        hydrate: route.hydrate,
-        runtime: route.runtime,
-      })),
+      .map((route) =>
+        pruneUndefined({
+          id: route.id,
+          path: route.path,
+          appId: route.appId,
+          pageId: route.pageId,
+          module: route.module,
+        }),
+      ),
     server: {
       entry: serverEntry,
       assets: serverAssets,
@@ -400,7 +396,6 @@ export function createPublicManifest(
     version: output.version,
     buildId: output.buildId,
     publicPath: output.publicPath,
-    runtime: output.runtime,
     assets: clonePublicAssetRecord(output.assets, publicAssetFiles),
     apps: Object.fromEntries(
       Object.entries(output.apps).map(([id, app]) => [
@@ -420,9 +415,6 @@ export function createPublicManifest(
         path: route.path,
         appId: route.appId,
         pageId: route.pageId,
-        render: route.render,
-        hydrate: route.hydrate,
-        runtime: route.runtime,
       }),
     ),
     rsc: output.rsc
@@ -556,7 +548,7 @@ function sanitizePprRegion(
 }
 
 function sanitizeRuntimeModule(
-  module: RuntimeModuleOutput | undefined,
+  module: PublicRuntimeModuleOutput | undefined,
 ): PublicRuntimeModuleOutput | undefined {
   if (!module) return undefined;
   return pruneUndefined({

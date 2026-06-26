@@ -7,7 +7,6 @@ import type {
   PublicPathOutput,
   RenderMode,
   RuntimeOutput,
-  ServerRuntime,
 } from "@evjs/shared/manifest";
 import { createFrameworkRuntime } from "./framework-runtime.js";
 import type { Plugin } from "./plugin.js";
@@ -67,7 +66,6 @@ export interface DeploymentArtifact {
   distDir: string;
   paths?: BuildOutput["paths"];
   publicPath: PublicPathOutput;
-  runtime: RuntimeOutput;
   assets?: Record<string, AssetGroup>;
   apps: Record<string, DeploymentApp>;
   pages: Record<string, DeploymentPage>;
@@ -104,8 +102,6 @@ export interface DeploymentRoute {
   path: string;
   appId?: string;
   pageId?: string;
-  render?: RenderMode;
-  runtime?: ServerRuntime;
 }
 
 export interface DeploymentServer {
@@ -114,6 +110,7 @@ export interface DeploymentServer {
   fn?: string;
   ppr?: string;
   rsc?: string;
+  transport?: RuntimeOutput["transport"];
   assets?: AssetGroup;
   renderers: string[];
   functions: string[];
@@ -159,7 +156,6 @@ export function createDeploymentArtifact(
     distDir: output.distDir,
     paths: getDeploymentOutputPaths(output),
     publicPath: output.publicPath,
-    runtime: output.runtime,
     ...(includeAssets ? { assets: output.assets } : {}),
     apps: Object.fromEntries(
       Object.entries(output.apps).map(([id, app]) => [
@@ -192,8 +188,6 @@ export function createDeploymentArtifact(
       path: route.path,
       appId: route.appId,
       pageId: route.pageId,
-      render: route.render,
-      runtime: route.runtime,
     })),
     server: {
       entry: output.server.entry,
@@ -201,6 +195,9 @@ export function createDeploymentArtifact(
       fn: output.runtime.server.fn,
       ppr: output.runtime.server.ppr,
       rsc: output.runtime.server.rsc,
+      ...(output.runtime.transport
+        ? { transport: output.runtime.transport }
+        : {}),
       ...(includeAssets ? { assets: output.server.assets } : {}),
       renderers: Object.keys(output.server.renderers ?? {}),
       functions: Object.keys(output.server.functions),

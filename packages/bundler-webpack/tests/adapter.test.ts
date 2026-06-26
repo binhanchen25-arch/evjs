@@ -574,7 +574,6 @@ describe("webpackAdapter build", () => {
         module: {
           type: "entry",
           href: "main.js",
-          source: "./src/main.ts",
         },
       });
       expect(manifest.pages.dashboard).toMatchObject({
@@ -593,8 +592,6 @@ describe("webpackAdapter build", () => {
         appId: "default",
         pageId: "dashboard",
         module: "./src/pages/Dashboard !page 中文.ts",
-        render: "ssr",
-        hydrate: "load",
       });
       expect(manifest.assets["dashboard-server"]).toEqual({
         js: ["dashboard-server.cjs"],

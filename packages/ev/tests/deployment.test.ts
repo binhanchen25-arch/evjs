@@ -43,6 +43,9 @@ describe("createDeploymentArtifact", () => {
           ppr: "/framework/ppr",
           rsc: "/framework/rsc",
         },
+        transport: {
+          baseUrl: "https://api.example.com",
+        },
       },
       assets: {
         main: { js: ["main.js"], css: ["main.css"] },
@@ -77,7 +80,6 @@ describe("createDeploymentArtifact", () => {
           id: "insights",
           path: "/insights",
           pageId: "insights",
-          render: "ssr",
         },
       ],
       server: {
@@ -148,7 +150,6 @@ describe("createDeploymentArtifact", () => {
         serverDir: "dist/server",
       },
       publicPath: "auto",
-      runtime: output.runtime,
       apps: {
         default: {
           entry: "./src/main.tsx",
@@ -172,8 +173,6 @@ describe("createDeploymentArtifact", () => {
           path: "/insights",
           appId: undefined,
           pageId: "insights",
-          render: "ssr",
-          runtime: undefined,
         },
       ],
       server: {
@@ -182,6 +181,9 @@ describe("createDeploymentArtifact", () => {
         fn: "/framework/fn",
         ppr: "/framework/ppr",
         rsc: "/framework/rsc",
+        transport: {
+          baseUrl: "https://api.example.com",
+        },
         renderers: ["insights-rsc"],
         functions: ["search"],
         routes: [
@@ -243,7 +245,6 @@ describe("createDeploymentArtifact", () => {
           id: "insights",
           path: "/insights/$id",
           pageId: "insights",
-          render: "ssr",
         },
       ],
       server: {
@@ -342,13 +343,11 @@ describe("createDeploymentArtifact", () => {
           id: "orders",
           path: "/orders/$orderId",
           appId: "default",
-          render: "csr",
         },
         {
           id: "pricing",
           path: "/pricing",
           pageId: "pricing",
-          render: "ssg",
         },
       ],
       server: {
@@ -572,25 +571,21 @@ describe("createDeploymentArtifact", () => {
           id: "orders",
           path: "/orders/$orderId",
           appId: "default",
-          render: "csr",
         },
         {
           id: "dashboard",
           path: "/dashboard",
           pageId: "dashboard",
-          render: "ssr",
         },
         {
           id: "campaign",
           path: "/campaign",
           pageId: "campaign",
-          render: "ssr",
         },
         {
           id: "insights",
           path: "/insights",
           pageId: "insights",
-          render: "ssr",
         },
       ],
       server: {
@@ -679,7 +674,6 @@ describe("createDeploymentArtifact", () => {
           id: "article",
           path: "/article",
           pageId: "article",
-          render: "ssr",
         },
       ],
       server: {
@@ -741,7 +735,6 @@ describe("createDeploymentArtifact", () => {
           id: "pricing",
           path: "/pricing",
           pageId: "pricing",
-          render: "ssg",
         },
       ],
       server: {
@@ -799,7 +792,6 @@ describe("createDeploymentArtifact", () => {
           id: "insights",
           path: "/insights/$id",
           pageId: "insights",
-          render: "ssr",
         },
       ],
       server: {
@@ -979,19 +971,16 @@ function createMpaStaticDeploymentOutput(): BuildOutput {
         id: "index",
         path: "/",
         pageId: "index",
-        render: "csr",
       },
       {
         id: "pricing",
         path: "/pricing",
         pageId: "pricing",
-        render: "ssg",
       },
       {
         id: "users_userId",
         path: "/users/$userId",
         pageId: "users_userId",
-        render: "csr",
       },
     ],
     server: {
@@ -1034,7 +1023,6 @@ function createServerDeploymentOutput(paths: {
         id: "app",
         path: "/app",
         appId: "default",
-        render: "csr",
       },
     ],
     server: {

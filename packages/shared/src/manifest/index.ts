@@ -335,7 +335,6 @@ export interface PublicManifestOutput {
   version: 1;
   buildId: string;
   publicPath: PublicPathOutput;
-  runtime: RuntimeOutput;
   assets?: Record<string, AssetGroup>;
   apps: Record<string, PublicAppOutput>;
   pages: Record<string, PublicPageOutput>;
@@ -445,10 +444,9 @@ export type PublicPprRegionOutput = Omit<
 export interface RuntimeModuleOutput {
   type: "entry" | "lifecycle" | "react-component";
   href?: string;
-  source?: string;
 }
 
-export type PublicRuntimeModuleOutput = Omit<RuntimeModuleOutput, "source">;
+export type PublicRuntimeModuleOutput = RuntimeModuleOutput;
 
 export interface RouteOutput {
   id: string;
@@ -458,12 +456,12 @@ export interface RouteOutput {
   appId?: string;
   pageId?: string;
   module?: string;
-  render?: RenderMode;
-  hydrate?: HydrationMode;
-  runtime?: ServerRuntime;
 }
 
-export type PublicRouteOutput = Omit<RouteOutput, "module">;
+export type PublicRouteOutput = Pick<
+  RouteOutput,
+  "id" | "path" | "appId" | "pageId"
+>;
 
 export interface ServerOutput {
   entry?: string;
@@ -750,7 +748,13 @@ export function assertFrameworkManifestShape(
   if (value.paths !== undefined) {
     assertBuildOutputPaths(value.paths, `${source}.paths`);
   }
-  assertObject(value.runtime, `${source}.runtime`);
+  if (value.runtime === undefined) {
+    if (requireServer) {
+      throw new Error(`[evjs] ${source}.runtime must be an object.`);
+    }
+  } else {
+    assertObject(value.runtime, `${source}.runtime`);
+  }
   if (value.assets !== undefined) {
     assertObject(value.assets, `${source}.assets`);
     assertAssetGroupRecord(value.assets, `${source}.assets`);
@@ -764,31 +768,33 @@ export function assertFrameworkManifestShape(
   }
   assertRouteOutputs(value.routes, `${source}.routes`, value.pages, value.apps);
 
-  assertObject(value.runtime.server, `${source}.runtime.server`);
-  assertManifestPathname(
-    value.runtime.server.basePath,
-    `${source}.runtime.server.basePath`,
-    true,
-  );
-  assertManifestPathname(
-    value.runtime.server.fn,
-    `${source}.runtime.server.fn`,
-    true,
-  );
-  assertManifestPathname(
-    value.runtime.server.ppr,
-    `${source}.runtime.server.ppr`,
-  );
-  assertManifestPathname(
-    value.runtime.server.rsc,
-    `${source}.runtime.server.rsc`,
-  );
-  if (value.runtime.transport !== undefined) {
-    assertObject(value.runtime.transport, `${source}.runtime.transport`);
-    assertManifestTransportBaseUrl(
-      value.runtime.transport.baseUrl,
-      `${source}.runtime.transport.baseUrl`,
+  if (value.runtime !== undefined) {
+    assertObject(value.runtime.server, `${source}.runtime.server`);
+    assertManifestPathname(
+      value.runtime.server.basePath,
+      `${source}.runtime.server.basePath`,
+      true,
     );
+    assertManifestPathname(
+      value.runtime.server.fn,
+      `${source}.runtime.server.fn`,
+      true,
+    );
+    assertManifestPathname(
+      value.runtime.server.ppr,
+      `${source}.runtime.server.ppr`,
+    );
+    assertManifestPathname(
+      value.runtime.server.rsc,
+      `${source}.runtime.server.rsc`,
+    );
+    if (value.runtime.transport !== undefined) {
+      assertObject(value.runtime.transport, `${source}.runtime.transport`);
+      assertManifestTransportBaseUrl(
+        value.runtime.transport.baseUrl,
+        `${source}.runtime.transport.baseUrl`,
+      );
+    }
   }
   if (value.server === undefined) {
     if (requireServer) {
@@ -1127,9 +1133,6 @@ function assertRuntimeModuleOutput(value: unknown, source: string): void {
   assertObject(value, source);
   assertRuntimeModuleType(value.type, `${source}.type`);
   assertManifestString(value.href, `${source}.href`);
-  if (value.source !== undefined) {
-    assertManifestString(value.source, `${source}.source`);
-  }
 }
 
 function assertRuntimeModuleType(value: unknown, source: string): void {
@@ -1204,11 +1207,6 @@ function assertHydrationMode(value: unknown, source: string): void {
   throw new Error(
     `[evjs] ${source} must be "none", "load", "visible", or "idle".`,
   );
-}
-
-function assertServerRuntime(value: unknown, source: string): void {
-  if (value === "node" || value === "edge") return;
-  throw new Error(`[evjs] ${source} must be "node" or "edge".`);
 }
 
 function assertRscPageOutputContract(
@@ -1325,15 +1323,6 @@ function assertRouteOutputs(
     if (route.module !== undefined) {
       assertManifestString(route.module, `${routeSource}.module`);
     }
-    if (route.render !== undefined) {
-      assertRenderMode(route.render, `${routeSource}.render`);
-    }
-    if (route.hydrate !== undefined) {
-      assertHydrationMode(route.hydrate, `${routeSource}.hydrate`);
-    }
-    if (route.runtime !== undefined) {
-      assertServerRuntime(route.runtime, `${routeSource}.runtime`);
-    }
     if (page) {
       assertPageRouteOutputContract(route, page, routeSource);
     }
@@ -1352,11 +1341,6 @@ function assertPageRouteOutputContract(
   ) {
     throw new Error(
       `[evjs] ${routeSource}.path "${route.path as string}" must match manifest.pages.${route.pageId as string}.path "${page.path}".`,
-    );
-  }
-  if (route.render !== undefined && route.render !== page.render) {
-    throw new Error(
-      `[evjs] ${routeSource}.render must match manifest.pages.${route.pageId as string}.render "${page.render as string}".`,
     );
   }
 }

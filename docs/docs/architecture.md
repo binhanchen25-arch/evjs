@@ -176,6 +176,9 @@ manifest: it keeps only the build id, transport base URL, RSC endpoint,
 app/page module targets, mount selectors, and route lookup data needed to boot
 or navigate. Asset indexes, deployment metadata, source references, and
 renderer bundle metadata stay in manifests or `BuildOutput`.
+In `BuildOutput` and public manifests, client routes are URL-to-target indexes.
+Page rendering, hydration, and component model metadata stay under `pages`, and
+framework endpoints stay under runtime/server projections.
 
 TanStack Router is available through the `@evjs/client` standalone CSR surface
 for manual browser applications. In framework-managed apps, `@evjs/ev` owns
@@ -401,6 +404,8 @@ Build-pipeline adapters receive that object in memory; post-build tools can read
 Full BuildOutput manifests retain source modules and server renderer references.
 Client/server manifests are deployment metadata; generated browser and server
 runtimes consume minimal ClientRuntime and FrameworkRuntime contracts.
+Deployment artifacts group framework endpoint and transport data under their
+server section instead of duplicating the raw runtime object.
 
 The deployment model is capability-driven:
 

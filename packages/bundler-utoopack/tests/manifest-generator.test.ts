@@ -132,7 +132,6 @@ describe("UtoopackManifestGenerator", () => {
     expect(manifest.apps.default.module).toEqual({
       type: "entry",
       href: "main.js",
-      source: "./src/main.tsx",
     });
     expect(manifest.routes).toEqual([
       {
@@ -140,7 +139,6 @@ describe("UtoopackManifestGenerator", () => {
         path: "/",
         appId: "default",
         module: "./pages/Home.tsx",
-        render: "ssr",
       },
     ]);
     expect(manifest.server?.entry).toBe("server.js");
@@ -270,7 +268,6 @@ describe("UtoopackManifestGenerator", () => {
       module: {
         type: "entry",
         href: "home.js",
-        source: "./src/home.tsx",
       },
     });
     expect(manifest.pages.about).toMatchObject({
@@ -280,7 +277,6 @@ describe("UtoopackManifestGenerator", () => {
       module: {
         type: "entry",
         href: "about.js",
-        source: "./src/about.tsx",
       },
     });
   });

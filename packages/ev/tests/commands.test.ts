@@ -1435,6 +1435,7 @@ describe("build", () => {
       path.join(cwd, "dist/build-output.json"),
       "utf-8",
     );
+    const publicManifestJson = JSON.parse(publicManifest);
     const serverManifestJson = JSON.parse(serverManifest);
     const clientRuntimeJson = JSON.parse(clientRuntime);
     const buildOutputJson = JSON.parse(buildOutput);
@@ -1442,6 +1443,14 @@ describe("build", () => {
     expect(rawOutputComponents).toEqual(["./src/pages/Dashboard.tsx"]);
     expect(publicManifest).not.toContain(".tsx");
     expect(publicManifest).not.toContain("server.js");
+    expect(publicManifestJson).not.toHaveProperty("runtime");
+    expect(
+      publicManifestJson.routes.flatMap((route: Record<string, unknown>) =>
+        Object.keys(route),
+      ),
+    ).not.toEqual(
+      expect.arrayContaining(["module", "render", "hydrate", "runtime"]),
+    );
     expect(clientRuntime).not.toContain(".tsx");
     expect(clientRuntime).not.toContain("server.js");
     expect(clientRuntimeJson).not.toHaveProperty("publicPath");
