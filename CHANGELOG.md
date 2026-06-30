@@ -8,6 +8,35 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.3] — 2026-06-30
+
+### ⚠️ Breaking Changes
+
+- **Generated metadata contracts** — Reworked `dist/build-output.json`, `dist/client/manifest.json`, and `dist/server/manifest.json` into lightweight deployment metadata. Runtime-only RSC references, render coordination data, module records, chunk records, and duplicate asset groups are no longer exposed through deployment manifests.
+- **Runtime artifact cleanup** — Stopped emitting default `client/runtime.json`, `server/runtime.json`, and `server/framework-runtime.json` files. Framework runtime data is now embedded into generated HTML or server bootstrap code when it is required at runtime.
+- **Framework import surface** — Converged framework-facing imports on `@evjs/ev` and aligned server function runtime subpaths. Applications should depend on the top-level evjs package surface instead of importing framework internals from runtime packages.
+- **Server route conventions** — Moved discovered server file routes to the `src/apis` convention with middleware support and reflected them as lightweight `api-route` entries in deployment/server metadata.
+
+### ✨ Improvements
+
+- **Canonical deployment metadata** — Made `build-output.json` the compact deployment view with documents, static assets, server entry, server pages, server functions, PPR/RSC endpoints, and API routes grouped by deployment semantics.
+- **Lightweight manifests** — Kept `client/manifest.json` focused on public assets plus SPA/MPA routing, and kept `server/manifest.json` focused on `entry` plus server route capabilities.
+- **SSG support** — Added build-time static page generation for `render = "ssg"` pages, including nested routes and a dedicated multi-page SSG example.
+- **SPA route boundaries** — Added explicit SPA route boundary support and source alias resolution across client/server framework output.
+- **Server routes and middleware** — Added file-based server routes, route middleware discovery, const route path helpers, and examples covering API routes, render modes, and deployment adapters.
+- **Trusted publishing** — Updated the release workflow for npm trusted publishing through GitHub Releases.
+
+### 🐛 Bug Fixes
+
+- **Source alias server functions** — Fixed server function discovery and references when projects use source aliases.
+- **Static generation output** — Prevented SSG builds from leaking intermediate page entry files into the final client output.
+
+### 📝 Documentation
+
+- **Artifact and routing docs** — Refreshed build, deploy, config, plugin, architecture, client routes, server routes, file conventions, and project structure docs in English and Chinese for the tightened metadata and routing contracts.
+
+---
+
 ## [0.2.2] — 2026-06-24
 
 ### ✨ Improvements
