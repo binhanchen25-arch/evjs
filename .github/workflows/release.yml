@@ -38,4 +38,94 @@ jobs:
         run: npm run build
 
       - name: Publish to npm
-        run: npm publish --workspaces --access public
+        run: |
+          node --input-type=module <<'NODE'
+          import { spawnSync } from "node:child_process";
+          import { existsSync, readFileSync, readdirSync } from "node:fs";
+          import path from "node:path";
+
+          const version = process.env.GITHUB_REF_NAME?.replace(/^v/, "");
+          if (!version) {
+            throw new Error("GITHUB_REF_NAME is required.");
+          }
+
+          const workspacePackages = readdirSync("packages")
+            .map((name) => path.join("packages", name))
+            .filter((dir) => existsSync(path.join(dir, "package.json")))
+            .map((dir) => ({
+              dir,
+              packageJson: JSON.parse(
+                readFileSync(path.join(dir, "package.json"), "utf8"),
+              ),
+            }))
+            .filter(
+              ({ packageJson }) =>
+                packageJson.private !== true &&
+                typeof packageJson.name === "string",
+            );
+
+          const byName = new Map(
+            workspacePackages.map((workspacePackage) => [
+              workspacePackage.packageJson.name,
+              workspacePackage,
+            ]),
+          );
+          const ordered = [];
+          const visited = new Set();
+          const visiting = new Set();
+
+          function visit(workspacePackage) {
+            const name = workspacePackage.packageJson.name;
+            if (visited.has(name)) return;
+            if (visiting.has(name)) {
+              throw new Error(`Circular workspace dependency involving ${name}.`);
+            }
+            visiting.add(name);
+
+            const dependencyNames = new Set([
+              ...Object.keys(workspacePackage.packageJson.dependencies ?? {}),
+              ...Object.keys(workspacePackage.packageJson.peerDependencies ?? {}),
+              ...Object.keys(
+                workspacePackage.packageJson.optionalDependencies ?? {},
+              ),
+            ]);
+            for (const dependencyName of dependencyNames) {
+              const dependencyPackage = byName.get(dependencyName);
+              if (dependencyPackage) {
+                visit(dependencyPackage);
+              }
+            }
+
+            visiting.delete(name);
+            visited.add(name);
+            ordered.push(workspacePackage);
+          }
+
+          for (const workspacePackage of workspacePackages.toSorted((a, b) =>
+            a.packageJson.name.localeCompare(b.packageJson.name),
+          )) {
+            visit(workspacePackage);
+          }
+
+          for (const workspacePackage of ordered) {
+            const name = workspacePackage.packageJson.name;
+            const spec = `${name}@${version}`;
+            const viewResult = spawnSync("npm", ["view", spec, "version"], {
+              stdio: "ignore",
+            });
+            if (viewResult.status === 0) {
+              console.log(`${spec} is already published; skipping.`);
+              continue;
+            }
+
+            console.log(`Publishing ${spec}...`);
+            const publishResult = spawnSync(
+              "npm",
+              ["publish", "--workspace", workspacePackage.dir, "--access", "public"],
+              { stdio: "inherit" },
+            );
+            if (publishResult.status !== 0) {
+              process.exit(publishResult.status ?? 1);
+            }
+          }
+          NODE
