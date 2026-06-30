@@ -8,6 +8,27 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.4] — 2026-06-30
+
+### ⚠️ Breaking Changes
+
+- **Framework module surface** — Slimmed the `@evjs/ev` root entry to the minimal config/plugin authoring API: `defineConfig`, `Config`, `EvConfig`, `Plugin`, and `EvPlugin`.
+- **Semantic authoring subpaths** — Moved file-convention application APIs to curated `@evjs/ev/route`, `@evjs/ev/navigation`, `@evjs/ev/query`, `@evjs/ev/server-context`, and `@evjs/ev/transport` subpaths.
+- **Internal entry cleanup** — Removed the old `@evjs/ev/page`, `@evjs/ev/request`, `@evjs/ev/build-tools`, and `@evjs/ev/internal/*` public entry points without compatibility aliases. CLI, bundler adapters, manifest helpers, and generated runtime bridges now use `@evjs/ev/_internal/*`.
+
+### ✨ Improvements
+
+- **Config and plugin boundaries** — Split advanced config helpers into `@evjs/ev/config`, plugin authoring details into `@evjs/ev/plugin`, and deployment adapters into `@evjs/ev/deployment`.
+- **Runtime source organization** — Reorganized `@evjs/client` source by standalone, framework page/shell, server-function, RSC, and shared domains; reorganized `@evjs/server` source by app, request context, server functions, routes, framework rendering, runtimes, and shared domains.
+- **Generated route typing** — Updated generated route declarations to augment `@evjs/ev/route`, keeping file-convention route types aligned with the new authoring surface.
+
+### 📝 Documentation
+
+- **Import ownership principle** — Documented that file-convention apps import curated `@evjs/ev/*` authoring APIs, generated/adapter code uses `_internal`, and `@evjs/client`/`@evjs/server` remain lower-level standalone/manual runtime packages.
+- **Migration examples** — Updated examples, templates, English and Chinese docs, and agent guides to use the new package boundaries.
+
+---
+
 ## [0.2.3] — 2026-06-30
 
 ### ⚠️ Breaking Changes
