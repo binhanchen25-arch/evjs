@@ -30,7 +30,7 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 - **Source alias server functions** — Fixed server function discovery and references when projects use source aliases.
 - **Static generation output** — Prevented SSG builds from leaking intermediate page entry files into the final client output.
-- **NPM provenance metadata** — Updated package repository metadata so trusted publishing provenance matches the `afx-team/evjs` GitHub repository, and made workspace publishing skip already-published versions during release recovery.
+- **NPM provenance metadata** — Updated package repository metadata so trusted publishing provenance matches the `afx-team/evjs` GitHub repository, wired the release workflow to the configured npm token, and made workspace publishing skip already-published versions during release recovery.
 
 ### 📝 Documentation
 

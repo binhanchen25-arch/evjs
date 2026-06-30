@@ -38,6 +38,8 @@ jobs:
         run: npm run build
 
       - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node --input-type=module <<'NODE'
           import { spawnSync } from "node:child_process";
