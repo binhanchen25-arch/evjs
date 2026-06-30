@@ -91,46 +91,40 @@ test.describe("mpa", () => {
   test("emits MPA pages in manifest", async () => {
     const manifestPath = path.join(exampleDir, "dist", "manifest.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8")) as {
-      pages?: Record<string, unknown>;
+      routing?: {
+        kind?: string;
+        pages?: Record<string, unknown>;
+      };
     };
 
-    expect(manifest.pages).toEqual({
+    expect(manifest).not.toHaveProperty("pages");
+    expect(manifest).not.toHaveProperty("routes");
+    expect(manifest).not.toHaveProperty("assets");
+    expect(manifest.routing?.kind).toBe("mpa");
+    expect(manifest.routing?.pages).toEqual({
       about: expect.objectContaining({
         assets: expect.objectContaining({
           js: expect.arrayContaining([expect.stringMatching(/about.*\.js$/)]),
           css: expect.any(Array),
         }),
+        document: { fileName: "about.html" },
+        path: "/about",
         render: "csr",
-        hydrate: "load",
-        rendering: expect.objectContaining({
-          component: "client",
-          html: "client",
-          hydrate: "load",
-        }),
-        module: expect.objectContaining({
-          type: "react-component",
-          href: expect.stringMatching(/\.js$/),
-        }),
+        routeId: "about",
       }),
       home: expect.objectContaining({
         assets: expect.objectContaining({
           js: expect.arrayContaining([expect.stringMatching(/home.*\.js$/)]),
           css: expect.any(Array),
         }),
+        document: { fileName: "home.html" },
+        path: "/home",
         render: "csr",
-        hydrate: "load",
-        rendering: expect.objectContaining({
-          component: "client",
-          html: "client",
-          hydrate: "load",
-        }),
-        module: expect.objectContaining({
-          type: "react-component",
-          href: expect.stringMatching(/\.js$/),
-        }),
+        routeId: "home",
       }),
     });
     const publicManifestText = fs.readFileSync(manifestPath, "utf-8");
     expect(publicManifestText).not.toContain(".tsx");
+    expect(publicManifestText).not.toContain('"module"');
   });
 });

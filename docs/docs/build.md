@@ -30,11 +30,11 @@ dist/
 │   ├── index.html
 │   ├── main.[hash].js
 │   ├── [chunk].[hash].js
-│   ├── manifest.json
-│   └── runtime.json
-└── server/
-    ├── main.[hash].js
-    └── manifest.json
+│   └── manifest.json
+├── server/
+│   ├── main.[hash].js
+│   └── manifest.json
+└── build-output.json
 ```
 
 Use `output.client` and `output.server` when your host expects public files in a
@@ -59,19 +59,20 @@ dist/
 ├── index.html
 ├── main.[hash].js
 ├── [chunk].[hash].js
-├── manifest.json
-└── runtime.json
+└── manifest.json
 dist-server/
 ├── main.[hash].js
 └── manifest.json
 ```
 
-`runtime.json` is generated browser runtime configuration with only boot,
-navigation, transport, and RSC endpoint data. `manifest.json` files and
-`build-output.json` are generated deployment/tooling metadata. Client route
-entries are URL-to-app/page indexes; page rendering behavior stays on page
-records, and runtime endpoints stay out of the public client manifest.
-Application code should not import or edit these files.
+Generated HTML embeds the `ClientRuntime` needed by the browser bootstrap.
+`client/manifest.json` is lightweight deployment metadata: SPA manifests keep
+top-level public assets, while MPA manifests keep assets on each routing page.
+`server/manifest.json` preserves the server entry filename plus the server route
+projection. Runtime-only `FrameworkRuntime` data is injected into dev and
+deployment bootstraps instead of being emitted as JSON. `build-output.json` is
+canonical deployment metadata. Application code should not import or edit
+deployment metadata files.
 
 ## Page Output
 
@@ -94,7 +95,10 @@ export default function ProductPage() {
 }
 ```
 
-For static pages, use `render = "ssg"`. For partial prerendering, use
+For build-time static generation, use `render = "ssg"` on a statically
+addressable page. `ev build` renders that page into an emitted HTML document
+such as `dist/client/report.html`, and deployment metadata represents it as a
+`static-page` route. For server pages with partial prerendering, use
 `render = "ssr"` with `prerender = { partial: true }`.
 
 ```tsx

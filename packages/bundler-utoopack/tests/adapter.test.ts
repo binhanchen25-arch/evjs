@@ -10,6 +10,7 @@ import type {
 } from "@evjs/ev";
 import {
   buildHtml,
+  createDeploymentMetadata,
   createPublicManifest,
   createServerManifest,
   linkBuildOutput,
@@ -24,6 +25,7 @@ import {
 } from "@evjs/ev/build-tools";
 import type { ConfigComplete } from "@utoo/pack";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createClientRuntime } from "../../ev/src/framework-runtime.js";
 import { utoopackAdapter } from "../src/adapter/index.js";
 
 vi.mock("@utoo/pack", () => ({
@@ -65,6 +67,7 @@ vi.mock("@utoo/pack", () => ({
   build: vi.fn(),
 }));
 
+const CLIENT_RUNTIME_SCRIPT_ID = "__EVJS_CLIENT_RUNTIME__";
 const tempDirs: string[] = [];
 
 async function makeProject() {
@@ -129,15 +132,18 @@ function createFrameworkCallbacks(options: {
       const clientDir = path.resolve(options.cwd, plan.output.clientDir);
       await fs.promises.mkdir(rootDir, { recursive: true });
       const serverDir = path.join(rootDir, "server");
-      await fs.promises.mkdir(serverDir, { recursive: true });
-      await fs.promises.writeFile(
-        path.join(serverDir, "manifest.json"),
-        JSON.stringify(createServerManifest(output), null, 2),
-        "utf-8",
-      );
+      const serverManifest = createServerManifest(output);
+      if (serverManifest.entry || serverManifest.routes.length > 0) {
+        await fs.promises.mkdir(serverDir, { recursive: true });
+        await fs.promises.writeFile(
+          path.join(serverDir, "manifest.json"),
+          JSON.stringify(serverManifest, null, 2),
+          "utf-8",
+        );
+      }
       await fs.promises.writeFile(
         path.join(rootDir, "build-output.json"),
-        JSON.stringify(output, null, 2),
+        JSON.stringify(createDeploymentMetadata(output), null, 2),
         "utf-8",
       );
       await fs.promises.mkdir(clientDir, { recursive: true });
@@ -170,6 +176,7 @@ function createFrameworkCallbacks(options: {
           doc.documentElement?.setAttribute("data-evjs-kind", "app");
           doc.documentElement?.setAttribute("data-evjs-id", appId);
         }
+        embedClientRuntime(doc, output);
 
         const finalHtml = await buildHtml({
           doc,
@@ -208,6 +215,28 @@ function createFrameworkCallbacks(options: {
     },
     onServerBundleReady: options.onServerBundleReady ?? vi.fn(),
   };
+}
+
+function embedClientRuntime(
+  doc: ReturnType<typeof generateHtml>,
+  output: BuildOutput,
+): void {
+  const body = doc.body ?? doc.querySelector("body");
+  if (!body) return;
+  const json = JSON.stringify(createClientRuntime(output)).replace(
+    /</g,
+    "\\u003c",
+  );
+  const script = doc.createElement("script");
+  script.id = CLIENT_RUNTIME_SCRIPT_ID;
+  script.setAttribute("type", "application/json");
+  script.textContent = json;
+  const firstScript = body.querySelector("script[src]");
+  if (firstScript) {
+    body.insertBefore(script, firstScript);
+    return;
+  }
+  body.appendChild(script);
 }
 
 async function expectRejectedMessage(action: () => void | Promise<void>) {
@@ -278,17 +307,8 @@ describe("utoopackAdapter dev", () => {
       js: ["dev-hook.js"],
       css: [],
     });
-    expect(manifest.apps.default).toEqual({
-      assets: {
-        js: ["main.js"],
-        css: ["main.css"],
-      },
-      document: { fileName: "index.html" },
-      module: {
-        type: "entry",
-        href: "main.js",
-      },
-    });
+    expect("app" in manifest).toBe(false);
+    expect(manifest.routing).toEqual({ kind: "spa", routes: [] });
     expect(html).toContain('<link rel="stylesheet" href="/main.css">');
     expect(html).toContain('src="/main.js"');
     expect(html).toContain('data-evjs-kind="app"');
@@ -401,7 +421,7 @@ describe("utoopackAdapter dev", () => {
           path.join(cwd, "dist/manifest.json"),
           "utf-8",
         ),
-      ) as BuildOutput;
+      ) as ReturnType<typeof createPublicManifest>;
 
       expect(update.entries.added).toHaveLength(0);
       expect(update.entries.changed).toHaveLength(0);
@@ -409,7 +429,13 @@ describe("utoopackAdapter dev", () => {
       expect(html).toContain("next-shell");
       expect(html).toContain('data-evjs-kind="page"');
       expect(html).toContain('data-evjs-id="home"');
-      expect(manifest.pages.home.document).toEqual({ fileName: "home.html" });
+      expect(manifest).not.toHaveProperty("assets");
+      if (!("routing" in manifest) || manifest.routing.kind !== "mpa") {
+        throw new Error("Expected MPA public manifest.");
+      }
+      expect(manifest.routing.pages.home.document).toEqual({
+        fileName: "home.html",
+      });
       expect(onBuildOutput).toHaveBeenCalledTimes(2);
     } finally {
       await controller.close?.();
@@ -519,7 +545,7 @@ describe("utoopackAdapter dev", () => {
     }
   });
 
-  it("emits split build manifests plus index.html in fullstack mode", async () => {
+  it("emits split build manifests plus index.html in client-only mode", async () => {
     const cwd = await makeProject();
     const onServerBundleReady = vi.fn();
     const config = resolveConfig<ConfigComplete>({
@@ -556,15 +582,9 @@ describe("utoopackAdapter dev", () => {
       hooks,
     });
 
-    const buildOutput = JSON.parse(
+    const deploymentMetadata = JSON.parse(
       await fs.promises.readFile(
         path.join(cwd, "dist/build-output.json"),
-        "utf-8",
-      ),
-    );
-    const serverManifest = JSON.parse(
-      await fs.promises.readFile(
-        path.join(cwd, "dist/server/manifest.json"),
         "utf-8",
       ),
     );
@@ -579,31 +599,30 @@ describe("utoopackAdapter dev", () => {
       "utf-8",
     );
 
-    expect(buildOutput.apps.default).toEqual({
-      assets: {
-        js: ["main.js"],
-        css: ["main.css"],
+    expect("apps" in deploymentMetadata).toBe(false);
+    expect(deploymentMetadata.documents).toEqual([
+      {
+        kind: "app",
+        id: "default",
+        fileName: "index.html",
+        assets: {
+          js: ["main.js"],
+          css: ["main.css"],
+        },
       },
-      document: { fileName: "index.html" },
-      entry: "./src/main.tsx",
-      module: {
-        type: "entry",
-        href: "main.js",
-      },
-    });
-    expect(serverManifest.entry).toBe("index.js");
-    expect(publicManifest.apps.default.entry).toBeUndefined();
-    expect(publicManifest.apps.default.module).toEqual({
-      type: "entry",
-      href: "main.js",
-    });
+    ]);
+    expect(fs.existsSync(path.join(cwd, "dist/server/manifest.json"))).toBe(
+      false,
+    );
+    expect("app" in publicManifest).toBe(false);
+    expect(publicManifest.routing.kind).toBe("spa");
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(false);
     expect(html).toContain('<link rel="stylesheet" href="/main.css">');
     expect(html).toContain('src="/main.js"');
     expect(html).toContain('data-evjs-kind="app"');
     expect(html).toContain('data-evjs-id="default"');
     expect(html).toContain('<meta name="server">');
-    expect(onServerBundleReady).toHaveBeenCalledTimes(1);
+    expect(onServerBundleReady).not.toHaveBeenCalled();
   });
 });
 

@@ -11,7 +11,7 @@ export function deploymentExampleAdapter() {
           output.deployment = {
             ...(output.deployment ?? {}),
             deploymentAdaptersExample: {
-              apps: Object.keys(output.apps),
+              app: Object.keys(output.apps).length > 0,
               pages: Object.keys(output.pages),
               rscPages: Object.keys(output.rsc?.pages ?? {}),
               serverBasePath: output.runtime.server?.basePath,
@@ -29,7 +29,7 @@ export function deploymentExampleAdapter() {
         buildEnd({ output }) {
           const artifactPath = path.join(
             ctx.cwd,
-            output.distDir,
+            output.paths.rootDir,
             "deployment.example.json",
           );
           fs.mkdirSync(path.dirname(artifactPath), { recursive: true });

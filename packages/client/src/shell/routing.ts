@@ -1,5 +1,8 @@
 import { findBestPageRoute } from "@evjs/shared";
-import type { ClientRuntime } from "../runtime-config.js";
+import {
+  type ClientRuntime,
+  getClientRuntimeRoutes,
+} from "../runtime-config.js";
 import type { ActivationRequest } from "./types.js";
 
 export function createActivationRequestFromUrl(
@@ -8,11 +11,10 @@ export function createActivationRequestFromUrl(
 ): ActivationRequest {
   const href = url.toString();
   const pathname = getPathname(href);
-  const route = findBestPageRoute(runtime.routes, pathname);
+  const route = findBestPageRoute(getClientRuntimeRoutes(runtime), pathname);
 
   return {
     url: href,
-    appId: route?.appId,
     pageId: route?.pageId,
   };
 }

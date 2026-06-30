@@ -5,8 +5,9 @@ import type { BuildPlan } from "@evjs/shared/manifest";
 import { execa } from "execa";
 import { describe, expect, it } from "vitest";
 import { PAGE_ROUTE_CONVENTION_SUMMARY } from "../src/build-tools/page-route-conventions.js";
-import type { BundlerAdapter } from "../src/bundler.js";
+import type { BundlerAdapter, BundlerBuildFacts } from "../src/bundler.js";
 import {
+  type BuildResult,
   build,
   type Config,
   dev,
@@ -27,6 +28,19 @@ const devStartupTimeoutMs = 10_000;
 const devUpdateTimeoutMs = 10_000;
 const routeTypeCheckTimeoutMs = 30_000;
 
+interface EmbeddedClientRuntime {
+  runtime: {
+    server?: Record<string, unknown>;
+  };
+  app?: Record<string, unknown>;
+  routing: {
+    kind: string;
+    pages?: Record<string, Record<string, unknown>>;
+    routes?: Array<Record<string, unknown>>;
+  };
+  [key: string]: unknown;
+}
+
 async function createProject() {
   const cwd = await fs.promises.mkdtemp(path.join(os.tmpdir(), "evjs-"));
   await fs.promises.writeFile(
@@ -35,6 +49,16 @@ async function createProject() {
     "utf-8",
   );
   return cwd;
+}
+
+function readEmbeddedClientRuntime(html: string): EmbeddedClientRuntime {
+  const match = html.match(
+    /<script\b(?=[^>]*\bid="__EVJS_CLIENT_RUNTIME__")(?=[^>]*\btype="application\/json")[^>]*>([\s\S]*?)<\/script>/,
+  );
+  if (!match) {
+    throw new Error("Expected embedded client runtime script.");
+  }
+  return JSON.parse(match[1]) as EmbeddedClientRuntime;
 }
 
 async function createWorkspaceProject() {
@@ -118,7 +142,7 @@ function createMockBundler(
           main: { js: ["main.js"], css: [] },
         },
         firstClientEntryAssets: { js: ["main.js"], css: [] },
-        ...serverBuildFacts(),
+        ...serverBuildFacts(plan),
       };
     },
     async dev() {
@@ -127,13 +151,26 @@ function createMockBundler(
   };
 }
 
-function serverBuildFacts() {
+function serverBuildFacts(
+  plan: BuildPlan,
+): Pick<
+  BundlerBuildFacts,
+  "serverEntryAssets" | "serverEntry" | "serverAssets"
+> {
+  const serverRuntimeEntry = plan.entries.find(
+    (entry) => entry.kind === "server-runtime",
+  );
+  if (!serverRuntimeEntry) return {};
+
   return {
     serverEntryAssets: {
-      server: { js: ["server.js"], css: [] },
+      [serverRuntimeEntry.name]: {
+        js: [`${serverRuntimeEntry.name}.js`],
+        css: [],
+      },
     },
-    serverEntry: "server.js",
-    serverAssets: { js: ["server.js"], css: [] },
+    serverEntry: `${serverRuntimeEntry.name}.js`,
+    serverAssets: { js: [`${serverRuntimeEntry.name}.js`], css: [] },
   };
 }
 
@@ -397,8 +434,8 @@ describe("build", () => {
       "setup:production",
       "buildStart",
       "bundler.build",
-      "bundler.entries:main,server",
-      "buildOutput:main,server",
+      "bundler.entries:main",
+      "buildOutput:main",
       "buildEnd:main.patched.js",
       "dispose:production",
     ]);
@@ -441,7 +478,7 @@ describe("build", () => {
     expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(false);
     expect(events).toEqual([
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
       "buildOutput",
       "dispose",
     ]);
@@ -451,6 +488,19 @@ describe("build", () => {
     const cwd = await createProject();
     const events: string[] = [];
     const bundler = createMockBundler(events);
+    const firstClientJs = (result: EvBuildResult) => {
+      const { clientManifest } = result;
+      if (
+        "routing" in clientManifest &&
+        clientManifest.routing.kind === "mpa"
+      ) {
+        return (
+          Object.values(clientManifest.routing.pages)[0]?.assets.js[0] ?? "none"
+        );
+      }
+      const assets = "assets" in clientManifest ? clientManifest.assets : {};
+      return Object.values(assets ?? {})[0]?.js[0] ?? "none";
+    };
     const plugin: EvPlugin<Record<string, never>> = {
       name: "manifest-result",
       setup() {
@@ -459,12 +509,12 @@ describe("build", () => {
             events.push("manifest:buildStart");
           },
           transformHtml(doc: HtmlDocument, result: EvBuildResult) {
-            events.push(`manifest:html:${result.clientManifest.assets.js[0]}`);
+            events.push(`manifest:html:${firstClientJs(result)}`);
             doc.head?.appendChild(doc.createComment(" manifest html "));
           },
           buildEnd(result: EvBuildResult) {
             events.push(
-              `manifest:buildEnd:${result.clientManifest.assets.js[0]}:${result.serverManifest.entry ?? "none"}`,
+              `manifest:buildEnd:${firstClientJs(result)}:${result.serverManifest.entry ?? "none"}`,
             );
           },
         };
@@ -479,15 +529,22 @@ describe("build", () => {
       },
     );
 
-    await expect(
-      fs.promises.readFile(path.join(cwd, "dist/index.html"), "utf-8"),
-    ).resolves.toContain("manifest html");
+    const html = await fs.promises.readFile(
+      path.join(cwd, "dist/index.html"),
+      "utf-8",
+    );
+    const clientRuntime = readEmbeddedClientRuntime(html);
+
+    expect(html).toContain("manifest html");
+    expect(clientRuntime.routing.kind).toBe("spa");
+    expect(clientRuntime).not.toHaveProperty("assets");
+    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(false);
     expect(events).toEqual([
       "manifest:buildStart",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
       "manifest:html:main.js",
-      "manifest:buildEnd:main.js:server.js",
+      "manifest:buildEnd:main.js:none",
     ]);
   });
 
@@ -495,17 +552,13 @@ describe("build", () => {
     const cwd = await createProject();
     const bundler: BundlerAdapter<Record<string, never>> = {
       name: "mock-crossorigin-assets",
-      async build() {
+      async build({ plan }) {
         return {
           clientEntryAssets: {
             main: { js: ["main.js"], css: ["main.css"] },
           },
           firstClientEntryAssets: { js: ["main.js"], css: ["main.css"] },
-          serverEntryAssets: {
-            server: { js: ["server.js"], css: [] },
-          },
-          serverEntry: "server.js",
-          serverAssets: { js: ["server.js"], css: [] },
+          ...serverBuildFacts(plan),
         };
       },
       async dev() {},
@@ -567,7 +620,7 @@ describe("build", () => {
       "entry:evjs:pages-app",
       "metadata:pages-app",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
     ]);
     expect(fs.existsSync(path.join(cwd, ".evjs"))).toBe(false);
     await expect(
@@ -983,7 +1036,7 @@ describe("build", () => {
       "entry:evjs:pages-app",
       "metadata:pages-app",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
     ]);
   });
 
@@ -1168,7 +1221,7 @@ describe("build", () => {
             about: { js: ["about.js"], css: [] },
           },
           firstClientEntryAssets: { js: ["index.js"], css: [] },
-          ...serverBuildFacts(),
+          ...serverBuildFacts(plan),
         };
       },
       async dev() {},
@@ -1188,8 +1241,8 @@ describe("build", () => {
     );
 
     expect(events).toEqual([
-      "entries:index:page-client,about:page-client,server:server-runtime",
-      "metadata:react-component-page,react-component-page,none",
+      "entries:index:page-client,about:page-client",
+      "metadata:react-component-page,react-component-page",
       "html:index:./index.html,about:./src/pages/about.html",
     ]);
     expect(fs.existsSync(path.join(cwd, ".evjs"))).toBe(false);
@@ -1224,7 +1277,7 @@ describe("build", () => {
             product: { js: ["product.js"], css: [] },
           },
           firstClientEntryAssets: { js: ["product.js"], css: [] },
-          ...serverBuildFacts(),
+          ...serverBuildFacts(plan),
         };
       },
       async dev() {},
@@ -1326,13 +1379,13 @@ describe("build", () => {
     const events: string[] = [];
     const bundler: BundlerAdapter<Record<string, never>> = {
       name: "memory-output",
-      async build() {
+      async build({ plan }) {
         return {
           clientEntryAssets: {
             main: { js: ["memory.js"], css: [] },
           },
           firstClientEntryAssets: { js: ["memory.js"], css: [] },
-          ...serverBuildFacts(),
+          ...serverBuildFacts(plan),
         };
       },
       async dev() {},
@@ -1373,21 +1426,23 @@ describe("build", () => {
       "utf-8",
     );
 
-    const rawOutputComponents: Array<string | undefined> = [];
+    const rawOutputModules: Array<string | undefined> = [];
+    let frameworkRuntime: BuildResult["frameworkRuntime"];
     const bundler: BundlerAdapter<Record<string, never>> = {
       name: "memory-output",
-      async build() {
+      async build({ plan }) {
+        const serverFacts = serverBuildFacts(plan);
         return {
           clientEntryAssets: {
             dashboard: { js: ["dashboard.js"], css: [] },
           },
           firstClientEntryAssets: { js: ["dashboard.js"], css: [] },
           serverEntryAssets: {
-            server: { js: ["server.js"], css: [] },
+            ...serverFacts.serverEntryAssets,
             "dashboard-server": { js: ["dashboard-server.js"], css: [] },
           },
-          serverEntry: "server.js",
-          serverAssets: { js: ["server.js"], css: [] },
+          serverEntry: serverFacts.serverEntry,
+          serverAssets: serverFacts.serverAssets,
         };
       },
       async dev() {},
@@ -1397,6 +1452,7 @@ describe("build", () => {
       {
         pages: {
           dashboard: {
+            path: "/dashboard",
             component: "./src/pages/Dashboard.tsx",
             html: "./index.html",
           },
@@ -1407,9 +1463,10 @@ describe("build", () => {
             setup() {
               return {
                 buildEnd(result) {
-                  rawOutputComponents.push(
-                    result.output.pages.dashboard.component,
+                  rawOutputModules.push(
+                    result.output.pages.dashboard.module?.type,
                   );
+                  frameworkRuntime = result.frameworkRuntime;
                 },
               };
             },
@@ -1423,10 +1480,6 @@ describe("build", () => {
       path.join(cwd, "dist/client/manifest.json"),
       "utf-8",
     );
-    const clientRuntime = fs.readFileSync(
-      path.join(cwd, "dist/client/runtime.json"),
-      "utf-8",
-    );
     const serverManifest = fs.readFileSync(
       path.join(cwd, "dist/server/manifest.json"),
       "utf-8",
@@ -1437,84 +1490,145 @@ describe("build", () => {
     );
     const publicManifestJson = JSON.parse(publicManifest);
     const serverManifestJson = JSON.parse(serverManifest);
-    const clientRuntimeJson = JSON.parse(clientRuntime);
     const buildOutputJson = JSON.parse(buildOutput);
 
-    expect(rawOutputComponents).toEqual(["./src/pages/Dashboard.tsx"]);
+    expect(rawOutputModules).toEqual(["react-component"]);
     expect(publicManifest).not.toContain(".tsx");
     expect(publicManifest).not.toContain("server.js");
     expect(publicManifestJson).not.toHaveProperty("runtime");
+    expect(publicManifestJson).not.toHaveProperty("pages");
+    expect(publicManifestJson).not.toHaveProperty("routes");
+    expect(publicManifestJson).not.toHaveProperty("assets");
+    expect(publicManifestJson.routing.kind).toBe("mpa");
     expect(
-      publicManifestJson.routes.flatMap((route: Record<string, unknown>) =>
-        Object.keys(route),
-      ),
-    ).not.toEqual(
-      expect.arrayContaining(["module", "render", "hydrate", "runtime"]),
-    );
-    expect(clientRuntime).not.toContain(".tsx");
-    expect(clientRuntime).not.toContain("server.js");
-    expect(clientRuntimeJson).not.toHaveProperty("publicPath");
-    expect(clientRuntimeJson).not.toHaveProperty("assets");
-    expect(Object.keys(clientRuntimeJson.runtime.server ?? {})).not.toEqual(
-      expect.arrayContaining(["basePath", "fn", "ppr"]),
-    );
-    expect(
-      Object.values(clientRuntimeJson.apps).flatMap((app) =>
-        Object.keys(app as Record<string, unknown>),
-      ),
-    ).not.toEqual(expect.arrayContaining(["assets", "document", "entry"]));
-    expect(
-      Object.values(clientRuntimeJson.pages).flatMap((page) =>
+      Object.values(publicManifestJson.routing.pages).flatMap((page) =>
         Object.keys(page as Record<string, unknown>),
       ),
-    ).not.toEqual(
-      expect.arrayContaining([
-        "assets",
-        "document",
-        "render",
-        "rendering",
-        "path",
-        "routeId",
-        "componentModel",
-        "hydrate",
-        "ppr",
-      ]),
-    );
-    expect(clientRuntimeJson).not.toHaveProperty("rsc");
-    expect(
-      clientRuntimeJson.routes.flatMap((route: Record<string, unknown>) =>
-        Object.keys(route),
-      ),
-    ).not.toEqual(
-      expect.arrayContaining([
-        "parentId",
-        "kind",
-        "render",
-        "hydrate",
-        "runtime",
-      ]),
-    );
+    ).not.toEqual(expect.arrayContaining(["component", "source", "runtime"]));
     expect(serverManifestJson).toEqual({
       version: 1,
       entry: "server.js",
-      assets: { js: ["server.js"], css: [] },
-      functions: {},
-      routes: [],
+      routes: [
+        {
+          kind: "server-page",
+          path: "/dashboard",
+          pageId: "dashboard",
+          render: "ssr",
+          methods: ["GET", "HEAD"],
+        },
+      ],
     });
     expect(serverManifestJson.server).toBeUndefined();
+    expect(serverManifestJson.assets).toBeUndefined();
+    expect(serverManifestJson.functions).toBeUndefined();
+    expect(serverManifestJson.renderers).toBeUndefined();
     expect(serverManifest).not.toContain("./src/pages/Dashboard.tsx");
     expect(buildOutputJson.server?.entry).toBe("server.js");
-    expect(buildOutputJson.server?.renderers).toHaveProperty(
+    expect(buildOutputJson.routes).toContainEqual({
+      kind: "server-page",
+      path: "/dashboard",
+      pageId: "dashboard",
+      render: "ssr",
+      methods: ["GET", "HEAD"],
+    });
+    expect("renderers" in (buildOutputJson.server ?? {})).toBe(false);
+    expect(frameworkRuntime?.server?.renderers).toHaveProperty(
       "dashboard-server",
     );
-    expect(buildOutput).toContain("./src/pages/Dashboard.tsx");
+    expect(buildOutput).not.toContain("./src/pages/Dashboard.tsx");
     expect(buildOutput).toContain("server.js");
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(false);
     expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(false);
+    expect(fs.existsSync(path.join(cwd, "dist/client/runtime.json"))).toBe(
+      false,
+    );
+    expect(fs.existsSync(path.join(cwd, "dist/server/runtime.json"))).toBe(
+      false,
+    );
+    expect(
+      fs.existsSync(path.join(cwd, "dist/server/framework-runtime.json")),
+    ).toBe(false);
     expect(fs.existsSync(path.join(cwd, "dist/build-output.json"))).toBe(true);
     expect(fs.existsSync(path.join(cwd, "dist/server/build-output.json"))).toBe(
       false,
     );
+  });
+
+  it("prerenders SSG page HTML during production builds", async () => {
+    const cwd = await createProject();
+    await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/Report.tsx"),
+      [
+        'export const render = "ssg";',
+        "export default function Report() { return null; }",
+      ].join("\n"),
+      "utf-8",
+    );
+
+    const bundler: BundlerAdapter<Record<string, never>> = {
+      name: "ssg-mock",
+      async build() {
+        return {
+          clientEntryAssets: {},
+          firstClientEntryAssets: { js: [], css: [] },
+          serverEntryAssets: {
+            "report-server": { js: ["report-server.js"], css: [] },
+          },
+          serverAssets: { js: [], css: [] },
+          async loadServerModule(asset) {
+            if (asset !== "report-server.js") {
+              throw new Error(`Unexpected server module asset: ${asset}`);
+            }
+            return {
+              render(ctx: { pageId: string; request: Request }) {
+                return `<main data-page="${ctx.pageId}"><h1>Prerendered Report</h1><p>${ctx.request.url}</p></main>`;
+              },
+            };
+          },
+        };
+      },
+      async dev() {
+        return undefined;
+      },
+    };
+
+    await build(
+      {
+        pages: {
+          report: {
+            path: "/report",
+            component: "./src/pages/Report.tsx",
+            html: "./index.html",
+            mount: "#app",
+          },
+        },
+      },
+      { cwd, bundler },
+    );
+
+    const html = fs.readFileSync(
+      path.join(cwd, "dist/client/report.html"),
+      "utf-8",
+    );
+    const buildOutput = JSON.parse(
+      fs.readFileSync(path.join(cwd, "dist/build-output.json"), "utf-8"),
+    );
+
+    expect(html).toContain("Prerendered Report");
+    expect(html).toContain("http://evjs.local/report");
+    expect(html).not.toMatch(/<script[^>]+src=/);
+    expect(html).not.toContain("__EVJS_CLIENT_RUNTIME__");
+    expect(buildOutput.server).toEqual({});
+    expect(buildOutput.documents).toContainEqual({
+      kind: "page",
+      id: "report",
+      fileName: "report.html",
+      path: "/report",
+      render: "ssg",
+    });
+    expect(buildOutput.routes).toEqual([]);
+    expect(fs.existsSync(path.join(cwd, "dist/server"))).toBe(false);
   });
 
   it("removes stale split client manifests when rebuilding with flat client output", async () => {
@@ -1527,13 +1641,13 @@ describe("build", () => {
       true,
     );
     expect(fs.existsSync(path.join(cwd, "dist/client/runtime.json"))).toBe(
-      true,
+      false,
     );
 
     await build({ output: { client: "dist" } }, { cwd, bundler });
 
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
-    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(false);
     expect(fs.existsSync(path.join(cwd, "dist/client/manifest.json"))).toBe(
       false,
     );
@@ -1574,7 +1688,7 @@ describe("build", () => {
       "config:production",
       "setup:/api/fn",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
       "bundler.endpoint:/api/fn",
     ]);
   });
@@ -1728,7 +1842,7 @@ describe("build", () => {
       "setup",
       "buildStart",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
     ]);
   });
 
@@ -2389,7 +2503,9 @@ describe("build", () => {
     await fs.promises.writeFile(
       path.join(cwd, "src/pages/campaign.tsx"),
       [
-        'export const render = "ssg";',
+        'export const render = "ssr";',
+        'export const hydrate = "none";',
+        "export const prerender = true;",
         "export default function Campaign() { return null; }",
       ].join("\n"),
       "utf-8",
@@ -2416,7 +2532,7 @@ describe("build", () => {
     );
     expect(events).toContain("bundler.build");
     expect(fs.existsSync(path.join(cwd, "dist/manifest.json"))).toBe(true);
-    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(true);
+    expect(fs.existsSync(path.join(cwd, "dist/runtime.json"))).toBe(false);
     expect(fs.existsSync(path.join(cwd, "dist/server/manifest.json"))).toBe(
       true,
     );
@@ -3201,7 +3317,7 @@ describe("build", () => {
       "buildStart:a",
       "buildStart:b",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
       "buildEnd:a",
       "buildEnd:b",
     ]);
@@ -3245,7 +3361,7 @@ describe("build", () => {
       "setup:plugin-c",
       "setup:plugin-a",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
     ]);
   });
 
@@ -3291,7 +3407,7 @@ describe("build", () => {
       "setup:normal",
       "setup:post",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
     ]);
   });
 
@@ -3339,7 +3455,7 @@ describe("build", () => {
       "setup:plugin-a",
       "setup:plugin-b",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
     ]);
   });
 
@@ -3378,7 +3494,7 @@ describe("build", () => {
       "setup:plugin-c",
       "setup:plugin-b",
       "bundler.build",
-      "bundler.entries:main,server",
+      "bundler.entries:main",
     ]);
   });
 

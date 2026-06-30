@@ -53,38 +53,48 @@ test.describe("deployment-adapters", () => {
   test("emits manifest and deployment artifacts from BuildOutput", async () => {
     const manifestPath = path.join(exampleDir, "dist", "build-output.json");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    const manifestText = JSON.stringify(manifest);
 
-    expect(manifest.apps.default).toEqual(
-      expect.objectContaining({
-        mount: "#app",
-        module: expect.objectContaining({ type: "entry" }),
-      }),
-    );
-    expect(manifest.pages ?? {}).toEqual({});
-    expect(manifest.routes ?? []).toEqual([]);
-    expect(Object.values(manifest.server.functions)).toEqual(
+    expect("distDir" in manifest).toBe(false);
+    expect(manifest.paths).toEqual({
+      rootDir: "dist",
+      publicDir: "dist/client",
+      serverDir: "dist/server",
+    });
+    expect(manifestText).not.toContain('"chunks"');
+    expect("apps" in manifest).toBe(false);
+    expect("pages" in manifest).toBe(false);
+    expect("runtime" in manifest).toBe(false);
+    expect(manifest.documents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          exportName: "getMerchantOperationsSnapshot",
+          kind: "app",
+          id: "default",
+          fileName: "index.html",
         }),
       ]),
     );
-    expect(manifest.server.routes).toEqual(
+    expect(manifest.routes).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
+        {
+          kind: "server-function",
+          path: "/__evjs/fn",
+          methods: ["POST"],
+        },
+        {
+          kind: "api-route",
           path: "/api/deployment-adapters/health",
-          methods: expect.arrayContaining(["GET"]),
-        }),
+          methods: ["GET"],
+        },
       ]),
     );
-    expect(manifest.runtime.server).toEqual(
+    expect(manifest.server).toEqual(
       expect.objectContaining({
-        basePath: "/__evjs",
-        fn: "/__evjs/fn",
+        entry: expect.any(String),
       }),
     );
-    expect(manifest.deployment.deploymentAdaptersExample).toEqual({
-      apps: ["default"],
+    expect(manifest.metadata.deploymentAdaptersExample).toEqual({
+      app: true,
       pages: [],
       rscPages: [],
       serverBasePath: "/__evjs",
@@ -96,28 +106,42 @@ test.describe("deployment-adapters", () => {
         "utf-8",
       ),
     );
+    const deployArtifactText = JSON.stringify(deployArtifact);
     expect(deployArtifact.platform).toBe("deployment-adapters-example");
-    expect(deployArtifact.apps.default).toEqual(
-      expect.objectContaining({ mount: "#app" }),
-    );
-    expect(deployArtifact.server).toEqual(
-      expect.objectContaining({
-        basePath: "/__evjs",
-        fn: "/__evjs/fn",
-      }),
-    );
-    expect(deployArtifact.server.functions).toHaveLength(1);
-    expect(deployArtifact.server.routes).toEqual(
+    expect("distDir" in deployArtifact).toBe(false);
+    expect(deployArtifact.paths).toEqual({
+      rootDir: "dist",
+      publicDir: "dist/client",
+      serverDir: "dist/server",
+    });
+    expect(deployArtifactText).not.toContain('"chunks"');
+    expect("app" in deployArtifact).toBe(false);
+    expect(deployArtifact.documents).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          path: "/api/deployment-adapters/health",
+          kind: "app",
+          id: "default",
+          fileName: "index.html",
         }),
+      ]),
+    );
+    expect(deployArtifact.routes).toEqual(
+      expect.arrayContaining([
+        {
+          kind: "server-function",
+          path: "/__evjs/fn",
+          methods: ["POST"],
+        },
+        {
+          kind: "api-route",
+          path: "/api/deployment-adapters/health",
+          methods: ["GET"],
+        },
       ]),
     );
     expect(deployArtifact.metadata).toEqual(
       expect.objectContaining({
-        deploymentAdaptersExample:
-          manifest.deployment.deploymentAdaptersExample,
+        deploymentAdaptersExample: manifest.metadata.deploymentAdaptersExample,
       }),
     );
 
@@ -131,7 +155,7 @@ test.describe("deployment-adapters", () => {
       expect.objectContaining({
         platform: "node",
         server: expect.objectContaining({
-          basePath: "/__evjs",
+          entry: expect.any(String),
         }),
       }),
     );

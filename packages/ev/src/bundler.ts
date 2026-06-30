@@ -18,9 +18,9 @@ export interface BundlerBuildFacts {
   serverEntry?: string;
   serverAssets?: AssetGroup;
   serverModules?: BuildOutputServerModule[];
+  loadServerModule?: (asset: string) => Promise<unknown>;
   rscManifests?: {
     clientReferenceManifest?: Record<string, unknown>;
-    serverConsumerManifest?: Record<string, unknown>;
   };
 }
 

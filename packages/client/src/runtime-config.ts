@@ -24,9 +24,12 @@ export interface ClientRuntime {
       baseUrl?: string;
     };
   };
-  apps: Record<string, ClientRuntimeApp>;
-  pages: Record<string, ClientRuntimePage>;
-  routes: ClientRuntimeRoute[];
+  app?: ClientRuntimeApp;
+  routing?: ClientRuntimeRouting;
+  /** @deprecated Use routing.kind === "mpa".pages. */
+  pages?: Record<string, ClientRuntimePage>;
+  /** @deprecated Use routing.kind === "spa".routes or page route metadata. */
+  routes?: ClientRuntimeRoute[];
 }
 
 export interface ClientAssetGroup {
@@ -47,14 +50,25 @@ export interface ClientRuntimeApp {
 export interface ClientRuntimePage {
   mount?: string;
   module?: ClientRuntimeModule;
+  path?: string;
+  routeId?: string;
 }
 
 export interface ClientRuntimeRoute {
   id: string;
   path: string;
-  appId?: string;
   pageId?: string;
 }
+
+export type ClientRuntimeRouting =
+  | {
+      kind: "spa";
+      routes: ClientRuntimeRoute[];
+    }
+  | {
+      kind: "mpa";
+      pages: Record<string, ClientRuntimePage>;
+    };
 
 export function assertClientRuntime(
   value: unknown,
@@ -80,27 +94,75 @@ export function assertClientRuntime(
       `${source}.runtime.transport.baseUrl`,
     );
   }
-  assertObject(value.apps, `${source}.apps`);
-  assertApps(value.apps, `${source}.apps`);
+  if (value.app !== undefined) {
+    assertApp(value.app, `${source}.app`);
+  }
+  assertRuntimeRouting(value, source);
+}
+
+export function getClientRuntimePages(
+  runtime: ClientRuntime,
+): Record<string, ClientRuntimePage> {
+  if (runtime.routing?.kind === "mpa") return runtime.routing.pages;
+  return runtime.pages ?? {};
+}
+
+export function getClientRuntimeRoutes(
+  runtime: ClientRuntime,
+): ClientRuntimeRoute[] {
+  if (runtime.routing?.kind === "spa") return runtime.routing.routes;
+  if (runtime.routing?.kind === "mpa") {
+    return createRoutesFromPages(runtime.routing.pages);
+  }
+  return runtime.routes ?? [];
+}
+
+function assertRuntimeRouting(
+  value: Record<string, unknown>,
+  source: string,
+): void {
+  if (value.routing !== undefined) {
+    if (value.pages !== undefined || value.routes !== undefined) {
+      throw new Error(
+        `[evjs] ${source} must not define both routing and pages/routes.`,
+      );
+    }
+    assertObject(value.routing, `${source}.routing`);
+    if (value.routing.kind === "spa") {
+      if (!Array.isArray(value.routing.routes)) {
+        throw new Error(`[evjs] ${source}.routing.routes must be an array.`);
+      }
+      assertRoutes(value.routing.routes, `${source}.routing.routes`, {});
+      return;
+    }
+    if (value.routing.kind === "mpa") {
+      assertObject(value.routing.pages, `${source}.routing.pages`);
+      assertPages(value.routing.pages, `${source}.routing.pages`);
+      assertRoutes(
+        createRoutesFromPages(value.routing.pages),
+        `${source}.routing.pages`,
+        value.routing.pages,
+      );
+      return;
+    }
+    throw new Error(`[evjs] ${source}.routing.kind must be "spa" or "mpa".`);
+  }
+
   assertObject(value.pages, `${source}.pages`);
   assertPages(value.pages, `${source}.pages`);
   if (!Array.isArray(value.routes)) {
     throw new Error(`[evjs] ${source}.routes must be an array.`);
   }
-  assertRoutes(value.routes, `${source}.routes`, value.pages, value.apps);
+  assertRoutes(value.routes, `${source}.routes`, value.pages);
 }
 
-function assertApps(value: Record<string, unknown>, source: string): void {
-  for (const [name, app] of Object.entries(value)) {
-    assertBuildIdentifierKey(name, source);
-    const appSource = `${source}.${name}`;
-    assertObject(app, appSource);
-    if (app.module !== undefined) {
-      assertRuntimeModule(app.module, `${appSource}.module`);
-    }
-    if (app.mount !== undefined) {
-      assertRuntimeString(app.mount, `${appSource}.mount`);
-    }
+function assertApp(value: unknown, source: string): void {
+  assertObject(value, source);
+  if (value.module !== undefined) {
+    assertRuntimeModule(value.module, `${source}.module`);
+  }
+  if (value.mount !== undefined) {
+    assertRuntimeString(value.mount, `${source}.mount`);
   }
 }
 
@@ -115,7 +177,31 @@ function assertPages(value: Record<string, unknown>, source: string): void {
     if (page.module !== undefined) {
       assertRuntimeModule(page.module, `${pageSource}.module`);
     }
+    if (page.path !== undefined) {
+      assertRuntimePathname(page.path, `${pageSource}.path`, true);
+    }
+    if (page.routeId !== undefined) {
+      assertRuntimeString(page.routeId, `${pageSource}.routeId`);
+    }
   }
+}
+
+function createRoutesFromPages(
+  pages: Record<string, unknown>,
+): ClientRuntimeRoute[] {
+  return Object.entries(pages).flatMap(([pageId, page]) => {
+    if (!isRecord(page)) return [];
+    if (typeof page.path !== "string" || typeof page.routeId !== "string") {
+      return [];
+    }
+    return [
+      {
+        id: page.routeId,
+        path: page.path,
+        pageId,
+      },
+    ];
+  });
 }
 
 function assertRuntimeModule(value: unknown, source: string): void {
@@ -138,7 +224,6 @@ function assertRoutes(
   value: unknown[],
   source: string,
   pages: Record<string, unknown>,
-  apps: Record<string, unknown>,
 ): void {
   const idOwners = new Map<string, string>();
   const pathOwners = new Map<string, { path: string; source: string }>();
@@ -158,12 +243,6 @@ function assertRoutes(
       `${routeSource}.pageId`,
       `${source.replace(/\.routes$/, "")}.pages`,
       pages,
-    );
-    assertOptionalRecordReference(
-      route.appId,
-      `${routeSource}.appId`,
-      `${source.replace(/\.routes$/, "")}.apps`,
-      apps,
     );
   });
 }

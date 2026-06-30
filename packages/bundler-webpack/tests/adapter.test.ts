@@ -13,6 +13,7 @@ import type {
 } from "@evjs/ev";
 import {
   buildHtml,
+  createDeploymentMetadata,
   createPublicManifest,
   createServerManifest,
   linkBuildOutput,
@@ -24,6 +25,7 @@ import {
   diffBuildPlan,
   generateHtml,
 } from "@evjs/ev/build-tools";
+import type { PublicManifestOutput } from "@evjs/shared/manifest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createClientRuntime,
@@ -48,6 +50,7 @@ const WEBPACK_DEV_TEST_NAMES = {
   pageAddition:
     "applies page additions through updatePlan without restarting ev dev",
 } as const;
+const CLIENT_RUNTIME_SCRIPT_ID = "__EVJS_CLIENT_RUNTIME__";
 const allocatedDevPorts = new Set<number>();
 
 type ServerRuntimeGlobals = typeof globalThis & {
@@ -56,6 +59,11 @@ type ServerRuntimeGlobals = typeof globalThis & {
     asset: string,
   ) => Promise<Record<string, unknown>>;
 };
+
+const frameworkRuntimeByOutput = new WeakMap<
+  BuildOutput,
+  FrameworkRuntimeOutput
+>();
 
 function devIt(name: string, run: () => void | Promise<void>) {
   it(name, run, WEBPACK_DEV_TEST_TIMEOUT);
@@ -182,8 +190,11 @@ async function emitFrameworkArtifacts(options: {
     serverEntry: options.facts.serverEntry,
     serverAssets: options.facts.serverAssets,
     serverModules: options.facts.serverModules,
+  });
+  const frameworkRuntime = createFrameworkRuntime(output, {
     rscManifests: options.facts.rscManifests,
   });
+  frameworkRuntimeByOutput.set(output, frameworkRuntime);
   await options.onBuildOutput?.(output);
 
   const rootDir = path.join(options.cwd, options.plan.distDir);
@@ -198,7 +209,7 @@ async function emitFrameworkArtifacts(options: {
   );
   await fs.writeFile(
     path.join(rootDir, "build-output.json"),
-    JSON.stringify(output, null, 2),
+    JSON.stringify(createDeploymentMetadata(output), null, 2),
     "utf-8",
   );
   await fs.mkdir(clientDir, { recursive: true });
@@ -207,12 +218,6 @@ async function emitFrameworkArtifacts(options: {
     JSON.stringify(createPublicManifest(output), null, 2),
     "utf-8",
   );
-  await fs.writeFile(
-    path.join(clientDir, "runtime.json"),
-    JSON.stringify(createClientRuntime(output), null, 2),
-    "utf-8",
-  );
-
   for (const html of options.plan.html) {
     const pageId = html.owner.pageId;
     const appId = html.owner.appId;
@@ -236,6 +241,7 @@ async function emitFrameworkArtifacts(options: {
       doc.documentElement?.setAttribute("data-evjs-kind", "app");
       doc.documentElement?.setAttribute("data-evjs-id", appId);
     }
+    embedClientRuntime(doc, output);
 
     const finalHtml = await buildHtml({
       doc,
@@ -275,6 +281,28 @@ async function emitFrameworkArtifacts(options: {
   }
 
   return output;
+}
+
+function embedClientRuntime(
+  doc: ReturnType<typeof generateHtml>,
+  output: BuildOutput,
+): void {
+  const body = doc.body ?? doc.querySelector("body");
+  if (!body) return;
+  const json = JSON.stringify(createClientRuntime(output)).replace(
+    /</g,
+    "\\u003c",
+  );
+  const script = doc.createElement("script");
+  script.id = CLIENT_RUNTIME_SCRIPT_ID;
+  script.setAttribute("type", "application/json");
+  script.textContent = json;
+  const firstScript = body.querySelector("script[src]");
+  if (firstScript) {
+    body.insertBefore(script, firstScript);
+    return;
+  }
+  body.appendChild(script);
 }
 
 describe("webpack stats ownership", () => {
@@ -451,7 +479,7 @@ describe("webpackAdapter build", () => {
         mode: "development",
       });
 
-      await buildWithFrameworkArtifacts({
+      const output = await buildWithFrameworkArtifacts({
         config,
         cwd,
         graph: analysis.graph,
@@ -461,7 +489,7 @@ describe("webpackAdapter build", () => {
 
       const manifest = JSON.parse(
         await fs.readFile(path.join(cwd, "dist/manifest.json"), "utf-8"),
-      ) as BuildOutput;
+      ) as PublicManifestOutput;
       const html = await fs.readFile(path.join(cwd, "dist/home.html"), "utf-8");
       const bundle = await fs.readFile(path.join(cwd, "dist/home.js"), "utf-8");
 
@@ -471,9 +499,16 @@ describe("webpackAdapter build", () => {
         component: "./src/pages/Home ! page 中文.tsx",
         mount: "#root",
       });
-      expect(manifest.pages.home).toMatchObject({
+      expect(manifest).not.toHaveProperty("assets");
+      if (!("routing" in manifest) || manifest.routing.kind !== "mpa") {
+        throw new Error("Expected MPA public manifest.");
+      }
+      expect(manifest.routing.pages.home).toMatchObject({
         assets: { js: ["home.js"], css: [] },
-        mount: "#root",
+        render: "csr",
+      });
+      expect("module" in manifest.routing.pages.home).toBe(false);
+      expect(output.pages.home).toMatchObject({
         render: "csr",
         module: {
           type: "react-component",
@@ -483,6 +518,17 @@ describe("webpackAdapter build", () => {
       expect(html).toContain('data-evjs-kind="page"');
       expect(html).toContain('data-evjs-id="home"');
       expect(html).toContain('src="/home.js"');
+      expect(readEmbeddedClientRuntime(html)).toMatchObject({
+        routing: {
+          kind: "mpa",
+          pages: {
+            home: {
+              module: { type: "react-component", href: "home.js" },
+              mount: "#root",
+            },
+          },
+        },
+      });
       expect(bundle).toContain("registerShellModule");
       expect(bundle).toContain("data-evjs-shell-load");
       await expect(fs.access(path.join(cwd, ".evjs"))).rejects.toThrow();
@@ -531,7 +577,7 @@ describe("webpackAdapter build", () => {
         output.assets.plugin = { js: ["plugin.js"], css: [] };
       });
 
-      await buildWithFrameworkArtifacts({
+      const output = await buildWithFrameworkArtifacts({
         config,
         cwd,
         graph: analysis.graph,
@@ -549,24 +595,23 @@ describe("webpackAdapter build", () => {
         onBuildOutput,
       });
 
-      const manifest = JSON.parse(
+      const deploymentMetadata = JSON.parse(
         await fs.readFile(path.join(cwd, "dist/build-output.json"), "utf-8"),
-      ) as BuildOutput;
+      );
       const publicManifest = JSON.parse(
         await fs.readFile(path.join(cwd, "dist/client/manifest.json"), "utf-8"),
-      ) as BuildOutput;
+      ) as PublicManifestOutput;
       const html = await fs.readFile(
         path.join(cwd, "dist/client/index.html"),
         "utf-8",
       );
 
       expect(onBuildOutput).toHaveBeenCalledTimes(1);
-      expect(manifest.apps.default).toEqual({
+      expect(output.apps.default).toEqual({
         assets: {
           js: ["main.js"],
           css: [],
         },
-        entry: "./src/main.ts",
         mount: "#app",
         document: {
           fileName: "index.html",
@@ -576,35 +621,53 @@ describe("webpackAdapter build", () => {
           href: "main.js",
         },
       });
-      expect(manifest.pages.dashboard).toMatchObject({
+      expect(output.pages.dashboard).toMatchObject({
         assets: {
           js: [],
           css: [],
         },
-        component: "./src/pages/Dashboard !page 中文.ts",
         hydrate: "load",
         render: "ssr",
         routeId: "dashboard",
       });
-      expect(manifest.routes).toContainEqual({
-        id: "dashboard",
+      expect(deploymentMetadata.routes).toContainEqual({
+        kind: "server-page",
         path: "/dashboard",
-        appId: "default",
         pageId: "dashboard",
-        module: "./src/pages/Dashboard !page 中文.ts",
+        render: "ssr",
+        methods: ["GET", "HEAD"],
       });
-      expect(manifest.assets["dashboard-server"]).toEqual({
+      expect(output.assets["dashboard-server"]).toEqual({
         js: ["dashboard-server.cjs"],
         css: [],
       });
-      expect(manifest.server?.entry).toBe("server.cjs");
-      expect(manifest.assets.plugin).toEqual({ js: ["plugin.js"], css: [] });
-      expect(publicManifest.apps.default.entry).toBeUndefined();
-      expect(publicManifest.apps.default.module).toEqual({
-        type: "entry",
-        href: "main.js",
+      expect(deploymentMetadata.server?.entry).toBe("server.cjs");
+      expect(output.assets.plugin).toEqual({ js: ["plugin.js"], css: [] });
+      expect("apps" in deploymentMetadata).toBe(false);
+      expect("pages" in deploymentMetadata).toBe(false);
+      expect("app" in publicManifest).toBe(false);
+      if (
+        !("routing" in publicManifest) ||
+        publicManifest.routing.kind !== "spa"
+      ) {
+        throw new Error("Expected SPA public manifest.");
+      }
+      expect("assets" in publicManifest).toBe(true);
+      if (!("assets" in publicManifest)) {
+        throw new Error("Expected SPA public manifest assets.");
+      }
+      expect(publicManifest.assets).toEqual({
+        main: {
+          js: ["main.js"],
+          css: [],
+        },
       });
-      expect(publicManifest.pages.dashboard.component).toBeUndefined();
+      expect(publicManifest.routing.routes).toContainEqual({
+        id: "dashboard",
+        path: "/dashboard",
+        pageId: "dashboard",
+        render: "ssr",
+      });
       await expect(
         fs.access(path.join(cwd, "dist/manifest.json")),
       ).rejects.toThrow();
@@ -612,7 +675,7 @@ describe("webpackAdapter build", () => {
       expect(html).toContain('data-evjs-kind="app"');
       expect(html).toContain('data-evjs-id="default"');
       expect(html).toContain('<meta name="html-kind" content="app">');
-      const response = await requestServerEntry(cwd, manifest, "/dashboard");
+      const response = await requestServerEntry(cwd, output, "/dashboard");
       expect(response.status).toBe(200);
       expect(await response.text()).toContain('<div id="app">dashboard</div>');
       await expect(
@@ -665,7 +728,7 @@ describe("webpackAdapter build", () => {
         mode: "development",
       });
 
-      await buildWithFrameworkArtifacts({
+      const output = await buildWithFrameworkArtifacts({
         config,
         cwd,
         graph: analysis.graph,
@@ -673,10 +736,7 @@ describe("webpackAdapter build", () => {
         hooks: [],
       });
 
-      const manifest = JSON.parse(
-        await fs.readFile(path.join(cwd, "dist/build-output.json"), "utf-8"),
-      ) as BuildOutput;
-      const response = await requestServerEntry(cwd, manifest, "/dashboard");
+      const response = await requestServerEntry(cwd, output, "/dashboard");
 
       expect(response.status).toBe(200);
       const text = await response.text();
@@ -739,7 +799,7 @@ describe("webpackAdapter build", () => {
         mode: "development",
       });
 
-      await buildWithFrameworkArtifacts({
+      const output = await buildWithFrameworkArtifacts({
         config,
         cwd,
         graph: analysis.graph,
@@ -747,18 +807,14 @@ describe("webpackAdapter build", () => {
         hooks: [],
       });
 
-      const manifest = JSON.parse(
+      const deploymentMetadata = JSON.parse(
         await fs.readFile(path.join(cwd, "dist/build-output.json"), "utf-8"),
-      ) as BuildOutput;
+      );
+      const frameworkRuntime = frameworkRuntimeByOutput.get(output);
+      expect(frameworkRuntime).toBeDefined();
       const clientReferenceManifest = JSON.parse(
         await fs.readFile(
           path.join(cwd, "dist/client/react-client-manifest.json"),
-          "utf-8",
-        ),
-      );
-      const serverConsumerManifest = JSON.parse(
-        await fs.readFile(
-          path.join(cwd, "dist/client/react-ssr-manifest.json"),
           "utf-8",
         ),
       );
@@ -773,30 +829,27 @@ describe("webpackAdapter build", () => {
           "insights-rsc",
         ]),
       );
-      expect(manifest.rsc?.clientReferenceManifest).toEqual(
+      expect("rsc" in deploymentMetadata).toBe(false);
+      expect(frameworkRuntime?.rsc?.clientReferenceManifest).toEqual(
         clientReferenceManifest,
-      );
-      expect(manifest.rsc?.serverConsumerManifest).toEqual(
-        serverConsumerManifest,
       );
       expect(Object.keys(clientReferenceManifest)).toEqual(
         expect.arrayContaining([badgeFileUrl]),
       );
-      expect(manifest.rsc?.pages?.insights).toEqual(
+      expect(output.rsc?.pages?.insights).toEqual(
         expect.objectContaining({
           renderer: "insights-rsc",
-          component: "./src/pages/Insights !page.tsx",
         }),
       );
-      expect(manifest.server?.renderers?.["insights-server"]).toMatchObject({
+      expect(output.server?.renderers?.["insights-server"]).toMatchObject({
         kind: "page-server",
         assets: { js: ["insights-server.cjs"], css: ["insights-server.css"] },
       });
-      expect(manifest.server?.renderers?.["insights-rsc"]).toMatchObject({
+      expect(output.server?.renderers?.["insights-rsc"]).toMatchObject({
         kind: "rsc-page",
         assets: { js: ["insights-rsc.cjs"], css: ["insights-rsc.css"] },
       });
-      expect(manifest.pages.insights.assets).toEqual({
+      expect(output.pages.insights.assets).toEqual({
         js: ["evjs-rsc-client.js"],
         css: expect.arrayContaining([
           "insights-server.css",
@@ -809,7 +862,7 @@ describe("webpackAdapter build", () => {
 
       const htmlResponse = await requestServerEntry(
         cwd,
-        manifest,
+        output,
         "/insights/weekly?tab=overview&tag=a&tag=b",
       );
       expect(htmlResponse.status).toBe(200);
@@ -823,7 +876,7 @@ describe("webpackAdapter build", () => {
 
       const flightResponse = await requestServerEntry(
         cwd,
-        manifest,
+        output,
         "/__evjs/rsc?page=insights&url=%2Finsights%2Fweekly%3Ftab%3Doverview%26tag%3Da%26tag%3Db",
       );
       expect(flightResponse.status).toBe(200);
@@ -885,7 +938,7 @@ describe("webpackAdapter build", () => {
         mode: "development",
       });
 
-      await buildWithFrameworkArtifacts({
+      const output = await buildWithFrameworkArtifacts({
         config,
         cwd,
         graph: analysis.graph,
@@ -893,47 +946,35 @@ describe("webpackAdapter build", () => {
         hooks: [],
       });
 
-      const manifest = JSON.parse(
-        await fs.readFile(path.join(cwd, "dist/build-output.json"), "utf-8"),
-      ) as BuildOutput;
       const campaignRegionId = getSinglePprRegionId(
-        manifest.pages.campaign.ppr?.regions,
+        output.pages.campaign.ppr?.regions,
       );
       const campaignRegionRenderer = `campaign-${campaignRegionId}-ppr-region`;
       const campaignRegionAsset = `${campaignRegionRenderer}.cjs`;
 
-      expect(manifest.pages.campaign.ppr).toMatchObject({
+      expect(output.pages.campaign.ppr).toMatchObject({
         delivery: "merge",
         shell: { js: ["campaign-ppr-shell.cjs"], css: [] },
         regions: {
           [campaignRegionId]: {
             id: campaignRegionId,
             assets: { js: [campaignRegionAsset], css: [] },
-            component: "./src/pages/Offer.tsx",
             cache: "no-store",
           },
         },
       });
-      expect(manifest.server?.renderers?.["campaign-ppr-shell"]).toMatchObject({
+      expect(output.server?.renderers?.["campaign-ppr-shell"]).toMatchObject({
         kind: "ppr-shell",
         owner: { pageId: "campaign" },
-        module: "./src/pages/Campaign.tsx",
         assets: { js: ["campaign-ppr-shell.cjs"], css: [] },
       });
-      expect(
-        manifest.server?.renderers?.[campaignRegionRenderer],
-      ).toMatchObject({
+      expect(output.server?.renderers?.[campaignRegionRenderer]).toMatchObject({
         kind: "ppr-region",
         owner: { pageId: "campaign", regionId: campaignRegionId },
-        module: "./src/pages/Offer.tsx",
         assets: { js: [campaignRegionAsset], css: [] },
       });
 
-      const shellResponse = await requestServerEntry(
-        cwd,
-        manifest,
-        "/campaign",
-      );
+      const shellResponse = await requestServerEntry(cwd, output, "/campaign");
       expect(shellResponse.status).toBe(200);
       expect(await shellResponse.text()).toContain(
         "<main>Campaign <!-- -->campaign<section>Offer region</section></main>",
@@ -941,7 +982,7 @@ describe("webpackAdapter build", () => {
 
       const regionResponse = await requestServerEntry(
         cwd,
-        manifest,
+        output,
         `/__evjs/ppr/campaign/${campaignRegionId}`,
       );
       expect(regionResponse.status).toBe(200);
@@ -1001,23 +1042,22 @@ describe("webpackAdapter dev", () => {
     try {
       const manifest = JSON.parse(
         await fs.readFile(path.join(cwd, "dist/manifest.json"), "utf-8"),
-      ) as { pages: BuildOutput["pages"] };
-      const runtime = JSON.parse(
-        await fs.readFile(path.join(cwd, "dist/runtime.json"), "utf-8"),
-      ) as { pages: Record<string, Record<string, unknown>> };
+      ) as PublicManifestOutput;
       const html = await fetchDevText(`http://127.0.0.1:${port}/home.html`);
 
       expect(onBuildOutput).toHaveBeenCalledTimes(1);
       expect("distDir" in manifest).toBe(false);
-      expect(manifest.pages.home.assets.js).toEqual(["home.js"]);
-      expect(runtime.pages.home).not.toHaveProperty("assets");
-      expect(runtime.pages.home).toEqual({
-        module: { type: "react-component", href: "home.js" },
-        mount: "#root",
-      });
+      expect(manifest).not.toHaveProperty("assets");
+      if (!("routing" in manifest) || manifest.routing.kind !== "mpa") {
+        throw new Error("Expected MPA public manifest.");
+      }
+      expect(manifest.routing.pages.home.assets.js).toEqual(["home.js"]);
       expect(html).toContain('data-evjs-kind="page"');
       expect(html).toContain('data-evjs-id="home"');
       expect(html).toContain('src="/home.js"');
+      await expect(
+        fs.access(path.join(cwd, "dist/runtime.json")),
+      ).rejects.toThrow();
     } finally {
       await controller?.close?.();
     }
@@ -1271,10 +1311,7 @@ describe("webpackAdapter dev", () => {
       const session = controller as unknown as {
         plan: { entries: Array<{ name: string }> };
       };
-      expect(session.plan.entries.map((entry) => entry.name)).toEqual([
-        "home",
-        "server",
-      ]);
+      expect(session.plan.entries.map((entry) => entry.name)).toEqual(["home"]);
     } finally {
       await controller?.close?.();
     }
@@ -1371,13 +1408,17 @@ describe("webpackAdapter dev", () => {
 
       const manifest = JSON.parse(
         await fs.readFile(path.join(cwd, "dist/manifest.json"), "utf-8"),
-      ) as BuildOutput;
+      ) as PublicManifestOutput;
       const html = await fetchDevText(`http://127.0.0.1:${port}/about.html`);
 
       expect(update.entries.added.map((entry) => entry.name)).toEqual([
         "about",
       ]);
-      expect(manifest.pages.about.assets.js).toEqual(["about.js"]);
+      expect(manifest).not.toHaveProperty("assets");
+      if (!("routing" in manifest) || manifest.routing.kind !== "mpa") {
+        throw new Error("Expected MPA public manifest.");
+      }
+      expect(manifest.routing.pages.about.assets.js).toEqual(["about.js"]);
       expect(html).toContain('data-evjs-kind="page"');
       expect(html).toContain('data-evjs-id="about"');
       expect(html).toContain('src="/about.js"');
@@ -1481,6 +1522,16 @@ async function fetchDevText(url: string): Promise<string> {
   return response.text;
 }
 
+function readEmbeddedClientRuntime(html: string): unknown {
+  const match = html.match(
+    /<script\b(?=[^>]*\bid="__EVJS_CLIENT_RUNTIME__")(?=[^>]*\btype="application\/json")[^>]*>([\s\S]*?)<\/script>/,
+  );
+  if (!match) {
+    throw new Error("Expected embedded client runtime script.");
+  }
+  return JSON.parse(match[1]);
+}
+
 async function requestServerEntry(
   cwd: string,
   manifest: BuildOutput,
@@ -1492,8 +1543,10 @@ async function requestServerEntry(
     manifest.server?.entry ?? "",
   );
   const serverDir = path.dirname(serverEntryPath);
+  const frameworkRuntime =
+    frameworkRuntimeByOutput.get(manifest) ?? createFrameworkRuntime(manifest);
   const runtimeGlobals = globalThis as ServerRuntimeGlobals;
-  runtimeGlobals.__EVJS_FRAMEWORK_RUNTIME__ = createFrameworkRuntime(manifest);
+  runtimeGlobals.__EVJS_FRAMEWORK_RUNTIME__ = frameworkRuntime;
   runtimeGlobals.__EVJS_SERVER_MODULE_LOADER__ = async (asset: string) => {
     const mod = await import(
       pathToFileURL(path.resolve(serverDir, asset)).href

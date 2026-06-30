@@ -1,22 +1,22 @@
 import type {
   AppGraph,
-  AppOutput,
   AssetGroup,
   BuildEntry,
   BuildOutput,
   BuildPlan,
+  DeploymentDocumentOutput,
+  DeploymentMetadata,
+  DeploymentRouteOutput,
+  DeploymentServerPageRenderOutput,
   HtmlDocumentOutput,
   HydrationMode,
   PageNode,
   PageOutput,
   PageRenderingOutput,
-  PprRegionOutput,
-  PublicAppOutput,
+  PublicDocumentOutput,
   PublicManifestOutput,
   PublicPageOutput,
-  PublicPprRegionOutput,
-  PublicRuntimeModuleOutput,
-  RscReferenceOutput,
+  PublicRoutingOutput,
   ServerFunctionOutput,
   ServerRouteOutput,
 } from "./index.js";
@@ -43,29 +43,20 @@ export interface BuildOutputLinkInput {
   serverEntry?: string;
   serverAssets?: AssetGroup;
   serverModules?: BuildOutputServerModule[];
-  rscManifests?: {
-    clientReferenceManifest?: Record<string, unknown>;
-    serverConsumerManifest?: Record<string, unknown>;
-  };
 }
 
 export interface ServerManifestOutput {
   version: 1;
   entry?: string;
-  assets: AssetGroup;
-  functions: Record<string, ServerManifestFunctionOutput>;
   routes: ServerManifestRouteOutput[];
 }
 
-export interface ServerManifestFunctionOutput {
-  assets: AssetGroup;
-}
-
-export interface ServerManifestRouteOutput {
-  path: string;
-  methods: string[];
-  assets: AssetGroup;
-}
+export type ServerManifestRouteOutput =
+  | Extract<DeploymentRouteOutput, { kind: "server-page" }>
+  | Extract<DeploymentRouteOutput, { kind: "server-function" }>
+  | Extract<DeploymentRouteOutput, { kind: "ppr-endpoint" }>
+  | Extract<DeploymentRouteOutput, { kind: "rsc-endpoint" }>
+  | Extract<DeploymentRouteOutput, { kind: "api-route" }>;
 
 export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
   const clientEntryAssets = input.clientEntryAssets ?? {};
@@ -91,12 +82,14 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
   const serverRuntimeAssets = serverRuntimeEntry
     ? serverAssetsForEntry(serverRuntimeEntry)
     : fallbackServerAssets;
-  const serverEntry = assertServerRuntimeEntry(
-    input.serverEntry ?? serverRuntimeAssets.js[0],
-    serverRuntimeAssets,
-    serverRuntimeEntry,
-  );
-  const serverAssets = serverRuntimeAssets;
+  const serverEntry = serverRuntimeEntry
+    ? assertServerRuntimeEntry(
+        input.serverEntry ?? serverRuntimeAssets.js[0],
+        serverRuntimeAssets,
+        serverRuntimeEntry,
+      )
+    : undefined;
+  const serverAssets = serverRuntimeEntry ? serverRuntimeAssets : EMPTY_ASSETS;
 
   const findEntryByOwner = (
     owner: BuildEntry["owner"],
@@ -150,7 +143,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
         {
           assets,
           document: cloneHtmlDocument(htmlDocuments.apps.get(id)),
-          entry: app.entry,
           mount: app.mount,
           module: entry
             ? {
@@ -202,10 +194,7 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
           rendering: derivePageRendering(page),
           path: page.path,
           routeId: page.routeId,
-          entry: page.entry,
-          component: page.component,
           componentModel: page.componentModel,
-          app: page.app,
           hydrate: effectivePageHydrate(page),
           mount: page.mount,
           prerender: page.prerender,
@@ -242,8 +231,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
                         {
                           id: regionId,
                           assets: serverAssetsForEntry(regionEntry),
-                          component: region.component,
-                          fallback: region.fallback,
                           cache: region.cache,
                           hydrate: region.hydrate,
                         },
@@ -262,7 +249,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
   for (const fn of input.graph.serverFunctions) {
     serverFunctions[fn.id] = {
       assets: assetsForSource(fn.module),
-      module: fn.module,
       exportName: fn.exportName,
     };
   }
@@ -279,7 +265,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
   return {
     version: 1,
     buildId: input.plan.buildId,
-    distDir: input.plan.distDir,
     paths: createBuildOutputPaths(input.plan),
     publicPath: input.plan.runtime.publicPath,
     runtime: {
@@ -297,7 +282,6 @@ export function linkBuildOutput(input: BuildOutputLinkInput): BuildOutput {
           path: route.path,
           appId: route.appId,
           pageId: route.pageId,
-          module: route.module,
         }),
       ),
     server: {
@@ -380,84 +364,207 @@ function assertServerRuntimeEntry(
 }
 
 /**
- * Project the internal build output into the public runtime manifest that is
- * safe to serve to browsers.
+ * Project the internal build output into a lightweight public manifest that is
+ * safe for deployment tooling to read.
  *
- * The internal `BuildOutput` intentionally keeps source modules, server
- * renderer modules, and raw React Flight manifests because the server runtime
- * needs those facts. The public manifest must not expose that implementation
- * metadata.
+ * The public manifest keeps browser-safe assets plus SPA/MPA routing metadata.
+ * Runtime startup data stays in the generated ClientRuntime contract, and
+ * framework endpoints stay in FrameworkRuntime/deployment metadata.
  */
 export function createPublicManifest(
   output: BuildOutput,
 ): PublicManifestOutput {
   const publicAssetFiles = collectPublicAssetFiles(output);
+  const documents = createPublicDocumentManifest(output, publicAssetFiles);
+  if (documents) {
+    return {
+      version: output.version,
+      buildId: output.buildId,
+      publicPath: output.publicPath,
+      documents,
+    };
+  }
+  const routing = createPublicManifestRouting(output, publicAssetFiles);
+  const assets =
+    routing.kind === "spa"
+      ? clonePublicAssetRecord(output.assets, publicAssetFiles)
+      : undefined;
   return pruneUndefined({
     version: output.version,
     buildId: output.buildId,
     publicPath: output.publicPath,
-    assets: clonePublicAssetRecord(output.assets, publicAssetFiles),
-    apps: Object.fromEntries(
-      Object.entries(output.apps).map(([id, app]) => [
-        id,
-        sanitizeAppOutput(app),
-      ]),
-    ),
-    pages: Object.fromEntries(
-      Object.entries(output.pages).map(([id, page]) => [
-        id,
-        sanitizePageOutput(page, publicAssetFiles),
-      ]),
-    ),
+    assets: assets && hasAssetRecordEntries(assets) ? assets : undefined,
+    routing,
+  }) as PublicManifestOutput;
+}
+
+function createPublicManifestRouting(
+  output: BuildOutput,
+  publicAssetFiles: Set<string>,
+): PublicRoutingOutput {
+  const hasSpaRoute = output.routes.some((route) => route.appId);
+  if (!hasSpaRoute && Object.keys(output.pages).length > 0) {
+    return {
+      kind: "mpa",
+      pages: Object.fromEntries(
+        Object.entries(output.pages).map(([id, page]) => [
+          id,
+          sanitizePageOutput(
+            page,
+            publicAssetFiles,
+            findOutputRouteForPage(output, id),
+          ),
+        ]),
+      ),
+    };
+  }
+
+  return {
+    kind: "spa",
     routes: output.routes.map((route) =>
       pruneUndefined({
         id: route.id,
         path: route.path,
-        appId: route.appId,
         pageId: route.pageId,
+        render: route.pageId ? output.pages[route.pageId]?.render : undefined,
       }),
     ),
-    rsc: output.rsc
-      ? pruneUndefined({
-          endpoint: output.rsc.endpoint,
-          pages: output.rsc.pages
-            ? Object.fromEntries(
-                Object.entries(output.rsc.pages).map(([id, page]) => [
-                  id,
-                  pruneUndefined({
-                    renderer: page.renderer,
-                    assets: clonePublicAssets(page.assets, publicAssetFiles),
-                    routeId: page.routeId,
-                  }),
-                ]),
-              )
-            : undefined,
-        })
-      : undefined,
-  }) as PublicManifestOutput;
+  };
+}
+
+function createPublicDocumentManifest(
+  output: BuildOutput,
+  publicAssetFiles: Set<string>,
+): PublicDocumentOutput[] | undefined {
+  if (!isStaticDocumentOnlyOutput(output)) return undefined;
+  const documents = createStaticSsgDocumentRecords(output).map((document) =>
+    pruneUndefined({
+      id: document.id,
+      path: document.path,
+      fileName: document.fileName,
+      render: document.render,
+      assets: optionalAssetGroup(
+        clonePublicAssets(document.assets, publicAssetFiles),
+      ),
+    }),
+  );
+  return documents.length > 0 ? documents : undefined;
+}
+
+function isStaticDocumentOnlyOutput(output: BuildOutput): boolean {
+  const documentIds = new Set(
+    createStaticSsgDocumentRecords(output).map((document) => document.id),
+  );
+  if (documentIds.size === 0) return false;
+  if (
+    Object.keys(output.pages).some((pageId) => !documentIds.has(pageId)) ||
+    output.routes.some(
+      (route) => !route.pageId || !documentIds.has(route.pageId),
+    )
+  ) {
+    return false;
+  }
+  if (output.server.entry) return false;
+  if (Object.keys(output.server.functions).length > 0) return false;
+  if (output.server.routes.length > 0) return false;
+  if (output.rsc && Object.keys(output.rsc.pages ?? {}).length > 0) {
+    return false;
+  }
+  if (
+    Object.values(output.apps).some(
+      (app) =>
+        app.document ||
+        app.assets.js.length > 0 ||
+        app.assets.css.length > 0 ||
+        app.module,
+    )
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function createStaticSsgDocumentRecords(output: BuildOutput): Array<{
+  id: string;
+  path: string;
+  fileName: string;
+  render: Extract<PageOutput["render"], "ssg">;
+  assets: AssetGroup;
+}> {
+  return Object.entries(output.pages).flatMap(([id, page]) => {
+    if (
+      !page.document ||
+      page.render !== "ssg" ||
+      page.rendering.html !== "static" ||
+      page.rendering.prerender !== "full" ||
+      page.ppr
+    ) {
+      return [];
+    }
+    const route = findOutputRouteForPage(output, id);
+    const path = route?.path ?? page.path;
+    if (!path?.startsWith("/")) return [];
+    return [
+      {
+        id,
+        path,
+        fileName: page.document.fileName,
+        render: page.render,
+        assets: page.assets,
+      },
+    ];
+  });
 }
 
 export function createServerManifest(
   output: BuildOutput,
 ): ServerManifestOutput {
-  const routes = output.server.routes.map((route) => ({
-    path: route.path,
-    methods: [...route.methods],
-    assets: cloneAssets(route.assets),
-  }));
-
   return {
     version: 1,
     ...(output.server.entry ? { entry: output.server.entry } : {}),
-    assets: cloneAssets(output.server.assets),
-    functions: Object.fromEntries(
-      Object.entries(output.server.functions).map(([id, fn]) => [
-        id,
-        { assets: cloneAssets(fn.assets) },
-      ]),
-    ),
-    routes,
+    routes: createDeploymentRoutes(output).filter(isServerManifestRoute),
   };
+}
+
+function isServerManifestRoute(
+  route: DeploymentRouteOutput,
+): route is ServerManifestRouteOutput {
+  return (
+    route.kind === "server-page" ||
+    route.kind === "server-function" ||
+    route.kind === "ppr-endpoint" ||
+    route.kind === "rsc-endpoint" ||
+    route.kind === "api-route"
+  );
+}
+
+export interface DeploymentMetadataOptions {
+  includeAssets?: boolean;
+}
+
+export function createDeploymentMetadata(
+  output: BuildOutput,
+  options: DeploymentMetadataOptions = {},
+): DeploymentMetadata {
+  const includeAssets = options.includeAssets ?? true;
+  const publicAssetFiles = collectPublicAssetFiles(output);
+  const assets = includeAssets
+    ? clonePublicAssetRecord(output.assets, publicAssetFiles)
+    : undefined;
+  return pruneUndefined({
+    version: 1 as const,
+    buildId: output.buildId,
+    paths: output.paths,
+    publicPath: output.publicPath,
+    assets: assets && hasAssetRecordEntries(assets) ? assets : undefined,
+    documents: createDeploymentDocuments(output, includeAssets),
+    routes: createDeploymentRoutes(output),
+    server: pruneUndefined({
+      entry: output.server.entry,
+    }),
+    metadata: output.deployment,
+  }) as DeploymentMetadata;
 }
 
 function createBuildOutputPaths(
@@ -470,44 +577,168 @@ function createBuildOutputPaths(
   };
 }
 
-function sanitizeAppOutput(app: AppOutput): PublicAppOutput {
-  return pruneUndefined({
-    assets: cloneAssets(app.assets),
-    document: cloneHtmlDocument(app.document),
-    mount: app.mount,
-    module: sanitizeRuntimeModule(app.module),
-  }) as PublicAppOutput;
-}
-
 function sanitizePageOutput(
   page: PageOutput,
   publicAssetFiles: Set<string>,
+  route?: BuildOutput["routes"][number],
 ): PublicPageOutput {
   return pruneUndefined({
     assets: clonePublicAssets(page.assets, publicAssetFiles),
     document: cloneHtmlDocument(page.document),
+    path: page.path ?? route?.path,
+    routeId: page.routeId ?? route?.id,
     render: page.render,
-    rendering: page.rendering,
-    path: page.path,
-    routeId: page.routeId,
-    componentModel: page.componentModel,
-    hydrate: page.hydrate,
-    mount: page.mount,
-    prerender: page.prerender,
-    module: sanitizeRuntimeModule(page.module),
-    ppr: page.ppr
-      ? {
-          delivery: page.ppr.delivery ?? "merge",
-          shell: clonePublicAssets(page.ppr.shell, publicAssetFiles),
-          regions: Object.fromEntries(
-            Object.entries(page.ppr.regions).map(([id, region]) => [
-              id,
-              sanitizePprRegion(region, publicAssetFiles),
-            ]),
-          ),
-        }
-      : undefined,
   }) as PublicPageOutput;
+}
+
+function createDeploymentDocuments(
+  output: BuildOutput,
+  includeAssets: boolean,
+): DeploymentDocumentOutput[] {
+  const documents: DeploymentDocumentOutput[] = [];
+  for (const [id, app] of Object.entries(output.apps)) {
+    if (!app.document) continue;
+    const fallbackRoute = findOutputRouteForApp(output, id);
+    documents.push(
+      pruneUndefined({
+        kind: "app" as const,
+        id,
+        fileName: app.document.fileName,
+        fallback: fallbackRoute?.path,
+        assets: includeAssets ? optionalAssetGroup(app.assets) : undefined,
+      }),
+    );
+  }
+  for (const [id, page] of Object.entries(output.pages)) {
+    if (!page.document) continue;
+    const route = findOutputRouteForPage(output, id);
+    const staticDocument = createStaticDocumentMetadata(page, route);
+    documents.push(
+      pruneUndefined({
+        kind: "page" as const,
+        id,
+        fileName: page.document.fileName,
+        ...staticDocument,
+        assets: includeAssets ? optionalAssetGroup(page.assets) : undefined,
+      }),
+    );
+  }
+  return documents;
+}
+
+function createDeploymentRoutes(output: BuildOutput): DeploymentRouteOutput[] {
+  const routes: DeploymentRouteOutput[] = [];
+  for (const route of output.routes) {
+    if (route.pageId) {
+      const page = output.pages[route.pageId];
+      if (!page) continue;
+      if (page.document && (page.render === "csr" || page.render === "ssg")) {
+        continue;
+      }
+      if (page.render !== "csr") {
+        const rendering = createDeploymentServerPageRendering(
+          output,
+          route.pageId,
+          page,
+        );
+        routes.push({
+          kind: "server-page",
+          path: route.path,
+          pageId: route.pageId,
+          ...rendering,
+          methods: ["GET", "HEAD"],
+        });
+      }
+      continue;
+    }
+
+    if (route.appId) continue;
+  }
+
+  if (Object.keys(output.server.functions).length > 0) {
+    routes.push({
+      kind: "server-function",
+      path: output.runtime.server.fn,
+      methods: ["POST"],
+    });
+  }
+  if (Object.values(output.pages).some((page) => page.ppr)) {
+    const pprPath = output.runtime.server.ppr;
+    if (pprPath) {
+      routes.push({
+        kind: "ppr-endpoint",
+        path: `${pprPath}/*`,
+        methods: ["GET", "HEAD"],
+      });
+    }
+  }
+  if (output.rsc && output.runtime.server.rsc) {
+    routes.push({
+      kind: "rsc-endpoint",
+      path: output.runtime.server.rsc,
+      methods: ["GET", "HEAD"],
+    });
+  }
+  for (const route of output.server.routes) {
+    routes.push({
+      kind: "api-route",
+      path: route.path,
+      methods: [...route.methods],
+    });
+  }
+  return routes;
+}
+
+function createStaticDocumentMetadata(
+  page: PageOutput,
+  route: BuildOutput["routes"][number] | undefined,
+): { path?: string; render?: Extract<PageOutput["render"], "csr" | "ssg"> } {
+  if (page.render !== "csr" && page.render !== "ssg") return {};
+  const path = route?.path ?? page.path;
+  if (!path) return {};
+  return {
+    path,
+    render: page.render,
+  };
+}
+
+function createDeploymentServerPageRendering(
+  output: BuildOutput,
+  pageId: string,
+  page: PageOutput,
+): {
+  render: DeploymentServerPageRenderOutput;
+  prerender?: "full" | "partial";
+  rsc?: true;
+} {
+  if (page.ppr) return { render: "ssr", prerender: "partial" };
+  if (output.rsc?.pages?.[pageId]) return { render: "ssr", rsc: true };
+  if (page.render === "ssg" || page.rendering.prerender === "full") {
+    return { render: "ssr", prerender: "full" };
+  }
+  if (page.render === "ssr") return { render: "ssr" };
+  if (page.render === "csr") {
+    throw new Error(
+      `[evjs] CSR page "${pageId}" cannot be emitted as a server deployment route.`,
+    );
+  }
+  throw new Error(
+    `[evjs] Page "${pageId}" render mode "${page.render}" cannot be emitted as a server deployment route.`,
+  );
+}
+
+function findOutputRouteForPage(
+  output: BuildOutput,
+  pageId: string,
+): BuildOutput["routes"][number] | undefined {
+  return output.routes.find((route) => route.pageId === pageId);
+}
+
+function findOutputRouteForApp(
+  output: BuildOutput,
+  appId: string,
+): BuildOutput["routes"][number] | undefined {
+  return output.routes.find((route) => route.appId === appId);
 }
 
 function createHtmlDocumentLookup(html: BuildPlan["html"]): {
@@ -535,28 +766,6 @@ function cloneHtmlDocument(
   return document ? { fileName: document.fileName } : undefined;
 }
 
-function sanitizePprRegion(
-  region: PprRegionOutput,
-  publicAssetFiles: Set<string>,
-): PublicPprRegionOutput {
-  return pruneUndefined({
-    id: region.id,
-    assets: clonePublicAssets(region.assets, publicAssetFiles),
-    cache: region.cache,
-    hydrate: region.hydrate,
-  }) as PublicPprRegionOutput;
-}
-
-function sanitizeRuntimeModule(
-  module: PublicRuntimeModuleOutput | undefined,
-): PublicRuntimeModuleOutput | undefined {
-  if (!module) return undefined;
-  return pruneUndefined({
-    type: module.type,
-    href: module.href,
-  }) as PublicRuntimeModuleOutput;
-}
-
 function clonePublicAssetRecord(
   assets: Record<string, AssetGroup>,
   publicAssetFiles: Set<string>,
@@ -572,6 +781,14 @@ function clonePublicAssetRecord(
   ) as Record<string, AssetGroup>;
 }
 
+function hasAssetRecordEntries(assets: Record<string, AssetGroup>): boolean {
+  return Object.keys(assets).length > 0;
+}
+
+function optionalAssetGroup(assets: AssetGroup): AssetGroup | undefined {
+  return assets.js.length > 0 || assets.css.length > 0 ? assets : undefined;
+}
+
 function collectPublicAssetFiles(output: BuildOutput): Set<string> {
   const files = new Set<string>();
   const collect = (assets: AssetGroup | undefined) => {
@@ -583,13 +800,6 @@ function collectPublicAssetFiles(output: BuildOutput): Set<string> {
   for (const page of Object.values(output.pages)) collect(page.assets);
 
   return files;
-}
-
-function cloneAssets(assets: AssetGroup): AssetGroup {
-  return {
-    js: [...assets.js],
-    css: [...assets.css],
-  };
 }
 
 function clonePublicAssets(
@@ -620,30 +830,21 @@ function linkRscOutput(
   input: BuildOutputLinkInput,
   serverAssetsForEntry: (entry: BuildEntry) => AssetGroup,
 ): BuildOutput["rsc"] | undefined {
-  const endpoint = input.plan.runtime.server.rsc;
   const rscRenderers = input.plan.entries.filter(
     (entry) => entry.environment === "server" && entry.kind === "rsc-page",
   );
   const rscPages = Object.values(input.graph.pages).filter(isRscPage);
 
-  if (
-    !endpoint &&
-    rscPages.length === 0 &&
-    !input.graph.clientReferences?.length &&
-    !input.graph.serverReferences?.length &&
-    !input.rscManifests?.clientReferenceManifest &&
-    !input.rscManifests?.serverConsumerManifest
-  ) {
+  if (rscPages.length === 0) {
     return undefined;
   }
-  if (!endpoint && rscPages.length > 0) {
+  if (!input.plan.runtime.server.rsc) {
     throw new Error(
       `[evjs] RSC page "${rscPages[0].id}" requires runtime.server.rsc before RSC manifest emission.`,
     );
   }
 
   return {
-    endpoint,
     pages:
       rscPages.length > 0
         ? Object.fromEntries(
@@ -654,17 +855,12 @@ function linkRscOutput(
                 {
                   renderer: renderer.name,
                   assets: serverAssetsForEntry(renderer),
-                  component: page.component,
                   routeId: page.routeId,
                 },
               ];
             }),
           )
         : undefined,
-    clientReferences: referencesToRecord(input.graph.clientReferences),
-    serverReferences: referencesToRecord(input.graph.serverReferences),
-    clientReferenceManifest: input.rscManifests?.clientReferenceManifest,
-    serverConsumerManifest: input.rscManifests?.serverConsumerManifest,
   };
 }
 
@@ -677,23 +873,6 @@ function findRscRendererForPage(
 
   throw new Error(
     `[evjs] RSC page "${pageId}" did not declare a matching rsc-page server renderer.`,
-  );
-}
-
-function referencesToRecord(
-  references:
-    | Array<{ id: string; module: string; exportName?: string }>
-    | undefined,
-): Record<string, RscReferenceOutput> | undefined {
-  if (!references?.length) return undefined;
-  return Object.fromEntries(
-    references.map((reference) => [
-      reference.id,
-      {
-        module: reference.module,
-        exportName: reference.exportName,
-      },
-    ]),
   );
 }
 
@@ -714,14 +893,14 @@ function linkServerRenderers(
       );
       return [
         renderer.name,
-        {
+        pruneUndefined({
           kind: renderer.kind,
+          phase: renderer.phase,
           owner: renderer.owner,
-          module: renderer.import,
           assets: entry
             ? serverAssetsForEntry(entry)
             : assetsForSource(renderer.import),
-        },
+        }),
       ];
     }),
   );

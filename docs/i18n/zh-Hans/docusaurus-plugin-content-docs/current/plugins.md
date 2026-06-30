@@ -167,26 +167,36 @@ import type { HtmlDocument } from "@evjs/ev";
 
 ## Build Result
 
-`buildEnd()` 接收最终构建输出，以及更聚焦的 client/server manifest 视图：
+`buildEnd()` 接收最终构建输出，以及更聚焦的 client/server manifest 和 deployment metadata 视图：
 
 ```ts
 setup() {
   return {
-    buildEnd({ output, clientManifest, serverManifest, isRebuild }) {
+    buildEnd({
+      output,
+      clientManifest,
+      serverManifest,
+      deploymentMetadata,
+      isRebuild,
+    }) {
       console.log("Apps:", Object.keys(output.apps));
       console.log("Pages:", Object.keys(output.pages));
-      console.log("Client JS:", clientManifest.assets.js);
+      console.log("Client asset groups:", Object.keys(clientManifest.assets ?? {}));
       console.log("Server entry:", serverManifest.entry);
+      console.log("Server routes:", serverManifest.routes.length);
+      console.log("Deploy routes:", deploymentMetadata.routes.length);
       console.log("Rebuild:", isRebuild);
     },
   };
 }
 ```
 
-部署插件应该从 `output` 读取 routes、functions、assets 和 runtime paths。
-只需要客户端或服务端 bundle 摘要的插件可以使用 `clientManifest` 和
-`serverManifest`。HTML hook 会收到同一组结果字段，并额外包含 `ctx.kind`、
-`ctx.fileName`、`ctx.assets` 等文档字段。
+部署插件应优先从 `deploymentMetadata` 读取 routes、documents、assets 和 server entry。
+需要完整内部构建图的插件仍可在内存中检查 `output`。只需要客户端 bundle 摘要的插件可以使用
+`clientManifest`：读取 SPA `routes` 或 MPA `pages` 前先检查
+`clientManifest.routing.kind`。只需要 server entry 和服务端处理 route 摘要的插件可以读取
+`serverManifest.routes`；完整部署规划仍应使用 `deploymentMetadata.routes`。HTML hook 会收到
+同一组结果字段，并额外包含 `ctx.kind`、`ctx.fileName`、`ctx.assets` 等文档字段。
 
 ## Bundler Config
 

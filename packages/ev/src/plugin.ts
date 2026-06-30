@@ -2,10 +2,20 @@ import type {
   AssetGroup,
   BuildEnvironment,
   BuildOutput,
+  DeploymentMetadata,
+  PublicManifestOutput,
+  PublicPageOutput,
+  PublicRouteOutput,
+  ServerManifestOutput,
 } from "@evjs/shared/manifest";
-import { createServerManifest } from "@evjs/shared/manifest";
+import {
+  createDeploymentMetadata,
+  createPublicManifest,
+  createServerManifest,
+} from "@evjs/shared/manifest";
 import type { Logger } from "@logtape/logtape";
 import type { Config, DefaultBundlerConfig, ResolvedConfig } from "./config.js";
+import type { FrameworkRuntimeOutput } from "./framework-runtime.js";
 
 /**
  * Minimal DOM element / document interface for plugin HTML manipulation.
@@ -93,68 +103,19 @@ export interface HtmlDocument {
 }
 
 /** JavaScript and CSS assets exposed to plugin manifest views. */
-export interface ManifestAssets {
-  /** JavaScript bundle paths. */
-  js: string[];
-  /** CSS bundle paths. */
-  css: string[];
-}
+export type ManifestAssets = AssetGroup;
 
 /** A discovered client route exposed to plugin manifest views. */
-export interface RouteEntry {
-  /** Route path, e.g. "/", "/posts/$postId", or "*". */
-  path: string;
-}
+export type RouteEntry = PublicRouteOutput;
 
 /** Per-page client manifest entry exposed to plugin hooks. */
-export interface PageManifestEntry {
-  /** Bundle asset paths for this page. */
-  assets: ManifestAssets;
-  /** Discovered routes for this page. */
-  routes?: RouteEntry[];
-}
+export type PageManifestEntry = PublicPageOutput;
 
-/** Client-focused manifest view derived from the linked framework output. */
-export interface ClientManifest {
-  /** Schema version for this manifest view. */
-  version: 1;
-  /** Bundle asset paths for SPA HTML injection. */
-  assets: ManifestAssets;
-  /** Discovered client routes. */
-  routes?: RouteEntry[];
-  /** Per-page assets for page-style outputs. */
-  pages?: Record<string, PageManifestEntry>;
-}
-
-/** Server function entry exposed to plugin manifest views. */
-export interface ServerFnEntry {
-  /** Emitted assets containing this function. */
-  assets: ManifestAssets;
-}
-
-/** Server route entry exposed to plugin manifest views. */
-export interface ServerRouteEntry {
-  /** URL path pattern handled by this route. */
-  path: string;
-  /** HTTP methods explicitly handled by this route. */
-  methods: string[];
-  /** Emitted assets containing this route handler. */
-  assets: ManifestAssets;
-}
+/** Client-focused deployment manifest view derived from the linked output. */
+export type ClientManifest = PublicManifestOutput;
 
 /** Server-focused manifest view derived from the linked framework output. */
-export interface ServerManifest {
-  /** Schema version for this manifest view. */
-  version: 1;
-  /** Server bundle entry filename. */
-  entry?: string;
-  /** Server bundle asset paths. */
-  assets: ManifestAssets;
-  /** Registered server functions. */
-  functions: Record<string, ServerFnEntry>;
-  /** Registered server route handlers. */
-  routes: ServerRouteEntry[];
-}
+export type ServerManifest = ServerManifestOutput;
 
 /** Base context passed to plugin bundler hooks. */
 export interface EvBundlerCtx<TBundlerCfg = DefaultBundlerConfig> {
@@ -374,11 +335,12 @@ export interface PluginHooks<TBundlerCfg = DefaultBundlerConfig>
     | ((ctx: BuildStartContext<TBundlerCfg>) => void | Promise<void>);
 
   /**
-   * Inspect or mutate the linked framework build output before it is emitted
-   * as the framework manifest and before HTML documents are transformed.
+   * Inspect or mutate the linked framework build output before deployment
+   * metadata is projected and before HTML documents are transformed.
    *
-   * Deployment adapters should use this hook to add deployment metadata to the
-   * BuildOutput emitted as `dist/build-output.json`.
+   * Deployment adapters should prefer buildEnd().deploymentMetadata for the
+   * canonical deployable artifact shape, and use this hook only when they need
+   * to add data to the in-memory BuildOutput before projection.
    */
   buildOutput?: (
     output: BuildOutput,
@@ -423,6 +385,8 @@ export interface EvBuildResult {
   clientManifest: ClientManifest;
   /** Server-focused manifest view derived from `output`. */
   serverManifest: ServerManifest;
+  /** Deployment metadata projection for adapters and tooling. */
+  deploymentMetadata: DeploymentMetadata;
   /** True if this is a rebuild triggered by file change (dev watch mode only). */
   isRebuild: boolean;
 }
@@ -433,6 +397,8 @@ export interface EvBuildResult {
 export interface BuildResult extends EvBuildResult {
   /** Single framework build output. */
   output: BuildOutput;
+  /** Server runtime contract generated from BuildOutput plus runtime-only facts. */
+  frameworkRuntime?: FrameworkRuntimeOutput;
 }
 
 export type HtmlDocumentInfo =
@@ -477,72 +443,19 @@ export type BuildOutputHookContext<TBundlerCfg = DefaultBundlerConfig> =
 
 export type EvDocument = HtmlDocument;
 
-const EMPTY_ASSETS: ManifestAssets = { js: [], css: [] };
-
 export function createBuildResult(
   output: BuildOutput,
   isRebuild: boolean,
+  options: { frameworkRuntime?: FrameworkRuntimeOutput } = {},
 ): BuildResult {
   return {
     output,
-    clientManifest: createClientManifest(output),
+    ...(options.frameworkRuntime
+      ? { frameworkRuntime: options.frameworkRuntime }
+      : {}),
+    clientManifest: createPublicManifest(output),
     serverManifest: createServerManifest(output),
+    deploymentMetadata: createDeploymentMetadata(output),
     isRebuild,
-  };
-}
-
-function createClientManifest(output: BuildOutput): ClientManifest {
-  const pageEntries = Object.entries(output.pages).filter(
-    ([, page]) => page.document,
-  );
-  const routes = createRouteEntries(output);
-  const pages =
-    pageEntries.length > 0
-      ? Object.fromEntries(
-          pageEntries.map(([pageId, page]) => {
-            const pageRoutes = createRouteEntries(output, pageId);
-            return [
-              pageId,
-              {
-                assets: cloneAssets(page.assets),
-                ...(pageRoutes.length > 0 ? { routes: pageRoutes } : {}),
-              },
-            ];
-          }),
-        )
-      : undefined;
-
-  return {
-    version: 1,
-    assets: pages
-      ? cloneAssets(EMPTY_ASSETS)
-      : cloneAssets(getAppAssets(output)),
-    ...(routes.length > 0 ? { routes } : {}),
-    ...(pages ? { pages } : {}),
-  };
-}
-
-function createRouteEntries(
-  output: BuildOutput,
-  pageId?: string,
-): RouteEntry[] {
-  return output.routes
-    .filter((route) => pageId === undefined || route.pageId === pageId)
-    .map((route) => ({ path: route.path }));
-}
-
-function getAppAssets(output: BuildOutput): AssetGroup {
-  return (
-    output.apps.default?.assets ??
-    Object.values(output.apps)[0]?.assets ??
-    Object.values(output.assets)[0] ??
-    EMPTY_ASSETS
-  );
-}
-
-function cloneAssets(assets: AssetGroup): ManifestAssets {
-  return {
-    js: [...assets.js],
-    css: [...assets.css],
   };
 }

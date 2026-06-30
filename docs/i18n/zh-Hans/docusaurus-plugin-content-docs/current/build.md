@@ -29,11 +29,11 @@ dist/
 │   ├── index.html
 │   ├── main.[hash].js
 │   ├── [chunk].[hash].js
-│   ├── manifest.json
-│   └── runtime.json
-└── server/
-    ├── main.[hash].js
-    └── manifest.json
+│   └── manifest.json
+├── server/
+│   ├── main.[hash].js
+│   └── manifest.json
+└── build-output.json
 ```
 
 如果部署平台要求 public 文件在其他目录，可以配置 `output.client` 和
@@ -57,17 +57,18 @@ dist/
 ├── index.html
 ├── main.[hash].js
 ├── [chunk].[hash].js
-├── manifest.json
-└── runtime.json
+└── manifest.json
 dist-server/
 ├── main.[hash].js
 └── manifest.json
 ```
 
-`runtime.json` 是只包含启动、导航、transport 和 RSC endpoint 数据的浏览器运行时配置。
-`manifest.json` 和 `build-output.json` 是部署/工具元信息。client route 条目只是
-URL 到 app/page 的索引；页面渲染行为保留在 page 记录上，runtime endpoint 不进入公开
-client manifest。应用代码不应该导入或修改这些文件。
+生成的 HTML 会内嵌浏览器启动所需的 `ClientRuntime`。`client/manifest.json` 是轻量部署
+元信息：SPA manifest 保留顶层公开 assets，MPA manifest 把 assets 保留在每个 routing
+page 上。`server/manifest.json` 保留 server entry 文件名和 server route projection。
+Runtime-only 的 `FrameworkRuntime` 数据会注入 dev 和 deployment bootstrap，不再作为
+JSON 文件输出。`build-output.json` 是 canonical deployment metadata。应用代码不应该导入或
+修改部署元信息文件。
 
 ## 页面输出
 
@@ -89,7 +90,9 @@ export default function ProductPage() {
 }
 ```
 
-静态页面使用 `render = "ssg"`。Partial prerendering 使用 `render = "ssr"`
+构建期静态生成使用 `render = "ssg"`，并要求页面拥有静态可寻址路径。`ev build`
+会把该页面渲染成输出 HTML，例如 `dist/client/report.html`，部署元信息中表现为
+`static-page` route。服务端页面的 partial prerendering 使用 `render = "ssr"`
 加 `prerender = { partial: true }`。
 
 ```tsx

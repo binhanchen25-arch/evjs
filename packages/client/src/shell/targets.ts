@@ -1,4 +1,7 @@
-import type { ClientRuntime } from "../runtime-config.js";
+import {
+  type ClientRuntime,
+  getClientRuntimePages,
+} from "../runtime-config.js";
 import { isRecord } from "../validation.js";
 import type { ActivationRequest, ResolvedShellTarget } from "./types.js";
 
@@ -7,7 +10,7 @@ export async function resolveTarget(
   request: ActivationRequest,
 ): Promise<ResolvedShellTarget> {
   if (request.pageId) {
-    const page = runtime.pages[request.pageId];
+    const page = getClientRuntimePages(runtime)[request.pageId];
     if (!page) {
       throw new Error(`[evjs] Page "${request.pageId}" is not in the runtime.`);
     }
@@ -30,22 +33,21 @@ export async function resolveTarget(
     };
   }
 
-  const appId = request.appId ?? Object.keys(runtime.apps)[0];
-  const app = appId ? runtime.apps[appId] : undefined;
-  if (!appId || !app) {
+  const app = runtime.app;
+  if (!app) {
     throw new Error("[evjs] No app target is available in the runtime.");
   }
-  const href = readRuntimeModuleHref(app.module, `App "${appId}"`);
+  const id = request.appId ?? "default";
+  const label = request.appId ? `App "${request.appId}"` : "App";
+  const href = readRuntimeModuleHref(app.module, label);
   if (!href) {
-    throw new Error(
-      `[evjs] App "${appId}" does not expose an importable runtime module.`,
-    );
+    throw new Error(`${label} does not expose an importable runtime module.`);
   }
   return {
-    id: appId,
+    id,
     href,
     ctx: {
-      id: appId,
+      id,
       kind: "app",
       runtime,
       output: app,

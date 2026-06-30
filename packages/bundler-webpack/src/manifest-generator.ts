@@ -67,12 +67,15 @@ export class WebpackManifestGenerator {
 
     const serverEntrypoints = readEntrypointAssets(this.serverStats);
     this.serverEntryAssets = serverEntrypoints.byName;
-    const serverEntryName =
-      this.plan.entries.find((entry) => entry.kind === "server-runtime")
-        ?.name ?? "server";
-    this.serverAssets =
-      this.serverEntryAssets[serverEntryName] ?? serverEntrypoints.first;
-    this.serverEntry = this.serverAssets.js[0];
+    const serverRuntimeEntry = this.plan.entries.find(
+      (entry) => entry.kind === "server-runtime",
+    );
+    if (serverRuntimeEntry) {
+      this.serverAssets =
+        this.serverEntryAssets[serverRuntimeEntry.name] ??
+        serverEntrypoints.first;
+      this.serverEntry = this.serverAssets.js[0];
+    }
     this.serverModules = collectServerModules(
       this.serverStats,
       this.serverAssets,
@@ -202,19 +205,14 @@ function normalizeModuleId(
 function readRscManifests(clientDir: string):
   | {
       clientReferenceManifest?: Record<string, unknown>;
-      serverConsumerManifest?: Record<string, unknown>;
     }
   | undefined {
   const clientReferenceManifest = readJsonObject(
     path.join(clientDir, "react-client-manifest.json"),
   );
-  const serverConsumerManifest = readJsonObject(
-    path.join(clientDir, "react-ssr-manifest.json"),
-  );
-  if (!clientReferenceManifest && !serverConsumerManifest) return undefined;
+  if (!clientReferenceManifest) return undefined;
   return {
     clientReferenceManifest,
-    serverConsumerManifest,
   };
 }
 

@@ -6,7 +6,12 @@ import type {
   PluginContext,
   PluginHooks,
 } from "@evjs/ev";
-import { resolveConfig } from "@evjs/ev";
+import {
+  createDeploymentMetadata,
+  createPublicManifest,
+  createServerManifest,
+  resolveConfig,
+} from "@evjs/ev";
 import { getLogger } from "@logtape/logtape";
 import { describe, expect, it } from "vitest";
 
@@ -62,7 +67,11 @@ const CTX: PluginContext = {
 const TEST_OUTPUT: BuildOutput = {
   version: 1,
   buildId: "test",
-  distDir: "dist",
+  paths: {
+    rootDir: "dist",
+    publicDir: "dist/client",
+    serverDir: "dist/server",
+  },
   publicPath: "/",
   runtime: {
     server: {
@@ -76,7 +85,6 @@ const TEST_OUTPUT: BuildOutput = {
   apps: {
     default: {
       assets: { js: ["main.js"], css: [] },
-      entry: "./src/main.tsx",
     },
   },
   pages: {},
@@ -95,22 +103,9 @@ function createTestBuildResult(
 ): BuildResult {
   return {
     output,
-    clientManifest: {
-      version: 1,
-      assets: output.apps.default?.assets ?? { js: [], css: [] },
-    },
-    serverManifest: {
-      version: 1 as const,
-      ...(output.server.entry ? { entry: output.server.entry } : {}),
-      assets: output.server.assets,
-      functions: Object.fromEntries(
-        Object.entries(output.server.functions).map(([id, fn]) => [
-          id,
-          { assets: fn.assets },
-        ]),
-      ),
-      routes: output.server.routes,
-    },
+    clientManifest: createPublicManifest(output),
+    serverManifest: createServerManifest(output),
+    deploymentMetadata: createDeploymentMetadata(output),
     isRebuild,
   };
 }

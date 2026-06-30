@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createApp } from "@evjs/server/app";
+import { createReactFrameworkServer } from "@evjs/server/react";
 import type {
   AppGraph,
   BuildOutput,
@@ -9,6 +11,7 @@ import type {
 } from "@evjs/shared/manifest";
 import {
   assertFrameworkManifestShape,
+  createDeploymentMetadata,
   createPublicManifest,
   createServerManifest,
   linkBuildOutput,
@@ -77,8 +80,14 @@ const DEV_PAGE_RENDER_PROXY_HEADER = "x-evjs-dev-page-render";
 const DEV_DIST_DIR = "dist";
 const DEV_DIST_LOCK_FILE = ".evjs-dev.lock";
 const MANIFEST_FILE = "manifest.json";
-const RUNTIME_FILE = "runtime.json";
+const CLIENT_RUNTIME_SCRIPT_ID = "__EVJS_CLIENT_RUNTIME__";
+const LEGACY_RUNTIME_FILE = "runtime.json";
+const LEGACY_FRAMEWORK_RUNTIME_FILE = "framework-runtime.json";
 const BUILD_OUTPUT_FILE = "build-output.json";
+const RUNTIME_ONLY_BUNDLER_MANIFEST_FILES = [
+  "react-client-manifest.json",
+  "react-ssr-manifest.json",
+];
 const PLUGIN_HOOK_NAMES = [
   "buildStart",
   "buildOutput",
@@ -1191,10 +1200,9 @@ function getFrameworkOutputPaths(
   cwd: string,
   output: BuildOutput,
 ): { rootDir: string; clientDir: string; serverDir: string } {
-  const rootDir = path.resolve(cwd, output.distDir);
-  const publicDir = output.paths?.publicDir ?? output.distDir;
-  const serverDir =
-    output.paths?.serverDir ?? path.join(output.distDir, "server");
+  const rootDir = path.resolve(cwd, output.paths.rootDir);
+  const publicDir = output.paths.publicDir;
+  const serverDir = output.paths.serverDir;
   return {
     rootDir,
     clientDir: path.resolve(cwd, publicDir),
@@ -1211,16 +1219,18 @@ async function emitFrameworkManifest(
     output,
   );
   await fs.promises.mkdir(rootDir, { recursive: true });
-  await fs.promises.mkdir(serverDir, { recursive: true });
   const serverManifest = createServerManifest(output);
-  await fs.promises.writeFile(
-    path.join(serverDir, MANIFEST_FILE),
-    JSON.stringify(serverManifest, null, 2),
-    "utf-8",
-  );
+  if (serverManifest.entry || serverManifest.routes.length > 0) {
+    await fs.promises.mkdir(serverDir, { recursive: true });
+    await fs.promises.writeFile(
+      path.join(serverDir, MANIFEST_FILE),
+      JSON.stringify(serverManifest, null, 2),
+      "utf-8",
+    );
+  }
   await fs.promises.writeFile(
     path.join(rootDir, BUILD_OUTPUT_FILE),
-    JSON.stringify(output, null, 2),
+    JSON.stringify(createDeploymentMetadata(output), null, 2),
     "utf-8",
   );
   await fs.promises.rm(path.join(serverDir, BUILD_OUTPUT_FILE), {
@@ -1230,7 +1240,7 @@ async function emitFrameworkManifest(
     clientDir,
     serverDir,
   ]);
-  await removeFrameworkOutputFileIfInactive(rootDir, RUNTIME_FILE, [
+  await removeFrameworkOutputFileIfInactive(rootDir, LEGACY_RUNTIME_FILE, [
     clientDir,
     serverDir,
   ]);
@@ -1241,7 +1251,7 @@ async function emitFrameworkManifest(
   );
   await removeFrameworkOutputFileIfInactive(
     path.join(rootDir, "client"),
-    RUNTIME_FILE,
+    LEGACY_RUNTIME_FILE,
     [clientDir, serverDir],
   );
   await removeFrameworkOutputFileIfInactive(
@@ -1251,22 +1261,44 @@ async function emitFrameworkManifest(
   );
   await removeFrameworkOutputFileIfInactive(
     path.join(rootDir, "server"),
-    RUNTIME_FILE,
+    LEGACY_RUNTIME_FILE,
+    [clientDir, serverDir],
+  );
+  await removeFrameworkOutputFileIfInactive(
+    path.join(rootDir, "server"),
+    LEGACY_FRAMEWORK_RUNTIME_FILE,
     [clientDir, serverDir],
   );
 
   const publicManifest = createPublicManifest(output);
-  const clientRuntime = createClientRuntime(output);
   await fs.promises.mkdir(clientDir, { recursive: true });
   await fs.promises.writeFile(
     path.join(clientDir, MANIFEST_FILE),
     JSON.stringify(publicManifest, null, 2),
     "utf-8",
   );
-  await fs.promises.writeFile(
-    path.join(clientDir, RUNTIME_FILE),
-    JSON.stringify(clientRuntime, null, 2),
-    "utf-8",
+  await fs.promises.rm(path.join(clientDir, LEGACY_RUNTIME_FILE), {
+    force: true,
+  });
+  if (output.server.entry) {
+    await fs.promises.mkdir(serverDir, { recursive: true });
+    await fs.promises.rm(path.join(serverDir, LEGACY_RUNTIME_FILE), {
+      force: true,
+    });
+  }
+  await fs.promises.rm(path.join(serverDir, LEGACY_FRAMEWORK_RUNTIME_FILE), {
+    force: true,
+  });
+  await removeRuntimeOnlyBundlerManifests(clientDir);
+}
+
+async function removeRuntimeOnlyBundlerManifests(
+  clientDir: string,
+): Promise<void> {
+  await Promise.all(
+    RUNTIME_ONLY_BUNDLER_MANIFEST_FILES.map((fileName) =>
+      fs.promises.rm(path.join(clientDir, fileName), { force: true }),
+    ),
   );
 }
 
@@ -1342,9 +1374,12 @@ async function emitFrameworkHtml<TBundlerCfg>(
   pluginCtx: PluginContext<TBundlerCfg>,
   output: BuildOutput,
   plan: BuildPlan,
+  frameworkRuntime: ReturnType<typeof createFrameworkRuntime>,
   isRebuild: boolean,
+  loadServerModule?: (asset: string) => Promise<unknown>,
 ): Promise<void> {
-  const { clientDir } = getFrameworkOutputPaths(cwd, output);
+  const { clientDir, serverDir } = getFrameworkOutputPaths(cwd, output);
+  const clientRuntime = createClientRuntime(output);
 
   for (const html of plan.html) {
     const htmlInfo = createHtmlDocumentInfo(html, output);
@@ -1369,6 +1404,22 @@ async function emitFrameworkHtml<TBundlerCfg>(
       doc.documentElement?.setAttribute("data-evjs-kind", "app");
       doc.documentElement?.setAttribute("data-evjs-id", htmlInfo.appId);
     }
+    if (htmlInfo.assets.js.length > 0) {
+      embedClientRuntime(doc, clientRuntime);
+    }
+    if (
+      plan.mode === "production" &&
+      shouldPrerenderStaticPage(output, htmlInfo)
+    ) {
+      await prerenderStaticPageHtml({
+        doc,
+        output,
+        html: htmlInfo,
+        frameworkRuntime,
+        serverDir,
+        loadServerModule,
+      });
+    }
 
     const finalHtml = await buildHtml({
       doc,
@@ -1385,6 +1436,126 @@ async function emitFrameworkHtml<TBundlerCfg>(
   }
 }
 
+function shouldPrerenderStaticPage(
+  output: BuildOutput,
+  html: HtmlDocumentInfo,
+): html is Extract<HtmlDocumentInfo, { kind: "page" }> {
+  if (html.kind !== "page") return false;
+  const page = output.pages[html.pageId];
+  return Boolean(
+    page &&
+      page.render === "ssg" &&
+      page.rendering.html === "static" &&
+      page.rendering.prerender === "full",
+  );
+}
+
+async function prerenderStaticPageHtml(options: {
+  doc: ReturnType<typeof generateHtml>;
+  output: BuildOutput;
+  html: Extract<HtmlDocumentInfo, { kind: "page" }>;
+  frameworkRuntime: ReturnType<typeof createFrameworkRuntime>;
+  serverDir: string;
+  loadServerModule?: (asset: string) => Promise<unknown>;
+}): Promise<void> {
+  const { doc, output, html, frameworkRuntime, serverDir, loadServerModule } =
+    options;
+  const page = output.pages[html.pageId];
+  const pathname = findStaticPagePath(output, html.pageId, page);
+  if (!page || !pathname) return;
+
+  const framework = createReactFrameworkServer({
+    runtime: frameworkRuntime,
+    loadModule: async (asset) =>
+      normalizeServerModule(
+        loadServerModule
+          ? await loadServerModule(asset)
+          : await import(pathToFileURL(path.resolve(serverDir, asset)).href),
+      ),
+    react: {
+      renderDocument(appHtml) {
+        return appHtml;
+      },
+    },
+  });
+  if (!framework?.render) {
+    throw new Error(
+      `[evjs] Unable to prerender SSG page "${html.pageId}" because no server renderer was emitted.`,
+    );
+  }
+
+  const app = createApp({ framework });
+  const response = await app.fetch(
+    new Request(new URL(pathname, "http://evjs.local").toString(), {
+      method: "GET",
+    }),
+  );
+  if (!response.ok) {
+    throw new Error(
+      `[evjs] Failed to prerender SSG page "${html.pageId}": ${response.status} ${response.statusText}`,
+    );
+  }
+
+  const mount = doc.querySelector(page.mount ?? "#app");
+  if (!mount) {
+    throw new Error(
+      `[evjs] Unable to prerender SSG page "${html.pageId}" because mount target "${page.mount ?? "#app"}" was not found.`,
+    );
+  }
+  mount.innerHTML = await response.text();
+}
+
+function findStaticPagePath(
+  output: BuildOutput,
+  pageId: string,
+  page: BuildOutput["pages"][string] | undefined,
+): string | undefined {
+  const routePath = output.routes.find(
+    (route) => route.pageId === pageId,
+  )?.path;
+  const pathname = routePath ?? page?.path;
+  if (!pathname || !isStaticPagePath(pathname)) return undefined;
+  return pathname;
+}
+
+function isStaticPagePath(pathname: string): boolean {
+  return !/(^|\/)(?:[$:]|[*])/.test(pathname);
+}
+
+function normalizeServerModule(mod: unknown): Record<string, unknown> {
+  const nested =
+    mod && typeof mod === "object" && "default" in mod
+      ? (mod as { default?: unknown }).default
+      : undefined;
+  return nested &&
+    typeof nested === "object" &&
+    ("default" in nested || "render" in nested || "fetch" in nested)
+    ? (nested as Record<string, unknown>)
+    : (mod as Record<string, unknown>);
+}
+
+function embedClientRuntime(
+  doc: ReturnType<typeof generateHtml>,
+  runtime: ReturnType<typeof createClientRuntime>,
+): void {
+  const body = doc.body ?? doc.querySelector("body");
+  if (!body) return;
+  const json = JSON.stringify(runtime)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+  const script = doc.createElement("script");
+  script.id = CLIENT_RUNTIME_SCRIPT_ID;
+  script.setAttribute("type", "application/json");
+  script.textContent = json;
+  const firstScript = body.querySelector("script[src]");
+  if (firstScript) {
+    body.insertBefore(script, firstScript);
+    return;
+  }
+  body.appendChild(script);
+}
+
 async function linkAndEmitBuildOutput<TBundlerCfg>(options: {
   bundlerFacts: BundlerBuildFacts;
   graph: AppGraph;
@@ -1394,7 +1565,10 @@ async function linkAndEmitBuildOutput<TBundlerCfg>(options: {
   hooks: PluginHooks<TBundlerCfg>[];
   pluginCtx: PluginContext<TBundlerCfg>;
   isRebuild: boolean;
-}): Promise<BuildOutput> {
+}): Promise<{
+  output: BuildOutput;
+  frameworkRuntime: ReturnType<typeof createFrameworkRuntime>;
+}> {
   const output = linkBuildOutput({
     graph: options.graph,
     plan: options.plan,
@@ -1404,11 +1578,13 @@ async function linkAndEmitBuildOutput<TBundlerCfg>(options: {
     serverEntry: options.bundlerFacts.serverEntry,
     serverAssets: options.bundlerFacts.serverAssets,
     serverModules: options.bundlerFacts.serverModules,
-    rscManifests: options.bundlerFacts.rscManifests,
   });
 
   await runBuildOutputHooks(options.hooks, output, options.pluginCtx);
   assertFrameworkManifestShape(output, "BuildOutput after buildOutput hooks");
+  const frameworkRuntime = createFrameworkRuntime(output, {
+    rscManifests: options.bundlerFacts.rscManifests,
+  });
   await emitFrameworkManifest(options.cwd, output);
   await emitFrameworkHtml(
     options.cwd,
@@ -1417,10 +1593,12 @@ async function linkAndEmitBuildOutput<TBundlerCfg>(options: {
     options.pluginCtx,
     output,
     options.plan,
+    frameworkRuntime,
     options.isRebuild,
+    options.bundlerFacts.loadServerModule,
   );
 
-  return output;
+  return { output, frameworkRuntime };
 }
 
 function normalizeAssetName(name: string | undefined): string | undefined {
@@ -1518,24 +1696,6 @@ function readServerEntryFromManifest(
     );
   } catch (err) {
     logger.warn`Failed to parse build manifest for server entry: ${err}`;
-    return undefined;
-  }
-}
-
-function readFrameworkRuntime(
-  cwd: string,
-  distDir: string,
-): ReturnType<typeof createFrameworkRuntime> | undefined {
-  const outputPath = path.resolve(cwd, distDir, BUILD_OUTPUT_FILE);
-  if (!fs.existsSync(outputPath)) return undefined;
-
-  try {
-    const output = JSON.parse(
-      fs.readFileSync(outputPath, "utf-8"),
-    ) as BuildOutput;
-    return createFrameworkRuntime(output);
-  } catch (err) {
-    logger.warn`Failed to parse build output for framework runtime: ${err}`;
     return undefined;
   }
 }
@@ -2239,6 +2399,9 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
   let releaseDevDistLock: (() => Promise<void>) | undefined;
   let stopWatchingDevDependencies = () => {};
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let activeFrameworkRuntime:
+    | ReturnType<typeof createFrameworkRuntime>
+    | undefined;
   const expectedApiExits = new WeakSet<ApiProcess>();
   let resolveShutdown: (() => void) | undefined;
   const waitForShutdown = new Promise<void>((resolve) => {
@@ -2283,7 +2446,6 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
     const bootstrapPath = path.join(devRootDir, "_dev_start.cjs");
     try {
       const serverBundlePath = path.join(devRootDir, "server", serverEntry);
-      const frameworkRuntime = readFrameworkRuntime(cwd, activePlan.distDir);
 
       if (!fs.existsSync(path.dirname(bootstrapPath))) {
         fs.mkdirSync(path.dirname(bootstrapPath), { recursive: true });
@@ -2294,7 +2456,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
           `(async () => {`,
           `const path = require("node:path");`,
           `const { pathToFileURL } = require("node:url");`,
-          `globalThis.__EVJS_FRAMEWORK_RUNTIME__ = ${JSON.stringify(frameworkRuntime, null, 2)};`,
+          `globalThis.__EVJS_FRAMEWORK_RUNTIME__ = ${JSON.stringify(activeFrameworkRuntime, null, 2)};`,
           `globalThis.__EVJS_DEV_PAGE_RENDER_PROXY_HEADER__ = ${JSON.stringify(DEV_PAGE_RENDER_PROXY_HEADER)};`,
           `const serverDir = path.dirname(${JSON.stringify(serverBundlePath)});`,
           `globalThis.__EVJS_SERVER_MODULE_LOADER__ = async (asset) => { const mod = await import(pathToFileURL(path.resolve(serverDir, asset)).href); const nested = mod && typeof mod.default === "object" ? mod.default : undefined; return nested && ("default" in nested || "render" in nested) ? nested : mod; };`,
@@ -2520,7 +2682,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
         plan: activePlan,
         callbacks: {
           async onBuildFacts(bundlerFacts, options) {
-            await linkAndEmitBuildOutput({
+            const { frameworkRuntime } = await linkAndEmitBuildOutput({
               bundlerFacts,
               graph: activeAnalysis.graph,
               plan: activePlan,
@@ -2530,6 +2692,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
               pluginCtx,
               isRebuild: options?.isRebuild ?? false,
             });
+            activeFrameworkRuntime = frameworkRuntime;
           },
           onServerBundleReady: handleServerBundleReady,
         },
@@ -2577,7 +2740,7 @@ export async function build<TBundlerCfg = DefaultBundlerConfig>(
       graph: prepared.graph,
       plan: prepared.plan,
     });
-    const buildOutput = await linkAndEmitBuildOutput({
+    const { output, frameworkRuntime } = await linkAndEmitBuildOutput({
       bundlerFacts,
       graph: prepared.graph,
       plan: prepared.plan,
@@ -2590,7 +2753,7 @@ export async function build<TBundlerCfg = DefaultBundlerConfig>(
 
     await runBuildEndHooks(
       prepared.hooks,
-      createBuildResult(buildOutput, false),
+      createBuildResult(output, false, { frameworkRuntime }),
     );
   } finally {
     await prepared.dispose();

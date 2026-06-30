@@ -1,14 +1,17 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type {
-  AssetGroup,
   BuildOutput,
-  ComponentModel,
-  PublicPathOutput,
-  RenderMode,
-  RuntimeOutput,
+  DeploymentDocumentOutput,
+  DeploymentMetadata,
+  DeploymentRouteOutput,
+  DeploymentServerOutput,
 } from "@evjs/shared/manifest";
-import { createFrameworkRuntime } from "./framework-runtime.js";
+import { createDeploymentMetadata } from "@evjs/shared/manifest";
+import {
+  createFrameworkRuntime,
+  type FrameworkRuntimeOutput,
+} from "./framework-runtime.js";
 import type { Plugin } from "./plugin.js";
 
 export interface DeploymentArtifactOptions {
@@ -22,6 +25,7 @@ export interface NodeDeploymentAdapterOptions
   serverFileName?: string;
   portEnv?: string;
   defaultPort?: number;
+  frameworkRuntime?: FrameworkRuntimeOutput;
 }
 
 export interface StaticDeploymentAdapterOptions
@@ -35,6 +39,7 @@ export interface EdgeDeploymentAdapterOptions
   artifactFileName?: string;
   workerFileName?: string;
   assetsBinding?: string;
+  frameworkRuntime?: FrameworkRuntimeOutput;
 }
 
 export interface NodeDeploymentFiles {
@@ -59,73 +64,13 @@ export interface EdgeDeploymentFiles {
   workerModule?: string;
 }
 
-export interface DeploymentArtifact {
-  version: 1;
+export interface DeploymentArtifact extends DeploymentMetadata {
   platform?: string;
-  buildId: string;
-  distDir: string;
-  paths?: BuildOutput["paths"];
-  publicPath: PublicPathOutput;
-  assets?: Record<string, AssetGroup>;
-  apps: Record<string, DeploymentApp>;
-  pages: Record<string, DeploymentPage>;
-  routes: DeploymentRoute[];
-  server: DeploymentServer;
-  rsc?: DeploymentRsc;
-  metadata?: Record<string, unknown>;
 }
 
-export interface DeploymentApp {
-  assets?: AssetGroup;
-  document?: {
-    fileName: string;
-  };
-  entry?: string;
-  mount?: string;
-}
-
-export interface DeploymentPage {
-  assets?: AssetGroup;
-  document?: {
-    fileName: string;
-  };
-  path?: string;
-  routeId?: string;
-  render: RenderMode;
-  componentModel?: ComponentModel;
-  hydrate?: string;
-  mount?: string;
-}
-
-export interface DeploymentRoute {
-  id: string;
-  path: string;
-  appId?: string;
-  pageId?: string;
-}
-
-export interface DeploymentServer {
-  entry?: string;
-  basePath?: string;
-  fn?: string;
-  ppr?: string;
-  rsc?: string;
-  transport?: RuntimeOutput["transport"];
-  assets?: AssetGroup;
-  renderers: string[];
-  functions: string[];
-  routes: Array<{
-    path: string;
-    methods: string[];
-  }>;
-}
-
-export interface DeploymentRsc {
-  endpoint?: string;
-  pages: string[];
-  clientReferences: string[];
-  serverReferences: string[];
-}
+export type DeploymentDocument = DeploymentDocumentOutput;
+export type DeploymentRoute = DeploymentRouteOutput;
+export type DeploymentServer = DeploymentServerOutput;
 
 interface StaticDocumentRoute {
   path: string;
@@ -148,78 +93,19 @@ export function createDeploymentArtifact(
   output: BuildOutput,
   options: DeploymentArtifactOptions = {},
 ): DeploymentArtifact {
-  const includeAssets = options.includeAssets ?? true;
-  const artifact: DeploymentArtifact = {
-    version: 1,
+  return pruneUndefined({
+    ...createDeploymentMetadata(output, {
+      includeAssets: options.includeAssets,
+    }),
     ...(options.platform ? { platform: options.platform } : {}),
-    buildId: output.buildId,
-    distDir: output.distDir,
-    paths: getDeploymentOutputPaths(output),
-    publicPath: output.publicPath,
-    ...(includeAssets ? { assets: output.assets } : {}),
-    apps: Object.fromEntries(
-      Object.entries(output.apps).map(([id, app]) => [
-        id,
-        {
-          ...(includeAssets ? { assets: app.assets } : {}),
-          document: app.document,
-          entry: app.entry,
-          mount: app.mount,
-        },
-      ]),
-    ),
-    pages: Object.fromEntries(
-      Object.entries(output.pages).map(([id, page]) => [
-        id,
-        {
-          ...(includeAssets ? { assets: page.assets } : {}),
-          document: page.document,
-          path: page.path,
-          routeId: page.routeId,
-          render: page.render,
-          componentModel: page.componentModel,
-          hydrate: page.hydrate,
-          mount: page.mount,
-        },
-      ]),
-    ),
-    routes: output.routes.map((route) => ({
-      id: route.id,
-      path: route.path,
-      appId: route.appId,
-      pageId: route.pageId,
-    })),
-    server: {
-      entry: output.server.entry,
-      basePath: output.runtime.server.basePath,
-      fn: output.runtime.server.fn,
-      ppr: output.runtime.server.ppr,
-      rsc: output.runtime.server.rsc,
-      ...(output.runtime.transport
-        ? { transport: output.runtime.transport }
-        : {}),
-      ...(includeAssets ? { assets: output.server.assets } : {}),
-      renderers: Object.keys(output.server.renderers ?? {}),
-      functions: Object.keys(output.server.functions),
-      routes: output.server.routes.map((route) => ({
-        path: route.path,
-        methods: route.methods,
-      })),
-    },
-    ...(output.rsc
-      ? {
-          rsc: {
-            endpoint: output.rsc.endpoint,
-            pages: Object.keys(output.rsc.pages ?? {}),
-            clientReferences: Object.keys(output.rsc.clientReferences ?? {}),
-            serverReferences: Object.keys(output.rsc.serverReferences ?? {}),
-          },
-        }
-      : {}),
-    ...(output.deployment ? { metadata: output.deployment } : {}),
-  };
+  }) as DeploymentArtifact;
+}
 
-  return artifact;
+function pruneUndefined<T extends Record<string, unknown>>(value: T): T {
+  for (const key of Object.keys(value)) {
+    if (value[key] === undefined) delete value[key];
+  }
+  return value;
 }
 
 export function createNodeDeploymentFiles(
@@ -253,8 +139,11 @@ export function nodeDeploymentAdapter(
     name: "node-deployment-adapter",
     setup() {
       return {
-        async buildEnd({ output }) {
-          const files = createNodeDeploymentFiles(output, options);
+        async buildEnd({ output, frameworkRuntime }) {
+          const files = createNodeDeploymentFiles(output, {
+            ...options,
+            frameworkRuntime,
+          });
           const rootDir = resolveOutputDir(output, "rootDir");
           await fs.mkdir(rootDir, { recursive: true });
           await fs.writeFile(
@@ -358,8 +247,11 @@ export function edgeDeploymentAdapter(
     name: "edge-deployment-adapter",
     setup() {
       return {
-        async buildEnd({ output }) {
-          const files = createEdgeDeploymentFiles(output, options);
+        async buildEnd({ output, frameworkRuntime }) {
+          const files = createEdgeDeploymentFiles(output, {
+            ...options,
+            frameworkRuntime,
+          });
           const rootDir = resolveOutputDir(output, "rootDir");
           await fs.mkdir(rootDir, { recursive: true });
           await fs.writeFile(
@@ -383,13 +275,7 @@ export function edgeDeploymentAdapter(
 function getDeploymentOutputPaths(
   output: BuildOutput,
 ): NonNullable<BuildOutput["paths"]> {
-  if (output.paths) return output.paths;
-
-  return {
-    rootDir: output.distDir,
-    publicDir: joinManifestPath(output.distDir, "client"),
-    serverDir: joinManifestPath(output.distDir, "server"),
-  };
+  return output.paths;
 }
 
 function resolveOutputDir(
@@ -404,15 +290,6 @@ function getPublicDirRelativeToRoot(output: BuildOutput): string {
   const paths = getDeploymentOutputPaths(output);
   const relative = path.relative(paths.rootDir, paths.publicDir);
   return relative || ".";
-}
-
-function joinManifestPath(...parts: string[]): string {
-  return parts
-    .map((part, index) =>
-      index === 0 ? part.replace(/\/+$/, "") : part.replace(/^\/+|\/+$/g, ""),
-    )
-    .filter(Boolean)
-    .join("/");
 }
 
 function createNodeServerModule(
@@ -433,7 +310,8 @@ function createNodeServerModule(
   const clientRoot = getPublicDirRelativeToRoot(output);
   const portEnv = options.portEnv ?? "PORT";
   const defaultPort = options.defaultPort ?? 3000;
-  const frameworkRuntime = createFrameworkRuntime(output);
+  const frameworkRuntime =
+    options.frameworkRuntime ?? createFrameworkRuntime(output);
 
   return `import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -612,7 +490,8 @@ function createEdgeWorkerModule(
   const frameworkRequestCondition = serverEntry
     ? "isFrameworkRequest(url.pathname)"
     : "false";
-  const frameworkRuntime = createFrameworkRuntime(output);
+  const frameworkRuntime =
+    options.frameworkRuntime ?? createFrameworkRuntime(output);
 
   return [
     `globalThis.__EVJS_FRAMEWORK_RUNTIME__ = ${JSON.stringify(frameworkRuntime, null, 2)};`,
@@ -899,7 +778,7 @@ function getFrameworkServerRoutes(output: BuildOutput): string[] {
 }
 
 function getStaticAssetPrefix(
-  publicPath: PublicPathOutput,
+  publicPath: BuildOutput["publicPath"],
 ): string | undefined {
   if (!publicPath.startsWith("/") || publicPath.startsWith("//")) {
     return undefined;

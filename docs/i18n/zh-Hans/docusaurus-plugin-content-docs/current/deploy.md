@@ -19,7 +19,6 @@ npm run build
 dist/
 ├── client/
 │   ├── manifest.json
-│   ├── runtime.json
 │   └── ...
 ├── server/
 │   ├── manifest.json
@@ -31,13 +30,14 @@ dist/
 
 - `dist/client/`：浏览器资源和生成的 HTML。
 - `dist/client/manifest.json`：给部署工具消费的浏览器安全路由和资源元信息。
-- `dist/client/runtime.json`：生成的页面 bootstrap 在 HTML 未内嵌配置时加载的最小浏览器运行时配置。
 - `dist/server/`：应用使用服务端函数、服务端文件路由、SSR、PPR 或 RSC 时生成的服务端 bundle 和服务端元信息。
-- `dist/build-output.json`：面向工具和部署 adapter 的完整构建元信息。应用代码不应导入或修改它。
+- `dist/server/manifest.json`：为了部署兼容保留的轻量 server manifest，包含 server entry
+  和服务端处理的 route projection。
+- `dist/build-output.json`：面向工具和部署 adapter 的 canonical deployment metadata。应用代码不应导入或修改它。
 
-如果页面 HTML 没有内嵌 runtime config，浏览器 runtime 会从配置的 runtime URL 或
-`/runtime.json` 获取它。部署时应把该响应作为 JSON 返回，并设置
-`Content-Type: application/json`。
+生成的 HTML 会内嵌浏览器 `ClientRuntime`。手动使用 `@evjs/client` runtime URL API 时仍可从配置的 URL 加载 JSON，但 CLI build 默认不再输出 `dist/client/runtime.json`。
+Runtime-only 的 `FrameworkRuntime` 数据通过 build/plugin result 传递，并注入 dev 或 deployment
+adapter bootstrap，不再作为默认 JSON artifact 输出。
 
 ## 选择部署目标
 
@@ -193,21 +193,20 @@ CMD ["node", "dist/server.mjs"]
 
 ## 自定义部署插件
 
-部署插件可以使用 `buildEnd({ output })` 输出平台文件。需要可复用的元信息结构时，可以从
-`createDeploymentArtifact()` 开始：
+部署插件可以使用 `buildEnd({ deploymentMetadata })` 输出平台文件。需要平台专属兼容字段时，
+可以在写文件前包装这份 metadata：
 
 ```ts
-import { createDeploymentArtifact } from "@evjs/ev";
-
 export function deployAdapter() {
   return {
     name: "deploy-adapter",
     setup() {
       return {
-        buildEnd({ output }) {
-          const artifact = createDeploymentArtifact(output, {
+        buildEnd({ deploymentMetadata }) {
+          const artifact = {
+            ...deploymentMetadata,
             platform: "custom",
-          });
+          };
 
           emitPlatformFiles(artifact);
         },
