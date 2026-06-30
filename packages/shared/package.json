@@ -27,13 +27,13 @@
   "files": [
     "esm"
   ],
-  "homepage": "https://github.com/evaijs/evjs#readme",
+  "homepage": "https://github.com/afx-team/evjs#readme",
   "bugs": {
-    "url": "https://github.com/evaijs/evjs/issues"
+    "url": "https://github.com/afx-team/evjs/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/evaijs/evjs.git"
+    "url": "git+https://github.com/afx-team/evjs.git"
   },
   "license": "MIT",
   "author": "xusd320",
