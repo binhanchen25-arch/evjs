@@ -8,6 +8,25 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.5] — 2026-06-30
+
+### ⚠️ Behavior Changes
+
+- **Server file routes** — `src/apis` is now discovered by default. Apps no longer need `server: { routing: true }` for conventional server routes.
+- **Convention opt-out** — Apps with existing files under `src/apis` that should not become server routes can use the advanced convention controls documented in Reference.
+
+### ✨ Improvements
+
+- **Default server routing** — Resolved omitted `server.routing` to the default `src/apis` route directory and kept server middleware conventions enabled with default server route discovery.
+- **Examples** — Removed redundant `server.routing: true` config from examples now covered by defaults.
+
+### 📝 Documentation
+
+- **Default docs** — Removed convention-disabling switches from default guides so the common path stays file-convention first.
+- **Advanced convention control** — Added English and Chinese Reference docs for disabling default conventions and using programmatic `@evjs/client` / `@evjs/server` apps.
+
+---
+
 ## [0.2.4] — 2026-06-30
 
 ### ⚠️ Breaking Changes
