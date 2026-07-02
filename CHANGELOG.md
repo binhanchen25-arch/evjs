@@ -8,6 +8,23 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.6] — 2026-07-02
+
+### ✨ Highlights
+
+- **Qiankun bridge plugin** — Added `@evjs/plugin-qiankun` with master and slave plugin APIs, runtime helpers, entry loader integration, examples, docs, and E2E coverage.
+- **Runtime transport globals** — Added runtime transport global support and centralized runtime transport lookup so server functions and RSC can resolve runtime endpoints without a fixed transport endpoint.
+
+### 🐛 Bug Fixes
+
+- **Utoopack runtime** — Required the Utoopack runtime from the adapter so generated bundles include the runtime module they depend on.
+
+### 📝 Documentation
+
+- **Qiankun integration** — Added English and Chinese qiankun guides plus master and slave example apps.
+
+---
+
 ## [0.2.5] — 2026-06-30
 
 ### ⚠️ Behavior Changes
