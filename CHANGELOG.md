@@ -8,6 +8,19 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.7] — 2026-07-02
+
+### ⚠️ Behavior Changes
+
+- **Framework runtime endpoints** — Framework runtime `fn`, `ppr`, and `rsc` endpoints are now stored as relative values such as `__evjs/fn`, `__evjs/ppr`, and `__evjs/rsc`. Server mounting, dev proxying, and deployment route generation convert them back to URL pathnames at their use sites.
+- **Runtime endpoint validation** — Client, server, and manifest runtime validation now reject framework runtime endpoints that start with `/`, keeping transport prefixes owned by runtime transport configuration.
+
+### 🐛 Bug Fixes
+
+- **Transport URL resolution** — Server function and RSC Flight requests now resolve relative framework endpoints under the configured transport `baseUrl`, preserving gateway path prefixes for hosted runtimes.
+
+---
+
 ## [0.2.6] — 2026-07-02
 
 ### ✨ Highlights
