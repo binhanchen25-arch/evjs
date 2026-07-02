@@ -157,6 +157,16 @@ Standalone/manual clients can import the same query hooks directly from
 ### Transport
 - `initTransport({ baseUrl, credentials, headers, functions })`: Configure the default HTTP adapter. `functions.endpoint` can override the server function path for standalone runtimes.
 - `credentials` / `headers`: Supported HTTP defaults; fetch `mode` is intentionally not configurable.
+- Hosting runtimes can set `window.__EVJS_TRANSPORT__` before framework server
+  requests run. The value accepts data-only `RuntimeTransportOptions`:
+  `baseUrl`, `credentials`, and `headers`. Endpoint paths continue to come from
+  framework runtime metadata; application `initTransport()` calls still take
+  priority for server functions.
+- Runtime transport is for framework-managed browser requests to evjs server
+  endpoints. Current consumers are server functions and RSC Flight; future
+  client helpers for server routes or PPR should use the same runtime transport.
+  It does not control runtime metadata loading, static assets, dynamic imports,
+  or application-authored `fetch()` calls.
 - `@evjs/client/transport`: Public subpath for low-level transport APIs such as `createServerReference`, `getFnId`, `getFnName`, and `initTransport`.
 - The default HTTP adapter expects successful server-function responses to use
   `Content-Type: application/json`. Non-JSON error responses use their trimmed

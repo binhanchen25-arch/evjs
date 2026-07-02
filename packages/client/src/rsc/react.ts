@@ -27,9 +27,12 @@ import {
 import {
   assertClientRuntime,
   type ClientRuntime,
+  type ClientRuntimeTransport,
   getClientRuntimeRoutes,
+  getClientRuntimeServer,
   type HydrationMode,
   type RenderMode,
+  resolveClientRuntimeTransport,
 } from "../shared/runtime-config.js";
 import { formatErrorDetail, isRecord } from "../shared/validation.js";
 import {
@@ -310,7 +313,7 @@ export async function fetchRscFlight(
   options: RscFlightFetchOptions,
 ): Promise<Response> {
   assertRscFlightFetchOptions(options);
-  const endpoint = options.runtime.runtime.server?.rsc;
+  const endpoint = getClientRuntimeServer(options.runtime)?.rsc;
   if (!endpoint) {
     throw new Error(
       "[evjs] RSC Flight endpoint is not present in the runtime.",
@@ -322,10 +325,15 @@ export async function fetchRscFlight(
     throw new Error("[evjs] RSC Flight fetch requires a fetch implementation.");
   }
 
-  const requestUrl = resolveRscFlightUrl(endpoint, options);
+  const transport = resolveClientRuntimeTransport(options.runtime);
+  const requestUrl = resolveRscFlightUrl(endpoint, options, transport);
+  const requestInit = resolveRscFlightRequestInit(transport);
   let response: unknown;
   try {
-    response = await fetchImpl(requestUrl);
+    response =
+      requestInit === undefined
+        ? await fetchImpl(requestUrl)
+        : await fetchImpl(requestUrl, requestInit);
   } catch (error) {
     throw new Error(
       `[evjs] RSC Flight request failed${formatErrorDetail(error)}`,
@@ -344,6 +352,26 @@ export function assertRscFlightFetchOptions(
   assertClientRuntime(options.runtime, "fetchRscFlight() runtime");
   assertOptionalRscFlightString(options.pageId, "fetchRscFlight() pageId");
   assertOptionalRscFlightUrl(options.url, "fetchRscFlight() url");
+}
+
+function resolveRscFlightRequestInit(
+  transport: ClientRuntimeTransport | undefined,
+): RequestInit | undefined {
+  if (!transport) return undefined;
+
+  const init: RequestInit = {};
+  if (transport.credentials !== undefined) {
+    init.credentials = transport.credentials;
+  }
+
+  const headers = new Headers(transport.headers);
+  if ([...headers.keys()].length > 0) {
+    init.headers = headers;
+  }
+
+  return init.credentials !== undefined || init.headers !== undefined
+    ? init
+    : undefined;
 }
 
 function assertOptionalRscFlightString(value: unknown, path: string): void {
@@ -425,11 +453,12 @@ export async function loadRscDebugPage(
 function resolveRscFlightUrl(
   endpoint: string,
   options: RscFlightFetchOptions,
+  transport: ClientRuntimeTransport | undefined,
 ): string {
   const explicitUrl = options.url?.toString();
   const locationHref = globalThis.location?.href;
   const currentUrl = explicitUrl ?? locationHref;
-  const transportBaseUrl = options.runtime.runtime.transport?.baseUrl;
+  const transportBaseUrl = transport?.baseUrl;
   const base = transportBaseUrl ?? locationHref ?? explicitUrl ?? endpoint;
   const url = new URL(endpoint, base);
   if (options.pageId) {
