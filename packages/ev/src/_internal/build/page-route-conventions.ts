@@ -24,12 +24,14 @@ export const PAGE_ROUTE_CONVENTION_RULES = [
   {
     id: "dynamic-segment",
     category: "route",
-    summary: "$param filenames for dynamic segments and $...splat catch-alls",
+    summary:
+      "$param filenames for dynamic segments and terminal $...splat catch-alls",
     valid: ["users/$userId.tsx", "files/$...splat.tsx"],
     invalid: [
       "users/[userId].tsx",
       "users/$123.tsx",
       "files/$...123.tsx",
+      "files/$...path/edit.tsx",
       "users/$__proto__.tsx",
       "docs/$_splat.tsx",
     ],
@@ -226,6 +228,7 @@ export interface InvalidPageRouteSegment {
     | "duplicate-catch-all"
     | "duplicate-dynamic"
     | "dynamic"
+    | "non-terminal-catch-all"
     | "reserved-catch-all"
     | "reserved-dynamic"
     | "static";
@@ -379,8 +382,15 @@ export function findInvalidRouteSegment(
     options.allowCasePreservingStatic === false
       ? LOWERCASE_STATIC_ROUTE_SEGMENT_PATTERN
       : CASE_PRESERVING_STATIC_ROUTE_SEGMENT_PATTERN;
+  let lastRouteSegmentIndex = -1;
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    if (!isPageRouteGroupSegment(segments[index])) {
+      lastRouteSegmentIndex = index;
+      break;
+    }
+  }
   let hasCatchAll = false;
-  for (const segment of segments) {
+  for (const [index, segment] of segments.entries()) {
     if (isPageRouteGroupSegment(segment)) continue;
 
     if (isCatchAllPageRouteSegment(segment)) {
@@ -393,6 +403,9 @@ export function findInvalidRouteSegment(
       const name = getCatchAllRouteParamName(segment);
       if (getPageRouteParamNameValidationError(name) === "reserved") {
         return { kind: "reserved-catch-all", segment };
+      }
+      if (index !== lastRouteSegmentIndex) {
+        return { kind: "non-terminal-catch-all", segment };
       }
       if (hasCatchAll) return { kind: "duplicate-catch-all", segment };
       hasCatchAll = true;
@@ -500,6 +513,9 @@ function formatInvalidRouteSegmentViolation(
   }
   if (invalid.kind === "duplicate-catch-all") {
     return `Catch-all page route segment "${invalid.segment}" repeats a wildcard route segment. Use at most one catch-all segment within one route path.`;
+  }
+  if (invalid.kind === "non-terminal-catch-all") {
+    return `Catch-all page route segment "${invalid.segment}" must be the final URL path segment. Move it to the end of the route path, or split the route into explicit files.`;
   }
   if (invalid.kind === "dynamic") {
     return `Dynamic page route segment "${invalid.segment}" must use a JavaScript identifier after "$", such as "$userId".`;

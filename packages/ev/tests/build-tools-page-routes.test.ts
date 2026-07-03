@@ -102,6 +102,7 @@ describe("discoverPageRoutes", () => {
           invalid: expect.arrayContaining([
             "users/[userId].tsx",
             "files/$...123.tsx",
+            "files/$...path/edit.tsx",
             "users/$__proto__.tsx",
             "docs/$_splat.tsx",
           ]),
@@ -210,7 +211,7 @@ describe("discoverPageRoutes", () => {
       ]),
     );
     expect(PAGE_ROUTE_CONVENTION_SUMMARY).toBe(
-      "Page route files use index files for directory roots, $param filenames for dynamic segments and $...splat catch-alls, one page file per URL path, one dynamic param name per URL shape, unique generated route ids, route groups for pathless organization, and case-preserving URL-safe static segments; ignored colocated modules include _-prefixed private modules, dot-prefixed hidden modules, declaration files, test/spec modules, Storybook modules, client-only *.client.* modules, and server-only *.server.* modules; SPA root layout auto-discovery uses one layout/index.tsx module beside the route directory; nested SPA route layouts use layout source modules below a route; SPA error boundaries use error source modules scoped by directory; SPA not-found boundaries use not-found source modules scoped by directory; MPA page routes can use colocated HTML templates with the same basename",
+      "Page route files use index files for directory roots, $param filenames for dynamic segments and terminal $...splat catch-alls, one page file per URL path, one dynamic param name per URL shape, unique generated route ids, route groups for pathless organization, and case-preserving URL-safe static segments; ignored colocated modules include _-prefixed private modules, dot-prefixed hidden modules, declaration files, test/spec modules, Storybook modules, client-only *.client.* modules, and server-only *.server.* modules; SPA root layout auto-discovery uses one layout/index.tsx module beside the route directory; nested SPA route layouts use layout source modules below a route; SPA error boundaries use error source modules scoped by directory; SPA not-found boundaries use not-found source modules scoped by directory; MPA page routes can use colocated HTML templates with the same basename",
     );
     expect(isPageRouteSourceModuleFile("index.tsx")).toBe(true);
     expect(isPageRouteSourceModuleFile("index.d.ts")).toBe(false);
@@ -355,16 +356,30 @@ describe("discoverPageRoutes", () => {
       'Catch-all page route segment "$..._splat" uses a reserved param name. Use a safe application-specific name such as "$...splat"; runtime wildcard params are exposed as "_splat".',
     );
     expect(
+      findPageRouteSegmentConventionViolation(["files", "$...path", "edit"]),
+    ).toEqual({
+      kind: "non-terminal-catch-all",
+      segment: "$...path",
+    });
+    expect(
       findPageRouteSegmentConventionViolation([
         "files",
         "$...path",
         "edit",
-        "$...rest",
+        "$...path",
       ]),
     ).toEqual({
-      kind: "duplicate-catch-all",
-      segment: "$...rest",
+      kind: "non-terminal-catch-all",
+      segment: "$...path",
     });
+    expect(
+      formatPageRouteSegmentConventionViolation({
+        kind: "non-terminal-catch-all",
+        segment: "$...path",
+      }),
+    ).toBe(
+      'Catch-all page route segment "$...path" must be the final URL path segment. Move it to the end of the route path, or split the route into explicit files.',
+    );
     expect(
       formatPageRouteSegmentConventionViolation({
         kind: "duplicate-catch-all",
@@ -664,6 +679,7 @@ describe("discoverPageRoutes", () => {
       expect(doc).toContain("src/pages/users/$userId.tsx");
       expect(doc).toContain("src/pages/users/[id].tsx");
       expect(doc).toContain("src/pages/files/$...path.tsx");
+      expect(doc).toContain("src/pages/files/$...path/edit.tsx");
       expect(doc).toContain("src/pages/users/$__proto__.tsx");
       expect(doc).toContain("src/pages/users.tsx");
       expect(doc).toContain("src/pages/users/index.tsx");
@@ -1255,8 +1271,8 @@ describe("discoverPageRoutes", () => {
         "export default function InvalidCatchAll() { return null; }",
       "src/pages/files/$..._splat.tsx":
         "export default function ReservedCatchAll() { return null; }",
-      "src/pages/files/$...path/archive/$...rest.tsx":
-        "export default function DuplicateCatchAll() { return null; }",
+      "src/pages/files/$...path/archive.tsx":
+        "export default function NonTerminalCatchAll() { return null; }",
       "src/pages/users/$id?.tsx":
         "export default function OptionalUser() { return null; }",
     });
@@ -1285,9 +1301,9 @@ describe("discoverPageRoutes", () => {
       },
       {
         level: "error",
-        file: "src/pages/files/$...path/archive/$...rest.tsx",
+        file: "src/pages/files/$...path/archive.tsx",
         message:
-          'Catch-all page route segment "$...rest" repeats a wildcard route segment. Use at most one catch-all segment within one route path.',
+          'Catch-all page route segment "$...path" must be the final URL path segment. Move it to the end of the route path, or split the route into explicit files.',
       },
       {
         level: "error",

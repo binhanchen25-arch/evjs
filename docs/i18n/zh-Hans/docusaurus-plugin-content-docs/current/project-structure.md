@@ -72,8 +72,8 @@ my-evjs-app/
 
 - 路由文件放在配置的 `routing.dir` 下，并使用 `.ts`、`.tsx`、`.js` 或
   `.jsx`。
-- 目录根路由使用 `index.*`；动态段使用 `$param`；SPA catch-all 段使用
-  `$...splat`；静态段保留 URL-safe 的大小写。
+- 目录根路由使用 `index.*`；动态段使用 `$param`；位于 URL path 末尾的 SPA
+  catch-all 段使用 `$...splat`；静态段保留 URL-safe 的大小写。
 - 支持 `(marketing)` 这类 route group 作为 pathless 组织目录，不会增加 URL
   segment。不完整的 group segment 会被拒绝。动态参数名必须是安全标识符；
   保留对象属性名和 `$_splat` 都会被拒绝。
@@ -95,8 +95,8 @@ my-evjs-app/
   URL 中，请使用 `marketing/about.tsx` 这样的真实 URL segment。
 - SPA 嵌套布局使用路由目录内的 layout 模块建模。如果某个外框不应该参与路由树，
   则作为普通组件由需要它的页面 import。
-- `$...splat` 只用于需要 catch-all route 的既有 SPA URL。新应用路由仍建议使用
-  明确的静态段和 `$param` 段，并保持简单小写命名。
+- `$...splat` 只作为 URL path 的最后一段，用于需要 catch-all route 的既有
+  SPA URL。新应用路由仍建议使用明确的静态段和 `$param` 段，并保持简单小写命名。
 - optional 或其他无法映射到文件约定的自定义 URL shape 使用显式 `pages` 配置。
 
 | 文件或目录 | 框架含义 | 用于 | 不用于 |
@@ -160,7 +160,7 @@ basename 的 colocated 模板替代全局 `index.html` 模板，例如
 1. **组件契约**：路由文件默认导出页面组件。渲染元信息放在页面组件旁边。语法错误和
    缺少默认导出的错误会在路由发现阶段、bundler 运行前报告。
 2. **文件名语法**：`index.tsx` 映射到当前目录根路径。动态段使用 `$param`。
-   SPA catch-all 段使用 `$...splat`，并映射为 `*`。`[id].tsx` 这类
+   位于 URL path 末尾的 SPA catch-all 段使用 `$...splat`，并映射为 `*`。`[id].tsx` 这类
    bracket 段和 `$slug?.tsx` 这类可选段会被拒绝。
 3. **URL segment 安全性**：动态参数名必须是 `$` 后面的 JavaScript 标识符。
    静态段必须使用 URL-safe 字母、数字、`.`、`_`、`-` 或 `~`；新应用路由仍建议使用
@@ -215,6 +215,7 @@ query string 或 hash 的路径都会被拒绝。
 | `src/pages/docs/index.tsx` | `/docs` | 嵌套目录根路由。 |
 | `src/pages/users/$userId.tsx` | `/users/$userId` | 动态段；参数名必须是 JavaScript 标识符。 |
 | `src/pages/files/$...path.tsx` | `/files/*` | SPA catch-all route；运行时 params 会把匹配到的后缀暴露为 `_splat`。 |
+| `src/pages/files/$...path/edit.tsx` | 拒绝 | Catch-all 段必须是 URL path 的最后一段。 |
 | `src/pages/legacyCamelCase.tsx` | `/legacyCamelCase` | 为既有稳定 URL 保留大小写的静态段。新路由仍建议使用小写。 |
 | `src/pages/users/settings.tsx` | `/users/settings` | 静态同级路由；排序早于 `users/$userId.tsx`。 |
 | `src/pages/(marketing)/about.tsx` | `/about` | Pathless route group；`(marketing)` 只组织文件，不增加 URL segment。 |

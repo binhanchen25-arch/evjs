@@ -76,8 +76,8 @@ Quick rules:
 
 - Route files live under the configured `routing.dir` and use `.ts`, `.tsx`,
   `.js`, or `.jsx`.
-- Directory roots use `index.*`; dynamic segments use `$param`; SPA catch-all
-  segments use `$...splat`; static segments preserve URL-safe casing.
+- Directory roots use `index.*`; dynamic segments use `$param`; terminal SPA
+  catch-all segments use `$...splat`; static segments preserve URL-safe casing.
 - Route groups such as `(marketing)` are supported as pathless organization and
   do not add URL segments. Malformed group segments are rejected. Dynamic param
   names must be safe identifiers; reserved object-property names and `$_splat`
@@ -105,9 +105,9 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 - Model SPA nested layouts with route-directory layout modules. Use ordinary
   components imported by a page when the wrapper should not participate in the
   route tree.
-- Use `$...splat` only for existing SPA URLs that need a catch-all route.
-  New application routes should prefer explicit static and `$param` segments
-  with simple lowercase names.
+- Use `$...splat` only as the final URL path segment for existing SPA URLs
+  that need a catch-all route. New application routes should prefer explicit
+  static and `$param` segments with simple lowercase names.
 - Use explicit `pages` config for optional or other custom URL shapes that do
   not map to the file convention.
 
@@ -175,7 +175,7 @@ Keep the rules in four buckets:
    Rendering metadata lives beside that component. Syntax errors and missing
    default exports are reported during route discovery before the bundler runs.
 2. **Filename syntax**: `index.tsx` maps to the directory root. Dynamic segments
-   use `$param`; SPA catch-all segments use `$...splat` and map to `*`.
+   use `$param`; terminal SPA catch-all segments use `$...splat` and map to `*`.
    Bracket segments such as `[id].tsx` and optional segments such as
    `$slug?.tsx` are rejected.
 3. **URL segment safety**: dynamic names must be JavaScript identifiers after
@@ -237,6 +237,7 @@ punctuation to underscores. That means `admin/panel.tsx` and
 | `src/pages/docs/index.tsx` | `/docs` | Nested directory root route. |
 | `src/pages/users/$userId.tsx` | `/users/$userId` | Dynamic segment; the param name must be a JavaScript identifier. |
 | `src/pages/files/$...path.tsx` | `/files/*` | SPA catch-all route; runtime params expose the matched suffix as `_splat`. |
+| `src/pages/files/$...path/edit.tsx` | Rejected | Catch-all segments must be the final URL path segment. |
 | `src/pages/legacyCamelCase.tsx` | `/legacyCamelCase` | Case-preserving static segment for stable existing URLs. Prefer lowercase for new routes. |
 | `src/pages/users/settings.tsx` | `/users/settings` | Static sibling; it ranks before `users/$userId.tsx`. |
 | `src/pages/(marketing)/about.tsx` | `/about` | Pathless route group; `(marketing)` organizes files without adding a URL segment. |
