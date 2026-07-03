@@ -17,6 +17,7 @@ import {
   PAGE_ROUTE_CONVENTION_SUMMARY,
   PAGE_ROUTE_SOURCE_EXTENSIONS,
   parsePageRouteFile,
+  routeIdPathFromSegments,
   routePathFromSegments,
   routePathShapeFromPath,
   routeShapeFromSegments,
@@ -94,10 +95,14 @@ describe("discoverPageRoutes", () => {
         expect.objectContaining({
           id: "dynamic-segment",
           category: "route",
-          valid: expect.arrayContaining(["users/$userId.tsx"]),
+          valid: expect.arrayContaining([
+            "users/$userId.tsx",
+            "files/$...splat.tsx",
+          ]),
           invalid: expect.arrayContaining([
             "users/[userId].tsx",
-            "files/$...path.tsx",
+            "files/$...123.tsx",
+            "files/$...path/edit.tsx",
             "users/$__proto__.tsx",
             "docs/$_splat.tsx",
           ]),
@@ -206,7 +211,7 @@ describe("discoverPageRoutes", () => {
       ]),
     );
     expect(PAGE_ROUTE_CONVENTION_SUMMARY).toBe(
-      "Page route files use index files for directory roots, $param filenames for dynamic segments, one page file per URL path, one dynamic param name per URL shape, unique generated route ids, route groups for pathless organization, and lowercase URL-safe static segments; ignored colocated modules include _-prefixed private modules, dot-prefixed hidden modules, declaration files, test/spec modules, Storybook modules, client-only *.client.* modules, and server-only *.server.* modules; SPA root layout auto-discovery uses one layout/index.tsx module beside the route directory; nested SPA route layouts use layout source modules below a route; SPA error boundaries use error source modules scoped by directory; SPA not-found boundaries use not-found source modules scoped by directory; MPA page routes can use colocated HTML templates with the same basename",
+      "Page route files use index files for directory roots, $param filenames for dynamic segments and terminal $...splat catch-alls, one page file per URL path, one dynamic param name per URL shape, unique generated route ids, route groups for pathless organization, and case-preserving URL-safe static segments; ignored colocated modules include _-prefixed private modules, dot-prefixed hidden modules, declaration files, test/spec modules, Storybook modules, client-only *.client.* modules, and server-only *.server.* modules; SPA root layout auto-discovery uses one layout/index.tsx module beside the route directory; nested SPA route layouts use layout source modules below a route; SPA error boundaries use error source modules scoped by directory; SPA not-found boundaries use not-found source modules scoped by directory; MPA page routes can use colocated HTML templates with the same basename",
     );
     expect(isPageRouteSourceModuleFile("index.tsx")).toBe(true);
     expect(isPageRouteSourceModuleFile("index.d.ts")).toBe(false);
@@ -223,6 +228,10 @@ describe("discoverPageRoutes", () => {
     expect(parsePageRouteFile("users/$userId.tsx")?.segments).toEqual([
       "users",
       "$userId",
+    ]);
+    expect(parsePageRouteFile("docs/$...splat.tsx")?.segments).toEqual([
+      "docs",
+      "$...splat",
     ]);
     expect(normalizePageRouteConventionPath("users\\$userId.tsx")).toBe(
       "users/$userId.tsx",
@@ -258,19 +267,22 @@ describe("discoverPageRoutes", () => {
 
     expect(routePathFromSegments([])).toBe("/");
     expect(routePathFromSegments(["users", "$userId"])).toBe("/users/$userId");
+    expect(routePathFromSegments(["docs", "$...splat"])).toBe("/docs/*");
     expect(routePathFromSegments(["(marketing)", "about"])).toBe("/about");
+    expect(routeIdPathFromSegments(["docs", "$...splat"])).toBe("/docs/$splat");
     expect(routeShapeFromSegments(["users", "$userId"])).toEqual({
       key: "/users/:param",
       label: "/users/:param",
+    });
+    expect(routeShapeFromSegments(["docs", "$...splat"])).toEqual({
+      key: "/docs/*",
+      label: "/docs/*",
     });
     expect(routePathShapeFromPath("/users/:userId")).toEqual({
       key: "/users/:param",
       label: "/users/:param",
     });
-    expect(findInvalidRouteSegment(["Users"])).toEqual({
-      kind: "static",
-      segment: "Users",
-    });
+    expect(findInvalidRouteSegment(["Users"])).toBeUndefined();
     expect(
       findPageRouteSegmentConventionViolation(["(marketing)", "about"]),
     ).toBeUndefined();
@@ -306,10 +318,7 @@ describe("discoverPageRoutes", () => {
     );
     expect(
       findPageRouteSegmentConventionViolation(["files", "$...path"]),
-    ).toEqual({
-      kind: "unsupported-dynamic",
-      segment: "$...path",
-    });
+    ).toBeUndefined();
     expect(
       formatPageRouteSegmentConventionViolation({
         kind: "unsupported-dynamic",
@@ -318,17 +327,78 @@ describe("discoverPageRoutes", () => {
     ).toBe(
       'Catch-all page route segments are not supported. Use explicit pages config for wildcard or custom URL shapes instead of "$...path".',
     );
-    expect(findPageRouteSegmentConventionViolation(["Users"])).toEqual({
+    expect(
+      findPageRouteSegmentConventionViolation(["files", "$...123"]),
+    ).toEqual({
+      kind: "catch-all",
+      segment: "$...123",
+    });
+    expect(
+      formatPageRouteSegmentConventionViolation({
+        kind: "catch-all",
+        segment: "$...123",
+      }),
+    ).toBe(
+      'Catch-all page route segment "$...123" must use a JavaScript identifier after "$...", such as "$...splat".',
+    );
+    expect(
+      findPageRouteSegmentConventionViolation(["files", "$..._splat"]),
+    ).toEqual({
+      kind: "reserved-catch-all",
+      segment: "$..._splat",
+    });
+    expect(
+      formatPageRouteSegmentConventionViolation({
+        kind: "reserved-catch-all",
+        segment: "$..._splat",
+      }),
+    ).toBe(
+      'Catch-all page route segment "$..._splat" uses a reserved param name. Use a safe application-specific name such as "$...splat"; runtime wildcard params are exposed as "_splat".',
+    );
+    expect(
+      findPageRouteSegmentConventionViolation(["files", "$...path", "edit"]),
+    ).toEqual({
+      kind: "non-terminal-catch-all",
+      segment: "$...path",
+    });
+    expect(
+      findPageRouteSegmentConventionViolation([
+        "files",
+        "$...path",
+        "edit",
+        "$...path",
+      ]),
+    ).toEqual({
+      kind: "non-terminal-catch-all",
+      segment: "$...path",
+    });
+    expect(
+      formatPageRouteSegmentConventionViolation({
+        kind: "non-terminal-catch-all",
+        segment: "$...path",
+      }),
+    ).toBe(
+      'Catch-all page route segment "$...path" must be the final URL path segment. Move it to the end of the route path, or split the route into explicit files.',
+    );
+    expect(
+      formatPageRouteSegmentConventionViolation({
+        kind: "duplicate-catch-all",
+        segment: "$...rest",
+      }),
+    ).toBe(
+      'Catch-all page route segment "$...rest" repeats a wildcard route segment. Use at most one catch-all segment within one route path.',
+    );
+    expect(findPageRouteSegmentConventionViolation(["contact us"])).toEqual({
       kind: "static",
-      segment: "Users",
+      segment: "contact us",
     });
     expect(
       formatPageRouteSegmentConventionViolation({
         kind: "static",
-        segment: "Users",
+        segment: "contact us",
       }),
     ).toBe(
-      'Static page route segment "Users" must use lowercase URL-safe characters: lowercase letters, numbers, ".", "_", "-", or "~". Rename the file to a lowercase URL-safe segment, or use explicit pages config for custom paths.',
+      'Static page route segment "contact us" must use URL-safe characters: letters, numbers, ".", "_", "-", or "~". Rename the file to a URL-safe segment, or use explicit pages config for custom paths.',
     );
     expect(findInvalidRouteSegment(["$__proto__"])).toEqual({
       kind: "reserved-dynamic",
@@ -397,6 +467,58 @@ describe("discoverPageRoutes", () => {
     expect(discovery.diagnostics).toEqual([]);
   });
 
+  it("discovers case-preserving and catch-all SPA page routes", async () => {
+    const cwd = await createFixture({
+      "src/layout/index.tsx": "export default function Root() { return null; }",
+      "src/pages/index.tsx": "export default function Home() { return null; }",
+      "src/pages/legacyCamelCase.tsx":
+        "export default function Legacy() { return null; }",
+      "src/pages/docs/layout.tsx":
+        "export default function DocsLayout() { return null; }",
+      "src/pages/docs/$...splat.tsx":
+        "export default function DocsCatchAll() { return null; }",
+      "src/pages/teams/$teamId/reports/$...path.tsx":
+        "export default function TeamReportsCatchAll() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "spa",
+    });
+
+    expect(discovery.rootModule).toBe("./src/layout/index.tsx");
+    expect(discovery.routes).toEqual([
+      {
+        id: "index",
+        path: "/",
+        module: "./src/pages/index.tsx",
+      },
+      {
+        id: "docs_layout",
+        path: "/docs",
+        module: "./src/pages/docs/layout.tsx",
+        kind: "layout",
+      },
+      {
+        id: "docs_splat",
+        path: "/docs/*",
+        module: "./src/pages/docs/$...splat.tsx",
+        parentId: "docs_layout",
+      },
+      {
+        id: "legacyCamelCase",
+        path: "/legacyCamelCase",
+        module: "./src/pages/legacyCamelCase.tsx",
+      },
+      {
+        id: "teams_teamId_reports_path",
+        path: "/teams/$teamId/reports/*",
+        module: "./src/pages/teams/$teamId/reports/$...path.tsx",
+      },
+    ]);
+    expect(discovery.diagnostics).toEqual([]);
+  });
+
   it("discovers colocated MPA HTML templates with the same basename", async () => {
     const cwd = await createFixture({
       "src/pages/index.tsx": "export default function Home() { return null; }",
@@ -441,6 +563,35 @@ describe("discoverPageRoutes", () => {
       },
     ]);
     expect(discovery.diagnostics).toEqual([]);
+  });
+
+  it("rejects catch-all page route segments in MPA mode", async () => {
+    const cwd = await createFixture({
+      "src/pages/index.tsx": "export default function Home() { return null; }",
+      "src/pages/docs/$...splat.tsx":
+        "export default function DocsCatchAll() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes(cwd, {
+      dir: "./src/pages",
+      mode: "mpa",
+    });
+
+    expect(discovery.routes).toEqual([
+      {
+        id: "index",
+        path: "/",
+        module: "./src/pages/index.tsx",
+      },
+    ]);
+    expect(discovery.diagnostics).toEqual([
+      {
+        level: "error",
+        file: "src/pages/docs/$...splat.tsx",
+        message:
+          'Catch-all page route segments are not supported. Use explicit pages config for wildcard or custom URL shapes instead of "$...splat".',
+      },
+    ]);
   });
 
   it("does not treat routing.html as an MPA file-route convention", async () => {
@@ -528,6 +679,7 @@ describe("discoverPageRoutes", () => {
       expect(doc).toContain("src/pages/users/$userId.tsx");
       expect(doc).toContain("src/pages/users/[id].tsx");
       expect(doc).toContain("src/pages/files/$...path.tsx");
+      expect(doc).toContain("src/pages/files/$...path/edit.tsx");
       expect(doc).toContain("src/pages/users/$__proto__.tsx");
       expect(doc).toContain("src/pages/users.tsx");
       expect(doc).toContain("src/pages/users/index.tsx");
@@ -1115,8 +1267,12 @@ describe("discoverPageRoutes", () => {
       "src/pages/index.tsx": "export default function Home() { return null; }",
       "src/pages/files/$.tsx":
         "export default function EmptyDynamic() { return null; }",
-      "src/pages/files/$...path.tsx":
-        "export default function CatchAll() { return null; }",
+      "src/pages/files/$...123.tsx":
+        "export default function InvalidCatchAll() { return null; }",
+      "src/pages/files/$..._splat.tsx":
+        "export default function ReservedCatchAll() { return null; }",
+      "src/pages/files/$...path/archive.tsx":
+        "export default function NonTerminalCatchAll() { return null; }",
       "src/pages/users/$id?.tsx":
         "export default function OptionalUser() { return null; }",
     });
@@ -1133,9 +1289,21 @@ describe("discoverPageRoutes", () => {
     expect(discovery.diagnostics).toEqual([
       {
         level: "error",
-        file: "src/pages/files/$...path.tsx",
+        file: "src/pages/files/$...123.tsx",
         message:
-          'Catch-all page route segments are not supported. Use explicit pages config for wildcard or custom URL shapes instead of "$...path".',
+          'Catch-all page route segment "$...123" must use a JavaScript identifier after "$...", such as "$...splat".',
+      },
+      {
+        level: "error",
+        file: "src/pages/files/$..._splat.tsx",
+        message:
+          'Catch-all page route segment "$..._splat" uses a reserved param name. Use a safe application-specific name such as "$...splat"; runtime wildcard params are exposed as "_splat".',
+      },
+      {
+        level: "error",
+        file: "src/pages/files/$...path/archive.tsx",
+        message:
+          'Catch-all page route segment "$...path" must be the final URL path segment. Move it to the end of the route path, or split the route into explicit files.',
       },
       {
         level: "error",
@@ -1152,12 +1320,14 @@ describe("discoverPageRoutes", () => {
     ]);
   });
 
-  it("rejects uppercase static route segments", async () => {
+  it("preserves uppercase static route segments", async () => {
     const cwd = await createFixture({
       "src/pages/index.tsx": "export default function Home() { return null; }",
       "src/pages/About.tsx": "export default function About() { return null; }",
       "src/pages/docs/API.tsx":
         "export default function ApiDocs() { return null; }",
+      "src/pages/legacyCamelCase.tsx":
+        "export default function Legacy() { return null; }",
       "src/pages/users/$userId.tsx":
         "export default function User() { return null; }",
     });
@@ -1171,25 +1341,27 @@ describe("discoverPageRoutes", () => {
         module: "./src/pages/index.tsx",
       },
       {
+        id: "About",
+        path: "/About",
+        module: "./src/pages/About.tsx",
+      },
+      {
+        id: "docs_API",
+        path: "/docs/API",
+        module: "./src/pages/docs/API.tsx",
+      },
+      {
+        id: "legacyCamelCase",
+        path: "/legacyCamelCase",
+        module: "./src/pages/legacyCamelCase.tsx",
+      },
+      {
         id: "users_userId",
         path: "/users/$userId",
         module: "./src/pages/users/$userId.tsx",
       },
     ]);
-    expect(discovery.diagnostics).toEqual([
-      {
-        level: "error",
-        file: "src/pages/About.tsx",
-        message:
-          'Static page route segment "About" must use lowercase URL-safe characters: lowercase letters, numbers, ".", "_", "-", or "~". Rename the file to a lowercase URL-safe segment, or use explicit pages config for custom paths.',
-      },
-      {
-        level: "error",
-        file: "src/pages/docs/API.tsx",
-        message:
-          'Static page route segment "API" must use lowercase URL-safe characters: lowercase letters, numbers, ".", "_", "-", or "~". Rename the file to a lowercase URL-safe segment, or use explicit pages config for custom paths.',
-      },
-    ]);
+    expect(discovery.diagnostics).toEqual([]);
   });
 
   it("rejects unsafe route segments and invalid dynamic parameter names", async () => {
@@ -1227,7 +1399,7 @@ describe("discoverPageRoutes", () => {
         level: "error",
         file: "src/pages/contact us.tsx",
         message:
-          'Static page route segment "contact us" must use lowercase URL-safe characters: lowercase letters, numbers, ".", "_", "-", or "~". Rename the file to a lowercase URL-safe segment, or use explicit pages config for custom paths.',
+          'Static page route segment "contact us" must use URL-safe characters: letters, numbers, ".", "_", "-", or "~". Rename the file to a URL-safe segment, or use explicit pages config for custom paths.',
       },
       {
         level: "error",
@@ -1251,7 +1423,7 @@ describe("discoverPageRoutes", () => {
         level: "error",
         file: "src/pages/settings?.tsx",
         message:
-          'Static page route segment "settings?" must use lowercase URL-safe characters: lowercase letters, numbers, ".", "_", "-", or "~". Rename the file to a lowercase URL-safe segment, or use explicit pages config for custom paths.',
+          'Static page route segment "settings?" must use URL-safe characters: letters, numbers, ".", "_", "-", or "~". Rename the file to a URL-safe segment, or use explicit pages config for custom paths.',
       },
       {
         level: "error",

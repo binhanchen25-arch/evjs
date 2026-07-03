@@ -27,25 +27,29 @@ with `routing.dir`, configure a different server file route directory with
 
 ## Segment Rules
 
-Page routes, server file routes, and API route middleware use the same
+Page routes, server file routes, and API route middleware share the same core
 path segment rules:
 
 | Pattern | Result |
 | --- | --- |
 | `index.*` | Directory root route. |
 | `$param.*` | Dynamic segment. Server file routes convert it to Hono `:param`. |
+| `$...splat.*` | SPA page-route catch-all segment. It maps to `*` and exposes `_splat` at runtime. |
 | `(group)` | Pathless route group for organization. It does not add a URL segment. |
 | `_private.*` or `_private/` | Ignored private module or directory. |
 | `.hidden.*` or `.hidden/` | Ignored hidden module or directory. |
 
-Static route segments must use lowercase URL-safe characters: lowercase
-letters, numbers, `.`, `_`, `-`, or `~`. Dynamic param names must be JavaScript
-identifiers after `$`, such as `$userId` or `$team_id`.
+Page route static segments must use URL-safe letters, numbers, `.`, `_`, `-`,
+or `~` and preserve casing for stable existing URLs. Lowercase names remain the
+recommended default for new application routes. Server file routes and API route
+middleware scopes keep lowercase URL-safe static segments. Dynamic param names
+must be JavaScript identifiers after `$`, such as `$userId` or `$team_id`.
 
 The following are rejected:
 
 - bracket routes such as `[id].tsx`;
-- catch-all routes such as `$...slug.tsx`;
+- malformed catch-all segments such as `$...123.tsx`;
+- more than one catch-all segment in one page route path;
 - optional params such as `$slug?.tsx`;
 - empty dynamic params such as `$.tsx`;
 - reserved dynamic params such as `$__proto__.tsx`, `$constructor.tsx`,
@@ -57,7 +61,9 @@ The following are rejected:
   `users/$userId.tsx`.
 
 Routes must follow the file shape. evjs does not provide alternate filename
-dialects for catch-all, optional, or bracket routes.
+dialects for optional or bracket routes. Catch-all file routes are only a SPA
+page-route convention; MPA page routes and server file routes reject catch-all
+segments.
 
 ## Ignored Support Files
 
@@ -86,6 +92,8 @@ src/pages/index.tsx              -> /
 src/pages/about.tsx              -> /about
 src/pages/users/index.tsx        -> /users
 src/pages/users/$userId.tsx      -> /users/$userId
+src/pages/docs/$...splat.tsx     -> /docs/*
+src/pages/legacyCamelCase.tsx    -> /legacyCamelCase
 src/pages/(marketing)/about.tsx  -> /about
 ```
 

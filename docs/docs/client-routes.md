@@ -34,17 +34,20 @@ The route convention is intentionally narrow:
 - Dynamic route segments use `$param` filenames such as `$userId.tsx` or
   `$team_id.tsx`.
 - Bracket segments such as `[id].tsx` and `[...slug].tsx` are rejected.
-- Catch-all and optional file segments are not part of the convention yet, so
-  `$...slug.tsx`, `$slug?.tsx`, and `$.tsx` are rejected.
+- SPA catch-all segments use `$...splat.tsx` as the final URL path segment and
+  map to `*`. Runtime params expose the matched suffix as `_splat`.
+- Optional file segments are not part of the convention, so `$slug?.tsx` and
+  `$.tsx` are rejected.
 - Dynamic param names must be JavaScript identifiers after `$`.
 - Reserved names such as `$__proto__.tsx`, `$constructor.tsx`,
   `$prototype.tsx`, and `$_splat.tsx` are rejected. `$_splat.tsx` is reserved
   because wildcard routes expose `*` as `_splat`.
-- Static route segments must be lowercase and URL-safe: lowercase letters,
-  numbers, `.`, `_`, `-`, or `~`.
+- Static route segments must be URL-safe: letters, numbers, `.`, `_`, `-`, or
+  `~`. Lowercase names remain the recommended default for new routes, but
+  stable existing URL casing can be preserved.
 
-Use explicit `pages` config when a file needs to map to a custom or
-case-sensitive path.
+Use explicit `pages` config when a file needs to map to an optional or custom
+path shape outside these conventions.
 
 The collision checks are strict:
 

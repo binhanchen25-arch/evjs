@@ -12,6 +12,7 @@ import {
   PAGE_ROUTE_SOURCE_EXTENSION_LABEL,
   PAGE_ROUTE_UNSUPPORTED_ROOT_LAYOUT_FILES,
   parsePageRouteFile,
+  routeIdPathFromSegments,
   routePathFromSegments,
   routeShapeFromSegments,
 } from "./page-route-conventions.js";
@@ -83,6 +84,7 @@ export async function discoverPageRoutes(
   let hasRouteCandidate = false;
   const spaConventions =
     options.mode !== "mpa" && options.spaConventions !== false;
+  const allowCatchAll = options.mode !== "mpa";
 
   for (const file of files) {
     const sourceRel = toProjectPath(cwd, file);
@@ -93,6 +95,7 @@ export async function discoverPageRoutes(
     if (conventionFile) {
       const segmentViolation = findPageRouteSegmentConventionViolation(
         conventionFile.segments,
+        { allowCatchAll },
       );
       if (segmentViolation) {
         diagnostics.push({
@@ -145,6 +148,7 @@ export async function discoverPageRoutes(
 
       const segmentViolation = findPageRouteSegmentConventionViolation(
         layoutFile.segments,
+        { allowCatchAll },
       );
       if (segmentViolation) {
         diagnostics.push({
@@ -197,6 +201,7 @@ export async function discoverPageRoutes(
 
     const segmentViolation = findPageRouteSegmentConventionViolation(
       routeFile.segments,
+      { allowCatchAll },
     );
     if (segmentViolation) {
       diagnostics.push({
@@ -242,7 +247,9 @@ export async function discoverPageRoutes(
     }
     routeByShape.set(routeShape.key, { file: sourceRel, path: routePath });
 
-    const routeId = deriveRouteIdFromPath(routePath);
+    const routeId = deriveRouteIdFromPath(
+      routeIdPathFromSegments(routeFile.segments),
+    );
     const previousIdOwner = routeById.get(routeId);
     if (previousIdOwner) {
       diagnostics.push({

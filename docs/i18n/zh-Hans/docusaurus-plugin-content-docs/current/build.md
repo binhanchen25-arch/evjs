@@ -156,8 +156,8 @@ export const GET = async () => Response.json({ ok: true });
 
 - `ev.config.ts` 导出 `defineConfig(...)`，且只使用公开配置字段。
 - HTML 模板包含配置的挂载点，通常是 `<div id="app"></div>`。
-- `src/pages` 路由符合文件约定：`$param` 动态段、`index.*` 目录根路由、
-  小写 URL-safe 静态段。
+- `src/pages` 路由符合文件约定：`index.*` 目录根路由、`$param` 动态段、
+  `$...splat` SPA catch-all 和 URL-safe 静态段。
 - 页面模块默认导出 React 组件。
 - 页面渲染元信息使用字面量值。
 - `"use server"` 模块以指令开头，并导出命名函数。

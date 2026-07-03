@@ -3272,6 +3272,32 @@ describe("createPublicManifest", () => {
     });
   });
 
+  it("keeps wildcard SPA routes in public manifests", () => {
+    const output: BuildOutput = {
+      ...createMinimalBuildOutput(),
+      apps: {
+        default: {
+          assets: { js: ["main.js"], css: [] },
+          document: { fileName: "index.html" },
+        },
+      },
+      routes: [
+        {
+          id: "docs_splat",
+          path: "/docs/*",
+          appId: "default",
+        },
+      ],
+    };
+
+    expect(createPublicManifest(output)).toMatchObject({
+      routing: {
+        kind: "spa",
+        routes: [{ id: "docs_splat", path: "/docs/*" }],
+      },
+    });
+  });
+
   it("keeps route-owned SSG page documents in SPA manifests", () => {
     const output: BuildOutput = {
       ...createMinimalBuildOutput(),

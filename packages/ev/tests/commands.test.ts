@@ -605,12 +605,32 @@ describe("build", () => {
       "export default function Home() { return null; }",
       "utf-8",
     );
+    await fs.promises.mkdir(path.join(cwd, "src/pages/docs"), {
+      recursive: true,
+    });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/docs/$...splat.tsx"),
+      "export default function DocsCatchAll() { return null; }",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/legacyCamelCase.tsx"),
+      "export default function Legacy() { return null; }",
+      "utf-8",
+    );
     const events: string[] = [];
     const bundler = createMockBundler(events, {
       onBuildPlan(plan) {
         const entry = plan.entries[0];
         events.push(`entry:${entry?.import}`);
         events.push(`metadata:${entry?.metadata?.type}`);
+        events.push(
+          `routes:${
+            entry?.metadata?.type === "pages-app"
+              ? entry.metadata.routes.map((route) => route.path).join(",")
+              : ""
+          }`,
+        );
       },
     });
 
@@ -627,13 +647,16 @@ describe("build", () => {
     expect(events).toEqual([
       "entry:evjs:pages-app",
       "metadata:pages-app",
+      "routes:/,/docs/*,/legacyCamelCase",
       "bundler.build",
       "bundler.entries:main",
     ]);
     expect(fs.existsSync(path.join(cwd, ".evjs"))).toBe(false);
     await expect(
       fs.promises.readFile(path.join(cwd, "src/route-types.d.ts"), "utf-8"),
-    ).resolves.toContain('import type * as EvPage_index from "./pages/index";');
+    ).resolves.toContain(
+      'import type * as EvPage_docs_splat from "./pages/docs/$...splat";',
+    );
   });
 
   it("does not rewrite unchanged generated SPA route types", async () => {
@@ -2179,7 +2202,7 @@ describe("build", () => {
     );
     expect((error as Error).message).toContain("src/pages/contact us.tsx");
     expect((error as Error).message).toContain(
-      'Static page route segment "contact us" must use lowercase URL-safe characters: lowercase letters, numbers, ".", "_", "-", or "~". Rename the file to a lowercase URL-safe segment, or use explicit pages config for custom paths.',
+      'Static page route segment "contact us" must use URL-safe characters: letters, numbers, ".", "_", "-", or "~". Rename the file to a URL-safe segment, or use explicit pages config for custom paths.',
     );
     expect((error as Error).message).toContain("src/pages/users/$123.tsx");
     expect((error as Error).message).toContain(

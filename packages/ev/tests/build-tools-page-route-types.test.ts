@@ -202,6 +202,33 @@ describe("generatePageRouteTypes", () => {
     );
   });
 
+  it("generates route declarations for case-preserving and catch-all paths", () => {
+    const source = generatePageRouteTypes({
+      routes: [
+        {
+          id: "docs_splat",
+          path: "/docs/*",
+          module: "./src/pages/docs/$...splat.tsx",
+        },
+        {
+          id: "legacyCamelCase",
+          path: "/legacyCamelCase",
+          module: "./src/pages/legacyCamelCase.tsx",
+        },
+      ],
+    });
+
+    expect(source).toContain(
+      'import type * as EvPage_docs_splat from "./src/pages/docs/$...splat";',
+    );
+    expect(source).toContain(
+      'EvRoute_docs_splat: { id: "docs_splat"; path: "/docs/*"; module: typeof EvPage_docs_splat };',
+    );
+    expect(source).toContain(
+      'EvRoute_legacyCamelCase: { id: "legacyCamelCase"; path: "/legacyCamelCase"; module: typeof EvPage_legacyCamelCase };',
+    );
+  });
+
   it("escapes route ids that are not valid TypeScript identifiers", () => {
     const source = generatePageRouteTypes({
       routes: [

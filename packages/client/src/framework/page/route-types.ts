@@ -52,7 +52,13 @@ type PageRouteModuleByPath<TPath extends string> =
     ? TModule
     : unknown;
 
-export type PageRouteParams<TPath extends string> = ResolveParams<TPath>;
+export type PageRouteParams<TPath extends string> = ResolveParams<TPath> &
+  PageRouteSplatParams<TPath>;
+
+type PageRouteSplatParams<TPath extends string> =
+  TPath extends `${string}*${string}`
+    ? { _splat: string }
+    : Record<never, never>;
 
 export type PageRouteSearch<TPath extends string> =
   PageRouteModuleByPath<TPath> extends {
@@ -103,7 +109,7 @@ type EvPageRoute<TId extends string, TFullPath extends string, TModule> = Route<
   TId,
   TId,
   EvModuleSearchValidator<TModule>,
-  ResolveParams<TFullPath>,
+  PageRouteParams<TFullPath>,
   EvEmpty,
   EvEmpty,
   EvEmpty,

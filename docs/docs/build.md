@@ -166,8 +166,9 @@ When a build fails, check the inputs users control first:
 - `ev.config.ts` exports `defineConfig(...)` and uses public config keys.
 - HTML templates contain the configured mount element, usually
   `<div id="app"></div>`.
-- `src/pages` routes follow the file conventions: `$param` dynamic segments,
-  `index.*` directory roots, and lowercase URL-safe static segments.
+- `src/pages` routes follow the file conventions: `index.*` directory roots,
+  `$param` dynamic segments, `$...splat` SPA catch-alls, and URL-safe static
+  segments.
 - Page modules default-export a React component.
 - Page rendering metadata uses literal values.
 - `"use server"` modules start with the directive and export named functions.
