@@ -177,6 +177,7 @@ async function discoverRouteMiddlewares(
 
     const segmentViolation = findPageRouteSegmentConventionViolation(
       convention.scopeSegments,
+      { allowCasePreservingStatic: false, allowCatchAll: false },
     );
     if (segmentViolation) {
       diagnostics.push({

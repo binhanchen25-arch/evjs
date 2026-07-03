@@ -24,24 +24,27 @@
 
 ## 路径段规则
 
-页面路由、服务端文件路由和 API route middleware 使用同一套路径段规则：
+页面路由、服务端文件路由和 API route middleware 共享一套核心路径段规则：
 
 | 模式 | 结果 |
 | --- | --- |
 | `index.*` | 目录根路由。 |
 | `$param.*` | 动态段。服务端文件路由会转换为 Hono `:param`。 |
+| `$...splat.*` | SPA 页面路由 catch-all 段。它会映射为 `*`，运行时暴露 `_splat`。 |
 | `(group)` | 用于组织目录的 pathless route group，不增加 URL segment。 |
 | `_private.*` 或 `_private/` | 忽略的私有模块或目录。 |
 | `.hidden.*` 或 `.hidden/` | 忽略的隐藏模块或目录。 |
 
-静态路由段必须使用小写 URL-safe 字符：小写字母、数字、`.`、`_`、`-`
-或 `~`。动态参数名必须是 `$` 后的 JavaScript 标识符，例如 `$userId` 或
-`$team_id`。
+页面路由的静态段必须使用 URL-safe 字母、数字、`.`、`_`、`-` 或 `~`，并为既有稳定
+URL 保留大小写。新应用路由仍建议使用小写命名。服务端文件路由和 API route
+middleware 作用域继续使用小写 URL-safe 静态段。动态参数名必须是 `$` 后的
+JavaScript 标识符，例如 `$userId` 或 `$team_id`。
 
 以下写法会被拒绝：
 
 - `[id].tsx` 这类 bracket route；
-- `$...slug.tsx` 这类 catch-all route；
+- `$...123.tsx` 这类格式错误的 catch-all 段；
+- 同一个页面路由路径中出现多个 catch-all 段；
 - `$slug?.tsx` 这类 optional param；
 - `$.tsx` 这类空动态参数；
 - `$__proto__.tsx`、`$constructor.tsx`、`$prototype.tsx` 或
@@ -50,8 +53,9 @@
 - `users.tsx` 和 `users/index.tsx` 这类重复 path；
 - `users/$id.tsx` 和 `users/$userId.tsx` 这类重复 dynamic shape。
 
-路由必须遵循文件形状。evjs 不提供 catch-all、optional 或 bracket routes
-的替代文件名方言。
+路由必须遵循文件形状。evjs 不提供 optional 或 bracket routes 的替代文件名方言。
+Catch-all 文件路由只属于 SPA 页面路由约定；MPA 页面路由和服务端文件路由都会拒绝
+catch-all 段。
 
 ## 忽略的支撑文件
 
@@ -79,6 +83,8 @@ src/pages/index.tsx              -> /
 src/pages/about.tsx              -> /about
 src/pages/users/index.tsx        -> /users
 src/pages/users/$userId.tsx      -> /users/$userId
+src/pages/docs/$...splat.tsx     -> /docs/*
+src/pages/legacyCamelCase.tsx    -> /legacyCamelCase
 src/pages/(marketing)/about.tsx  -> /about
 ```
 

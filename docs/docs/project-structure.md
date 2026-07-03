@@ -76,8 +76,8 @@ Quick rules:
 
 - Route files live under the configured `routing.dir` and use `.ts`, `.tsx`,
   `.js`, or `.jsx`.
-- Directory roots use `index.*`; dynamic segments use `$param`; static
-  segments stay lowercase and URL-safe.
+- Directory roots use `index.*`; dynamic segments use `$param`; SPA catch-all
+  segments use `$...splat`; static segments preserve URL-safe casing.
 - Route groups such as `(marketing)` are supported as pathless organization and
   do not add URL segments. Malformed group segments are rejected. Dynamic param
   names must be safe identifiers; reserved object-property names and `$_splat`
@@ -105,12 +105,15 @@ Migration rules stay explicit rather than adding alternate filename dialects:
 - Model SPA nested layouts with route-directory layout modules. Use ordinary
   components imported by a page when the wrapper should not participate in the
   route tree.
-- Use explicit `pages` config for catch-all, optional, case-sensitive, or other
-  custom URL shapes.
+- Use `$...splat` only for existing SPA URLs that need a catch-all route.
+  New application routes should prefer explicit static and `$param` segments
+  with simple lowercase names.
+- Use explicit `pages` config for optional or other custom URL shapes that do
+  not map to the file convention.
 
 | File or folder | Framework meaning | Use it for | Do not use it for |
 | --- | --- | --- | --- |
-| `src/pages/**/*.{tsx,jsx,ts,js}` | SPA/MPA page route discovery | Thin page components with optional literal rendering metadata | Shared helpers, tests, bracket routes, catch-all routes, or hand-written SPA router/bootstrap code |
+| `src/pages/**/*.{tsx,jsx,ts,js}` | SPA/MPA page route discovery | Thin page components with optional literal rendering metadata | Shared helpers, tests, bracket or optional routes, or hand-written SPA router/bootstrap code |
 | Same-basename `src/pages/**/*.html` beside a page route | MPA page HTML template | Page-specific document templates such as `about.html` beside `about.tsx` or `users/index.html` beside `users/index.tsx` | SPA layouts, route modules, or templates for unrelated routes |
 | Route paths, dynamic URL shapes, and generated route IDs under `src/pages` | Route collision checks before build output is generated | One page module per URL path, one parameter naming choice per dynamic URL shape, and unique generated route IDs | Parallel `users.tsx`/`users/index.tsx`, `users/$id.tsx`/`users/$userId.tsx`, or `admin/panel.tsx`/`admin_panel.tsx` routes |
 | `src/pages/(group)/**` | Pathless route group | Organizing page and layout modules without adding a URL segment | URL segments that should be visible in the browser path |
@@ -172,12 +175,15 @@ Keep the rules in four buckets:
    Rendering metadata lives beside that component. Syntax errors and missing
    default exports are reported during route discovery before the bundler runs.
 2. **Filename syntax**: `index.tsx` maps to the directory root. Dynamic segments
-   use `$param`; bracket segments such as `[id].tsx`, catch-all segments such as
-   `$...slug.tsx`, and optional segments such as `$slug?.tsx` are rejected.
+   use `$param`; SPA catch-all segments use `$...splat` and map to `*`.
+   Bracket segments such as `[id].tsx` and optional segments such as
+   `$slug?.tsx` are rejected.
 3. **URL segment safety**: dynamic names must be JavaScript identifiers after
-   `$`. Static segments must be lowercase URL-safe letters, numbers, `.`, `_`,
-   `-`, or `~`. Reserved names such as `$__proto__.tsx`, `$constructor.tsx`,
-   `$prototype.tsx`, and `$_splat.tsx` are rejected.
+   `$`. Static segments must be URL-safe letters, numbers, `.`, `_`, `-`, or
+   `~`; lowercase names remain the recommended default for new application
+   routes, but stable existing URL casing can be preserved. Reserved names such
+   as `$__proto__.tsx`, `$constructor.tsx`, `$prototype.tsx`, and `$_splat.tsx`
+   are rejected.
 4. **Organization only**: route groups such as `(marketing)` are pathless, so
    `src/pages/(marketing)/about.tsx` maps to `/about`. Malformed group segments
    such as `(marketing` are rejected.
@@ -204,9 +210,9 @@ Collision and ordering rules are also deterministic:
   `teams/$teamId/users/$teamId.tsx` is rejected.
 - Flat route files and directory index route files cannot claim the same URL
   path. Choose either `users.tsx` or `users/index.tsx` for `/users`.
-- SPA and MPA both order `/` first, parent routes before children, and static
-  siblings before dynamic siblings. For example, `users/settings.tsx` ranks
-  before `users/$id.tsx`.
+- SPA and MPA both order `/` first, parent routes before children, static
+  siblings before dynamic siblings, and catch-all siblings after dynamic
+  siblings. For example, `users/settings.tsx` ranks before `users/$id.tsx`.
 - Static siblings use locale-independent code-point ordering: `a-b.tsx`,
   `a.b.tsx`, `a0.tsx`, `a_c.tsx`, `aa.tsx`, and `a~d.tsx` keep that order on
   every machine.
@@ -217,7 +223,7 @@ Collision and ordering rules are also deterministic:
 Before build output is generated, evjs applies the same route checks to
 configured paths. It rejects duplicate paths, dynamic URL shapes, route IDs,
 empty dynamic params, reserved dynamic params, duplicate dynamic params,
-whitespace, query strings, and hashes.
+multiple wildcard segments, whitespace, query strings, and hashes.
 
 Generated route IDs come from URL paths and normalize separators and
 punctuation to underscores. That means `admin/panel.tsx` and
@@ -230,6 +236,8 @@ punctuation to underscores. That means `admin/panel.tsx` and
 | `src/pages/index.tsx` | `/` | Directory root route. |
 | `src/pages/docs/index.tsx` | `/docs` | Nested directory root route. |
 | `src/pages/users/$userId.tsx` | `/users/$userId` | Dynamic segment; the param name must be a JavaScript identifier. |
+| `src/pages/files/$...path.tsx` | `/files/*` | SPA catch-all route; runtime params expose the matched suffix as `_splat`. |
+| `src/pages/legacyCamelCase.tsx` | `/legacyCamelCase` | Case-preserving static segment for stable existing URLs. Prefer lowercase for new routes. |
 | `src/pages/users/settings.tsx` | `/users/settings` | Static sibling; it ranks before `users/$userId.tsx`. |
 | `src/pages/(marketing)/about.tsx` | `/about` | Pathless route group; `(marketing)` organizes files without adding a URL segment. |
 | `src/pages/posts/layout.tsx` | Layout route for `/posts` | SPA route layout that wraps descendants below `/posts`. |
@@ -240,7 +248,6 @@ punctuation to underscores. That means `admin/panel.tsx` and
 | `src/pages/ClientCard.client.tsx` | Ignored | Client-only modules can be colocated without becoming URL routes. |
 | `src/pages/users.server.ts` | Ignored | Server-only modules are not page routes; imported server functions are still handled by the server-function transform. |
 | `src/pages/users/[id].tsx` | Rejected | Bracket route syntax is not supported; use `$id.tsx`. |
-| `src/pages/files/$...path.tsx` | Rejected | Catch-all segments are not part of the convention. |
 | `src/pages/users/$__proto__.tsx` | Rejected | Reserved object-property names are not safe route param names. |
 | `src/pages/docs/$_splat.tsx` | Rejected | `_splat` is reserved for wildcard route params. |
 | `src/pages/layout.tsx` | Rejected | Use `src/layout/index.tsx` for the SPA root layout. Route layouts must be nested below a route segment. |
@@ -314,9 +321,9 @@ export const GET = async () => Response.json({ ok: true });
 The file path under `src/apis` is the URL path, so the example above
 maps to `/api/health`. A root route uses `src/apis/index.ts`; dynamic
 segments use `$param` filenames and map to Hono params such as `:userId`.
-Route groups are pathless, and the same segment safety rules used by page
-routes apply here: bracket, catch-all, optional, uppercase static segments,
-duplicate path, and duplicate dynamic-shape routes are rejected.
+Route groups are pathless. Server file routes reject bracket, catch-all,
+optional, uppercase static segments, duplicate path, and duplicate
+dynamic-shape routes.
 
 A file under `src/apis` becomes a server route only after it exports an
 uppercase HTTP method such as `GET` or `POST`. Files with no route exports are

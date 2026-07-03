@@ -72,8 +72,8 @@ my-evjs-app/
 
 - 路由文件放在配置的 `routing.dir` 下，并使用 `.ts`、`.tsx`、`.js` 或
   `.jsx`。
-- 目录根路由使用 `index.*`；动态段使用 `$param`；静态段保持小写且
-  URL-safe。
+- 目录根路由使用 `index.*`；动态段使用 `$param`；SPA catch-all 段使用
+  `$...splat`；静态段保留 URL-safe 的大小写。
 - 支持 `(marketing)` 这类 route group 作为 pathless 组织目录，不会增加 URL
   segment。不完整的 group segment 会被拒绝。动态参数名必须是安全标识符；
   保留对象属性名和 `$_splat` 都会被拒绝。
@@ -95,11 +95,13 @@ my-evjs-app/
   URL 中，请使用 `marketing/about.tsx` 这样的真实 URL segment。
 - SPA 嵌套布局使用路由目录内的 layout 模块建模。如果某个外框不应该参与路由树，
   则作为普通组件由需要它的页面 import。
-- catch-all、optional、大小写敏感或其他自定义 URL shape 使用显式 `pages` 配置。
+- `$...splat` 只用于需要 catch-all route 的既有 SPA URL。新应用路由仍建议使用
+  明确的静态段和 `$param` 段，并保持简单小写命名。
+- optional 或其他无法映射到文件约定的自定义 URL shape 使用显式 `pages` 配置。
 
 | 文件或目录 | 框架含义 | 用于 | 不用于 |
 | --- | --- | --- | --- |
-| `src/pages/**/*.{tsx,jsx,ts,js}` | SPA/MPA 页面路由发现 | 轻量页面组件和可选的字面量渲染元信息 | 共享 helper、测试、bracket route、catch-all route 或手写 SPA router/bootstrap 代码 |
+| `src/pages/**/*.{tsx,jsx,ts,js}` | SPA/MPA 页面路由发现 | 轻量页面组件和可选的字面量渲染元信息 | 共享 helper、测试、bracket/optional route 或手写 SPA router/bootstrap 代码 |
 | 页面路由旁同 basename 的 `src/pages/**/*.html` | MPA 页面 HTML 模板 | 页面专属 document 模板，例如 `about.tsx` 旁的 `about.html`，或 `users/index.tsx` 旁的 `users/index.html` | SPA layout、路由模块，或其他路由的模板 |
 | `src/pages` 下的 route paths、dynamic URL shapes 和生成的 route ID | 生成构建产物前的路由冲突检查 | 每个 URL path 只保留一个页面模块，每个 dynamic URL shape 只保留一种参数命名，并且生成的 route ID 必须唯一 | 并存的 `users.tsx`/`users/index.tsx`、`users/$id.tsx`/`users/$userId.tsx` 或 `admin/panel.tsx`/`admin_panel.tsx` 路由 |
 | `src/pages/(group)/**` | Pathless route group | 不增加 URL segment 的页面和 layout 组织目录 | 应出现在浏览器 URL 中的路径段 |
@@ -158,12 +160,12 @@ basename 的 colocated 模板替代全局 `index.html` 模板，例如
 1. **组件契约**：路由文件默认导出页面组件。渲染元信息放在页面组件旁边。语法错误和
    缺少默认导出的错误会在路由发现阶段、bundler 运行前报告。
 2. **文件名语法**：`index.tsx` 映射到当前目录根路径。动态段使用 `$param`。
-   `[id].tsx` 这类 bracket 段、`$...slug.tsx` 这类 catch-all 段，以及
-   `$slug?.tsx` 这类可选段都会被拒绝。
+   SPA catch-all 段使用 `$...splat`，并映射为 `*`。`[id].tsx` 这类
+   bracket 段和 `$slug?.tsx` 这类可选段会被拒绝。
 3. **URL segment 安全性**：动态参数名必须是 `$` 后面的 JavaScript 标识符。
-   静态段必须小写，并且只能使用 URL-safe 小写字母、数字、`.`、`_`、`-` 或 `~`。
-   `$__proto__.tsx`、`$constructor.tsx`、`$prototype.tsx` 和 `$_splat.tsx`
-   这类保留名称会被拒绝。
+   静态段必须使用 URL-safe 字母、数字、`.`、`_`、`-` 或 `~`；新应用路由仍建议使用
+   小写命名，但既有稳定 URL 的大小写可以保留。`$__proto__.tsx`、
+   `$constructor.tsx`、`$prototype.tsx` 和 `$_splat.tsx` 这类保留名称会被拒绝。
 4. **只做组织**：`(marketing)` 这类 route group 是 pathless 目录，因此
    `src/pages/(marketing)/about.tsx` 映射到 `/about`。`(marketing` 这类不完整
    group segment 会被拒绝。
@@ -190,16 +192,17 @@ basename 的 colocated 模板替代全局 `index.html` 模板，例如
   会被拒绝。
 - 扁平路由文件和目录 `index` 路由文件不能声明同一个 URL path。`/users` 应在
   `users.tsx` 和 `users/index.tsx` 中选择一种。
-- SPA 和 MPA 都按 `/` 最先、父路由早于子路由、同级静态路由早于动态路由排序。
-  因此 `users/settings.tsx` 会排在 `users/$id.tsx` 之前。
+- SPA 和 MPA 都按 `/` 最先、父路由早于子路由、同级静态路由早于动态路由、
+  catch-all 路由晚于动态路由排序。因此 `users/settings.tsx` 会排在
+  `users/$id.tsx` 之前。
 - 同级静态路由使用与 locale 无关的 code-point 顺序：`a-b.tsx`、`a.b.tsx`、
   `a0.tsx`、`a_c.tsx`、`aa.tsx`、`a~d.tsx` 在任何机器上都保持这个顺序。
 - 路由示例和配置应使用 `/` 分隔符。文件系统里的 `\` 分隔符会在路由解析前归一化，
   因此不同操作系统上的路径和生成 route id 保持一致。
 
 生成构建产物前，evjs 会对配置路径应用同样的路由检查。重复 path、动态 URL shape、
-route id、空动态参数、保留动态参数、重复动态参数、包含空白、query string 或 hash
-的路径都会被拒绝。
+route id、空动态参数、保留动态参数、重复动态参数、多个 wildcard 段、包含空白、
+query string 或 hash 的路径都会被拒绝。
 
 生成的 route id 来自 URL path，并把分隔符和标点归一化为下划线。因此
 `admin/panel.tsx` 和 `admin_panel.tsx` 都会生成 `admin_panel`，不能同时存在。
@@ -211,6 +214,8 @@ route id、空动态参数、保留动态参数、重复动态参数、包含空
 | `src/pages/index.tsx` | `/` | 目录根路由。 |
 | `src/pages/docs/index.tsx` | `/docs` | 嵌套目录根路由。 |
 | `src/pages/users/$userId.tsx` | `/users/$userId` | 动态段；参数名必须是 JavaScript 标识符。 |
+| `src/pages/files/$...path.tsx` | `/files/*` | SPA catch-all route；运行时 params 会把匹配到的后缀暴露为 `_splat`。 |
+| `src/pages/legacyCamelCase.tsx` | `/legacyCamelCase` | 为既有稳定 URL 保留大小写的静态段。新路由仍建议使用小写。 |
 | `src/pages/users/settings.tsx` | `/users/settings` | 静态同级路由；排序早于 `users/$userId.tsx`。 |
 | `src/pages/(marketing)/about.tsx` | `/about` | Pathless route group；`(marketing)` 只组织文件，不增加 URL segment。 |
 | `src/pages/posts/layout.tsx` | `/posts` 的 layout route | SPA route layout，会包裹 `/posts` 下的后代路由。 |
@@ -221,7 +226,6 @@ route id、空动态参数、保留动态参数、重复动态参数、包含空
 | `src/pages/ClientCard.client.tsx` | 忽略 | 客户端专用模块可以就近放置，不会成为 URL 路由。 |
 | `src/pages/users.server.ts` | 忽略 | 服务端专用模块不是页面路由；被页面导入的服务端函数仍由服务端函数转换处理。 |
 | `src/pages/users/[id].tsx` | 拒绝 | 不支持 bracket 路由语法；使用 `$id.tsx`。 |
-| `src/pages/files/$...path.tsx` | 拒绝 | catch-all 段暂不属于约定。 |
 | `src/pages/users/$__proto__.tsx` | 拒绝 | 保留对象属性名不是安全的路由参数名。 |
 | `src/pages/docs/$_splat.tsx` | 拒绝 | `_splat` 是 wildcard route params 的保留名称。 |
 | `src/pages/layout.tsx` | 拒绝 | SPA 根布局使用 `src/layout/index.tsx`。Route layout 必须嵌套在某个路由段下。 |
@@ -292,8 +296,8 @@ export const GET = async () => Response.json({ ok: true });
 `src/apis` 下的文件路径就是 URL path，因此上面的例子映射到
 `/api/health`。根路由使用 `src/apis/index.ts`；动态段使用
 `$param` 文件名，并映射为 Hono params，例如 `:userId`。
-Route group 不增加路径段，并且这里复用页面路由的 segment 安全规则：bracket、
-catch-all、optional、大写静态段、重复 path 和重复 dynamic shape 路由都会被拒绝。
+Route group 不增加路径段。服务端文件路由会拒绝 bracket、catch-all、optional、
+大写静态段、重复 path 和重复 dynamic shape 路由。
 
 `src/apis` 下的文件只有导出 `GET` 或 `POST` 这类大写 HTTP method 后才会成为
 服务端路由。没有 route exports 的文件会被忽略，因此 `schema.ts`、`db.ts` 和

@@ -178,7 +178,10 @@ async function analyzeServerRouteFile(
     return { diagnostics };
   }
 
-  const segmentViolation = findPageRouteSegmentConventionViolation(segments);
+  const segmentViolation = findPageRouteSegmentConventionViolation(segments, {
+    allowCasePreservingStatic: false,
+    allowCatchAll: false,
+  });
   if (segmentViolation) {
     diagnostics.push({
       level: "error",

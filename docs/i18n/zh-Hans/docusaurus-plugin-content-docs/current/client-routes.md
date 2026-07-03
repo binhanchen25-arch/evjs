@@ -31,16 +31,18 @@ src/
 
 - 动态路由段使用 `$param` 文件名，例如 `$userId.tsx` 或 `$team_id.tsx`。
 - `[id].tsx` 和 `[...slug].tsx` 这类 bracket 段会被拒绝。
-- catch-all 和可选文件段暂不属于页面路由约定，因此 `$...slug.tsx`、
-  `$slug?.tsx` 和 `$.tsx` 都会被拒绝。
+- SPA catch-all 段使用 `$...splat.tsx`，并映射为 `*`。运行时 params 会把匹配到的
+  后缀暴露为 `_splat`。
+- optional 文件段不属于约定，因此 `$slug?.tsx` 和 `$.tsx` 会被拒绝。
 - 动态参数名必须是 `$` 后面的 JavaScript 标识符。
 - `$__proto__.tsx`、`$constructor.tsx`、`$prototype.tsx` 和 `$_splat.tsx`
   这类保留名称会被拒绝。`$_splat.tsx` 被保留，是因为 wildcard 路由会把 `*`
   暴露为 `_splat`。
-- 静态路由段必须小写，并且只能使用 URL-safe 字符：小写字母、数字、`.`、`_`、`-`
-  或 `~`。
+- 静态路由段必须使用 URL-safe 字符：字母、数字、`.`、`_`、`-` 或 `~`。新路由仍建议
+  使用小写命名，但既有稳定 URL 的大小写可以保留。
 
-如果文件需要映射到自定义或大小写敏感 path，请使用显式 `pages` 配置。
+如果文件需要映射到 optional 或其他约定外的自定义 path shape，请使用显式 `pages`
+配置。
 
 冲突检查也保持严格：
 
