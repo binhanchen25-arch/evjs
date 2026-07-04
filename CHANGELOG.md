@@ -8,6 +8,19 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.8] — 2026-07-04
+
+### ✨ Improvements
+
+- **SPA file routes** — SPA page discovery now preserves URL-safe casing for static route segments and supports terminal `$...splat` catch-all file routes that emit `*` route paths.
+- **Wildcard route typing** — Generated route helper types expose wildcard params as `_splat`, matching runtime params and browser-facing manifest output.
+
+### 📝 Documentation
+
+- **Route conventions** — Updated English and Chinese docs for case-preserving static segments, terminal catch-all syntax, and the stricter MPA/server route boundaries.
+
+---
+
 ## [0.2.7] — 2026-07-02
 
 ### ⚠️ Behavior Changes
