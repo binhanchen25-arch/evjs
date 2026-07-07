@@ -6,6 +6,10 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ## [Unreleased]
 
+---
+
+## [0.2.9] — 2026-07-07
+
 ### 🐛 Bug Fixes
 
 - **SPA catch-all routes** — Generated catch-all page routes now emit TanStack-compatible `$` route paths, keeping direct URL matches, generated route types, and navigation helpers aligned.
