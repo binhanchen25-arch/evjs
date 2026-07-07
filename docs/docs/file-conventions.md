@@ -34,7 +34,7 @@ path segment rules:
 | --- | --- |
 | `index.*` | Directory root route. |
 | `$param.*` | Dynamic segment. Server file routes convert it to Hono `:param`. |
-| `$...splat.*` | SPA page-route catch-all segment. It maps to `*` and exposes `_splat` at runtime. |
+| `$...splat.*` | SPA page-route catch-all segment. It maps to `$` and exposes `_splat` at runtime. |
 | `(group)` | Pathless route group for organization. It does not add a URL segment. |
 | `_private.*` or `_private/` | Ignored private module or directory. |
 | `.hidden.*` or `.hidden/` | Ignored hidden module or directory. |
@@ -92,7 +92,7 @@ src/pages/index.tsx              -> /
 src/pages/about.tsx              -> /about
 src/pages/users/index.tsx        -> /users
 src/pages/users/$userId.tsx      -> /users/$userId
-src/pages/docs/$...splat.tsx     -> /docs/*
+src/pages/docs/$...splat.tsx     -> /docs/$
 src/pages/legacyCamelCase.tsx    -> /legacyCamelCase
 src/pages/(marketing)/about.tsx  -> /about
 ```

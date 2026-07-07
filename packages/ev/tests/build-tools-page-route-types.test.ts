@@ -207,7 +207,7 @@ describe("generatePageRouteTypes", () => {
       routes: [
         {
           id: "docs_splat",
-          path: "/docs/*",
+          path: "/docs/$",
           module: "./src/pages/docs/$...splat.tsx",
         },
         {
@@ -222,7 +222,7 @@ describe("generatePageRouteTypes", () => {
       'import type * as EvPage_docs_splat from "./src/pages/docs/$...splat";',
     );
     expect(source).toContain(
-      'EvRoute_docs_splat: { id: "docs_splat"; path: "/docs/*"; module: typeof EvPage_docs_splat };',
+      'EvRoute_docs_splat: { id: "docs_splat"; path: "/docs/$"; module: typeof EvPage_docs_splat };',
     );
     expect(source).toContain(
       'EvRoute_legacyCamelCase: { id: "legacyCamelCase"; path: "/legacyCamelCase"; module: typeof EvPage_legacyCamelCase };',

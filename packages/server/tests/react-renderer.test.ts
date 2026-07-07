@@ -452,7 +452,7 @@ describe("createReactServerRenderAdapter", () => {
     };
     manifest.routes.push({
       id: "docs-fallback",
-      path: "/docs/*",
+      path: "/docs/$",
       pageId: "docs",
     });
     function DocsPage() {

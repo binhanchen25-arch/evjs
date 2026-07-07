@@ -1238,6 +1238,8 @@ function formatConfiguredPageRouteParamValidationError(
       return `uses duplicate dynamic param name "${error.name}" in segment "${error.segment}". Use unique param names within one route path.`;
     case "duplicate-wildcard":
       return `contains more than one wildcard segment "${error.segment}". Use at most one wildcard segment in a route path.`;
+    case "star-wildcard":
+      return 'uses "*" as a wildcard segment. Use "$" for page route splats.';
   }
 }
 

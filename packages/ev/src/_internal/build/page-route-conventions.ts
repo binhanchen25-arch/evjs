@@ -563,7 +563,7 @@ export function isCatchAllPageRouteSegment(segment: string): boolean {
 }
 
 function routePathSegmentFromConventionSegment(segment: string): string {
-  return isCatchAllPageRouteSegment(segment) ? "*" : segment;
+  return isCatchAllPageRouteSegment(segment) ? "$" : segment;
 }
 
 function routeIdSegmentFromConventionSegment(segment: string): string {

@@ -267,7 +267,7 @@ describe("discoverPageRoutes", () => {
 
     expect(routePathFromSegments([])).toBe("/");
     expect(routePathFromSegments(["users", "$userId"])).toBe("/users/$userId");
-    expect(routePathFromSegments(["docs", "$...splat"])).toBe("/docs/*");
+    expect(routePathFromSegments(["docs", "$...splat"])).toBe("/docs/$");
     expect(routePathFromSegments(["(marketing)", "about"])).toBe("/about");
     expect(routeIdPathFromSegments(["docs", "$...splat"])).toBe("/docs/$splat");
     expect(routeShapeFromSegments(["users", "$userId"])).toEqual({
@@ -275,8 +275,8 @@ describe("discoverPageRoutes", () => {
       label: "/users/:param",
     });
     expect(routeShapeFromSegments(["docs", "$...splat"])).toEqual({
-      key: "/docs/*",
-      label: "/docs/*",
+      key: "/docs/$",
+      label: "/docs/$",
     });
     expect(routePathShapeFromPath("/users/:userId")).toEqual({
       key: "/users/:param",
@@ -501,7 +501,7 @@ describe("discoverPageRoutes", () => {
       },
       {
         id: "docs_splat",
-        path: "/docs/*",
+        path: "/docs/$",
         module: "./src/pages/docs/$...splat.tsx",
         parentId: "docs_layout",
       },
@@ -512,7 +512,7 @@ describe("discoverPageRoutes", () => {
       },
       {
         id: "teams_teamId_reports_path",
-        path: "/teams/$teamId/reports/*",
+        path: "/teams/$teamId/reports/$",
         module: "./src/pages/teams/$teamId/reports/$...path.tsx",
       },
     ]);

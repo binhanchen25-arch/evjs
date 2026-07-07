@@ -55,10 +55,12 @@ type PageRouteModuleByPath<TPath extends string> =
 export type PageRouteParams<TPath extends string> = ResolveParams<TPath> &
   PageRouteSplatParams<TPath>;
 
-type PageRouteSplatParams<TPath extends string> =
-  TPath extends `${string}*${string}`
-    ? { _splat: string }
-    : Record<never, never>;
+type PageRouteSplatParams<TPath extends string> = TPath extends
+  | "$"
+  | `${string}/$`
+  | `${string}/$/${string}`
+  ? { _splat: string }
+  : Record<never, never>;
 
 export type PageRouteSearch<TPath extends string> =
   PageRouteModuleByPath<TPath> extends {

@@ -30,7 +30,7 @@
 | --- | --- |
 | `index.*` | 目录根路由。 |
 | `$param.*` | 动态段。服务端文件路由会转换为 Hono `:param`。 |
-| `$...splat.*` | SPA 页面路由 catch-all 段。它会映射为 `*`，运行时暴露 `_splat`。 |
+| `$...splat.*` | SPA 页面路由 catch-all 段。它会映射为 `$`，运行时暴露 `_splat`。 |
 | `(group)` | 用于组织目录的 pathless route group，不增加 URL segment。 |
 | `_private.*` 或 `_private/` | 忽略的私有模块或目录。 |
 | `.hidden.*` 或 `.hidden/` | 忽略的隐藏模块或目录。 |
@@ -83,7 +83,7 @@ src/pages/index.tsx              -> /
 src/pages/about.tsx              -> /about
 src/pages/users/index.tsx        -> /users
 src/pages/users/$userId.tsx      -> /users/$userId
-src/pages/docs/$...splat.tsx     -> /docs/*
+src/pages/docs/$...splat.tsx     -> /docs/$
 src/pages/legacyCamelCase.tsx    -> /legacyCamelCase
 src/pages/(marketing)/about.tsx  -> /about
 ```

@@ -31,7 +31,7 @@ src/
 
 - 动态路由段使用 `$param` 文件名，例如 `$userId.tsx` 或 `$team_id.tsx`。
 - `[id].tsx` 和 `[...slug].tsx` 这类 bracket 段会被拒绝。
-- SPA catch-all 段使用 `$...splat.tsx` 作为 URL path 的最后一段，并映射为 `*`。
+- SPA catch-all 段使用 `$...splat.tsx` 作为 URL path 的最后一段，并映射为 `$`。
   运行时 params 会把匹配到的后缀暴露为 `_splat`。
 - optional 文件段不属于约定，因此 `$slug?.tsx` 和 `$.tsx` 会被拒绝。
 - 动态参数名必须是 `$` 后面的 JavaScript 标识符。

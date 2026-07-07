@@ -35,7 +35,7 @@ The route convention is intentionally narrow:
   `$team_id.tsx`.
 - Bracket segments such as `[id].tsx` and `[...slug].tsx` are rejected.
 - SPA catch-all segments use `$...splat.tsx` as the final URL path segment and
-  map to `*`. Runtime params expose the matched suffix as `_splat`.
+  map to `$`. Runtime params expose the matched suffix as `_splat`.
 - Optional file segments are not part of the convention, so `$slug?.tsx` and
   `$.tsx` are rejected.
 - Dynamic param names must be JavaScript identifiers after `$`.

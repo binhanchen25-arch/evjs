@@ -4,7 +4,8 @@ export type PageRouteParamNameValidationError = "empty" | "reserved";
 export type PageRouteParamSegmentValidationErrorKind =
   | PageRouteParamNameValidationError
   | "duplicate"
-  | "duplicate-wildcard";
+  | "duplicate-wildcard"
+  | "star-wildcard";
 
 export interface PageRouteParamSegmentValidationError {
   segment: string;
@@ -105,6 +106,9 @@ export function getPageRouteParamSegmentValidationError(
       seenWildcard = true;
       continue;
     }
+    if (segment === "*") {
+      return { segment, name: "_splat", error: "star-wildcard" };
+    }
 
     const name = getDynamicRouteParamName(segment);
     if (name === undefined) continue;
@@ -122,6 +126,7 @@ export function isReservedPageRouteParamName(name: string): boolean {
 }
 
 function getDynamicRouteParamName(segment: string): string | undefined {
+  if (isWildcardRouteSegment(segment)) return undefined;
   if (segment.startsWith("$") || segment.startsWith(":")) {
     return segment.slice(1);
   }
@@ -170,7 +175,7 @@ function matchPageRoutePath(
   const normalizedPathname = normalizeRoutePathname(pathname);
   const routeSegments = splitPath(normalizedRoutePath);
   const pathSegments = splitPath(normalizedPathname);
-  const prefixWildcard = routeSegments.at(-1) === "*";
+  const prefixWildcard = isWildcardRouteSegment(routeSegments.at(-1) ?? "");
   const segmentsToMatch = prefixWildcard
     ? routeSegments.slice(0, -1)
     : routeSegments;
@@ -248,14 +253,16 @@ function isStaticRouteSegment(segment: string): boolean {
 }
 
 function isDynamicRouteSegment(segment: string): boolean {
+  if (isWildcardRouteSegment(segment)) return false;
   return segment.startsWith("$") || segment.startsWith(":");
 }
 
 function isWildcardRouteSegment(segment: string): boolean {
-  return segment === "*";
+  return segment === "$";
 }
 
 function normalizeRouteShapeSegment(segment: string): string {
+  if (isWildcardRouteSegment(segment)) return segment;
   return isDynamicRouteSegment(segment) ? ":param" : segment;
 }
 

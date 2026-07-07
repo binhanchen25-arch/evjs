@@ -2270,12 +2270,25 @@ describe("resolveConfig", () => {
         pages: {
           home: {
             component: "./src/Home.tsx",
-            path: "/docs/*/edit/*",
+            path: "/docs/$/edit/$",
           },
         },
       }),
     ).toThrow(
-      '[evjs] pages.home.path contains more than one wildcard segment "*". Use at most one wildcard segment in a route path.',
+      '[evjs] pages.home.path contains more than one wildcard segment "$". Use at most one wildcard segment in a route path.',
+    );
+
+    expect(() =>
+      resolveConfig({
+        pages: {
+          home: {
+            component: "./src/Home.tsx",
+            path: "/docs/*",
+          },
+        },
+      }),
+    ).toThrow(
+      '[evjs] pages.home.path uses "*" as a wildcard segment. Use "$" for page route splats.',
     );
 
     expect(() =>

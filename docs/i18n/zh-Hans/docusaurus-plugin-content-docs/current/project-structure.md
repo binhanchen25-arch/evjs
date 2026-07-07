@@ -160,7 +160,7 @@ basename 的 colocated 模板替代全局 `index.html` 模板，例如
 1. **组件契约**：路由文件默认导出页面组件。渲染元信息放在页面组件旁边。语法错误和
    缺少默认导出的错误会在路由发现阶段、bundler 运行前报告。
 2. **文件名语法**：`index.tsx` 映射到当前目录根路径。动态段使用 `$param`。
-   位于 URL path 末尾的 SPA catch-all 段使用 `$...splat`，并映射为 `*`。`[id].tsx` 这类
+   位于 URL path 末尾的 SPA catch-all 段使用 `$...splat`，并映射为 `$`。`[id].tsx` 这类
    bracket 段和 `$slug?.tsx` 这类可选段会被拒绝。
 3. **URL segment 安全性**：动态参数名必须是 `$` 后面的 JavaScript 标识符。
    静态段必须使用 URL-safe 字母、数字、`.`、`_`、`-` 或 `~`；新应用路由仍建议使用
@@ -214,7 +214,7 @@ query string 或 hash 的路径都会被拒绝。
 | `src/pages/index.tsx` | `/` | 目录根路由。 |
 | `src/pages/docs/index.tsx` | `/docs` | 嵌套目录根路由。 |
 | `src/pages/users/$userId.tsx` | `/users/$userId` | 动态段；参数名必须是 JavaScript 标识符。 |
-| `src/pages/files/$...path.tsx` | `/files/*` | SPA catch-all route；运行时 params 会把匹配到的后缀暴露为 `_splat`。 |
+| `src/pages/files/$...path.tsx` | `/files/$` | SPA catch-all route；运行时 params 会把匹配到的后缀暴露为 `_splat`。 |
 | `src/pages/files/$...path/edit.tsx` | 拒绝 | Catch-all 段必须是 URL path 的最后一段。 |
 | `src/pages/legacyCamelCase.tsx` | `/legacyCamelCase` | 为既有稳定 URL 保留大小写的静态段。新路由仍建议使用小写。 |
 | `src/pages/users/settings.tsx` | `/users/settings` | 静态同级路由；排序早于 `users/$userId.tsx`。 |

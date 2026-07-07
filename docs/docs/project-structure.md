@@ -175,7 +175,7 @@ Keep the rules in four buckets:
    Rendering metadata lives beside that component. Syntax errors and missing
    default exports are reported during route discovery before the bundler runs.
 2. **Filename syntax**: `index.tsx` maps to the directory root. Dynamic segments
-   use `$param`; terminal SPA catch-all segments use `$...splat` and map to `*`.
+   use `$param`; terminal SPA catch-all segments use `$...splat` and map to `$`.
    Bracket segments such as `[id].tsx` and optional segments such as
    `$slug?.tsx` are rejected.
 3. **URL segment safety**: dynamic names must be JavaScript identifiers after
@@ -236,7 +236,7 @@ punctuation to underscores. That means `admin/panel.tsx` and
 | `src/pages/index.tsx` | `/` | Directory root route. |
 | `src/pages/docs/index.tsx` | `/docs` | Nested directory root route. |
 | `src/pages/users/$userId.tsx` | `/users/$userId` | Dynamic segment; the param name must be a JavaScript identifier. |
-| `src/pages/files/$...path.tsx` | `/files/*` | SPA catch-all route; runtime params expose the matched suffix as `_splat`. |
+| `src/pages/files/$...path.tsx` | `/files/$` | SPA catch-all route; runtime params expose the matched suffix as `_splat`. |
 | `src/pages/files/$...path/edit.tsx` | Rejected | Catch-all segments must be the final URL path segment. |
 | `src/pages/legacyCamelCase.tsx` | `/legacyCamelCase` | Case-preserving static segment for stable existing URLs. Prefer lowercase for new routes. |
 | `src/pages/users/settings.tsx` | `/users/settings` | Static sibling; it ranks before `users/$userId.tsx`. |

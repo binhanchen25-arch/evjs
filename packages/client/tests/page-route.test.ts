@@ -68,6 +68,48 @@ describe("createPagesApp", () => {
     expect(app.queryClient).toBeDefined();
   });
 
+  it("matches wildcard page routes from generated public route paths", () => {
+    function DocsFallback() {
+      return null;
+    }
+
+    const { app } = createPagesApp({
+      routes: [
+        {
+          id: "docs_splat",
+          path: "/docs/$",
+          module: { default: DocsFallback },
+        },
+      ],
+    });
+    const router = app.router as {
+      buildLocation(options: { to: string; params: { _splat: string } }): {
+        href: string;
+        pathname: string;
+      };
+      matchRoutes(path: string): Array<{ params: Record<string, string> }>;
+      update(options: {
+        history: ReturnType<typeof client.createMemoryHistory>;
+      }): void;
+    };
+    router.update({ history: client.createMemoryHistory() });
+
+    const matches = router.matchRoutes("/docs/guides/install");
+    expect(matches[matches.length - 1]?.params).toMatchObject({
+      "*": "guides/install",
+      _splat: "guides/install",
+    });
+    expect(
+      router.buildLocation({
+        to: "/docs/$",
+        params: { _splat: "guides/install" },
+      }),
+    ).toMatchObject({
+      href: "/docs/guides/install",
+      pathname: "/docs/guides/install",
+    });
+  });
+
   it("reports SPA render container errors with evjs diagnostics", () => {
     function Home() {
       return null;
@@ -238,10 +280,17 @@ describe("createPagesApp", () => {
     );
     expect(() =>
       createPagesApp({
-        routes: [{ path: "/docs/*/edit/*", module: { default: Home } }],
+        routes: [{ path: "/docs/$/edit/$", module: { default: Home } }],
       }),
     ).toThrow(
-      '[evjs] createPagesApp() routes[0].path contains more than one wildcard segment "*". Use at most one wildcard segment in a route path.',
+      '[evjs] createPagesApp() routes[0].path contains more than one wildcard segment "$". Use at most one wildcard segment in a route path.',
+    );
+    expect(() =>
+      createPagesApp({
+        routes: [{ path: "/docs/*", module: { default: Home } }],
+      }),
+    ).toThrow(
+      '[evjs] createPagesApp() routes[0].path uses "*" as a wildcard segment. Use "$" for page route splats.',
     );
     expect(() =>
       createPagesApp({

@@ -516,7 +516,7 @@ describe("createReactPageModule", () => {
       hydrate: "load",
       route: {
         id: "docs-fallback",
-        path: "/docs/*",
+        path: "/docs/$",
       },
     });
 

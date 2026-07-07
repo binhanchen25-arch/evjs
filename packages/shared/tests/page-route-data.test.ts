@@ -15,7 +15,7 @@ describe("page route data helpers", () => {
   it("matches page route paths with dynamic, colon, and wildcard segments", () => {
     expect(pageRoutePathMatches("/orders/$orderId", "/orders/123")).toBe(true);
     expect(pageRoutePathMatches("/orders/:orderId", "/orders/123")).toBe(true);
-    expect(pageRoutePathMatches("/docs/*", "/docs/guides/install")).toBe(true);
+    expect(pageRoutePathMatches("/docs/$", "/docs/guides/install")).toBe(true);
     expect(pageRoutePathMatches("/orders/$orderId", "/orders/123/items")).toBe(
       false,
     );
@@ -24,7 +24,7 @@ describe("page route data helpers", () => {
   it("finds the most specific matching page route independent of route order", () => {
     const routes = [
       { id: "user", path: "/users/$userId" },
-      { id: "catchall", path: "/users/*" },
+      { id: "catchall", path: "/users/$" },
       { id: "settings", path: "/users/settings" },
     ];
 
@@ -88,10 +88,15 @@ describe("page route data helpers", () => {
       name: "userId",
       error: "duplicate",
     });
-    expect(getPageRouteParamSegmentValidationError("/docs/*/edit/*")).toEqual({
-      segment: "*",
+    expect(getPageRouteParamSegmentValidationError("/docs/$/edit/$")).toEqual({
+      segment: "$",
       name: "_splat",
       error: "duplicate-wildcard",
+    });
+    expect(getPageRouteParamSegmentValidationError("/docs/*")).toEqual({
+      segment: "*",
+      name: "_splat",
+      error: "star-wildcard",
     });
     expect(
       getPageRouteParamSegmentValidationError("/users/:userId"),
@@ -105,16 +110,16 @@ describe("page route data helpers", () => {
   });
 
   it("matches wildcard page route params as splats", () => {
-    expect(matchPageRouteParams("/docs/*", "/docs/guides/install")).toEqual({
+    expect(matchPageRouteParams("/docs/$", "/docs/guides/install")).toEqual({
       _splat: "guides/install",
     });
-    expect(matchPageRouteParams("/files/*/edit", "/files/readme/edit")).toEqual(
+    expect(matchPageRouteParams("/files/$/edit", "/files/readme/edit")).toEqual(
       {
         _splat: "readme",
       },
     );
     expect(
-      matchPageRouteParams("/files/*/edit/*", "/files/readme/edit/intro"),
+      matchPageRouteParams("/files/$/edit/$", "/files/readme/edit/intro"),
     ).toEqual({
       _splat: "readme",
     });
@@ -139,7 +144,7 @@ describe("page route data helpers", () => {
     expect(pageRoutePathShapeFromPath("users/$id/details")).toBe(
       "/users/:param/details",
     );
-    expect(pageRoutePathShapeFromPath("/docs/*")).toBe("/docs/*");
+    expect(pageRoutePathShapeFromPath("/docs/$")).toBe("/docs/$");
     expect(pageRoutePathShapeFromPath("/users/$id/")).toBe("/users/:param");
   });
 

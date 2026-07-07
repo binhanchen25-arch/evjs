@@ -27,7 +27,7 @@ interface EvPageSearchModule {
 
 interface EvPageRoutes {
   index: { id: "index"; path: "/"; module: EvPageIndexModule };
-  docs_splat: { id: "docs_splat"; path: "/docs/*"; module: Empty };
+  docs_splat: { id: "docs_splat"; path: "/docs/$"; module: Empty };
   posts_postId: {
     id: "posts_postId";
     path: "/posts/$postId";
@@ -42,7 +42,7 @@ declare module "@evjs/client" {
 
 export function PageRouteLinkTypeTests() {
   useLinkProps({ to: "/" });
-  useLinkProps({ to: "/docs/*", params: { _splat: "guides/install" } });
+  useLinkProps({ to: "/docs/$", params: { _splat: "guides/install" } });
   useLinkProps({ to: "/posts/$postId", params: { postId: "p1" } });
   useLinkProps({ to: "/search", search: { q: "router", page: 1 } });
   Link({ to: "/posts/$postId", params: { postId: "p1" }, children: "Post" });
@@ -51,7 +51,7 @@ export function PageRouteLinkTypeTests() {
 
   const postParams = usePageParams("/posts/$postId");
   postParams.postId.toUpperCase();
-  const docsParams = usePageParams("/docs/*");
+  const docsParams = usePageParams("/docs/$");
   docsParams._splat.toUpperCase();
 
   const search = usePageSearch("/search");
@@ -77,13 +77,13 @@ export function PageRouteLinkTypeTests() {
   useLinkProps({ to: "/posts/$postId" });
 
   // @ts-expect-error wildcard page routes require the _splat param.
-  useLinkProps({ to: "/docs/*" });
+  useLinkProps({ to: "/docs/$" });
 
   // @ts-expect-error dynamic params must match the page route segment name.
   useLinkProps({ to: "/posts/$postId", params: { id: "p1" } });
 
   // @ts-expect-error wildcard page routes expose the _splat param.
-  useLinkProps({ to: "/docs/*", params: { path: "guides/install" } });
+  useLinkProps({ to: "/docs/$", params: { path: "guides/install" } });
 
   // @ts-expect-error search objects follow validateSearch output.
   useLinkProps({ to: "/search", search: { q: "router", page: "one" } });

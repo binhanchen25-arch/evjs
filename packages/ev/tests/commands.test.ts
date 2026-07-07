@@ -647,7 +647,7 @@ describe("build", () => {
     expect(events).toEqual([
       "entry:evjs:pages-app",
       "metadata:pages-app",
-      "routes:/,/docs/*,/legacyCamelCase",
+      "routes:/,/docs/$,/legacyCamelCase",
       "bundler.build",
       "bundler.entries:main",
     ]);

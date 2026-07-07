@@ -40,7 +40,7 @@ function routeSegments(routePath: string): string[] {
 type RouteSegmentKind = "static" | "dynamic" | "wildcard";
 
 function routeSegmentKind(segment: string): RouteSegmentKind {
-  if (segment === "*") return "wildcard";
+  if (segment === "$") return "wildcard";
   if (segment.startsWith("$") || segment.startsWith(":")) return "dynamic";
   return "static";
 }

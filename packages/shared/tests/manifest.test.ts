@@ -3284,7 +3284,7 @@ describe("createPublicManifest", () => {
       routes: [
         {
           id: "docs_splat",
-          path: "/docs/*",
+          path: "/docs/$",
           appId: "default",
         },
       ],
@@ -3293,7 +3293,7 @@ describe("createPublicManifest", () => {
     expect(createPublicManifest(output)).toMatchObject({
       routing: {
         kind: "spa",
-        routes: [{ id: "docs_splat", path: "/docs/*" }],
+        routes: [{ id: "docs_splat", path: "/docs/$" }],
       },
     });
   });

@@ -303,7 +303,7 @@ describe("createAppGraph and createBuildPlan", () => {
         routes: [
           {
             id: "users_catchall",
-            path: "/users/*",
+            path: "/users/$",
             module: "./src/pages/users/catchall.tsx",
           },
           {
@@ -342,7 +342,7 @@ describe("createAppGraph and createBuildPlan", () => {
       "/users",
       "/users/settings",
       "/users/:userId",
-      "/users/*",
+      "/users/$",
     ]);
     expect(metadata).toMatchObject({
       type: "pages-app",
@@ -351,7 +351,7 @@ describe("createAppGraph and createBuildPlan", () => {
         { id: "users", path: "/users" },
         { id: "users_settings", path: "/users/settings" },
         { id: "users_userId", path: "/users/:userId" },
-        { id: "users_catchall", path: "/users/*" },
+        { id: "users_catchall", path: "/users/$" },
       ],
     });
   });
@@ -617,7 +617,7 @@ describe("createAppGraph and createBuildPlan", () => {
           },
           {
             id: "duplicate_wildcard",
-            path: "/docs/*/edit/*",
+            path: "/docs/$/edit/$",
             module: "./src/pages/duplicate-wildcard.tsx",
           },
           {
@@ -686,7 +686,7 @@ describe("createAppGraph and createBuildPlan", () => {
         level: "error",
         file: "src/pages/duplicate-wildcard.tsx",
         message:
-          'Configured page route path "/docs/*/edit/*" contains more than one wildcard segment "*". Use at most one wildcard segment in a route path.',
+          'Configured page route path "/docs/$/edit/$" contains more than one wildcard segment "$". Use at most one wildcard segment in a route path.',
       },
       {
         level: "error",
