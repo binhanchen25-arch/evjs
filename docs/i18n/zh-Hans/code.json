@@ -1,66 +1,118 @@
 {
   "homepage.tagline": {
-    "message": "面向文件页面和 Hono 服务端的 React 全栈框架",
+    "message": "带 agent-readable .ev IR 的文件约定 React 框架",
     "description": "The tagline on the homepage hero"
+  },
+  "homepage.hero.description": {
+    "message": "应用代码保留在 src/pages、src/apis 和服务端模块中。evjs 会在 bundler 运行前生成框架托管的 entries、插件模块、slots 和 manifests。",
+    "description": "The homepage hero description"
   },
   "homepage.getStarted": {
     "message": "快速开始 →",
     "description": "The Get Started button on the homepage"
   },
-  "homepage.feature.zeroConfig.title": {
-    "message": "零配置",
-    "description": "Title for Zero Config feature"
+  "homepage.exploreIr": {
+    "message": "查看 .ev IR",
+    "description": "The generated IR button on the homepage"
   },
-  "homepage.feature.zeroConfig.description": {
-    "message": "ev dev / ev build —— 无需样板代码。约定优于配置，可选 ev.config.ts 自定义。",
-    "description": "Description for Zero Config feature"
+  "homepage.ir.label": {
+    "message": "生成的框架 IR",
+    "description": "Label above the homepage IR section"
   },
-  "homepage.feature.clientRoutes.title": {
-    "message": "客户端路由",
-    "description": "Title for Client Routes feature"
+  "homepage.ir.title": {
+    "message": "框架生成代码在 bundling 前可见",
+    "description": "Title of the homepage IR section"
   },
-  "homepage.feature.clientRoutes.description": {
-    "message": "基于 src/pages 提供类型安全的页面参数、搜索参数、loader 和导航，router 接线由 evjs 托管。",
-    "description": "Description for Client Routes feature"
+  "homepage.ir.description": {
+    "message": "运行 ev prepare 即可在不产出 dist 的情况下查看 .ev。Agent、插件作者和 reviewer 可以直接读取生成图，而不需要反向理解虚拟 loader。",
+    "description": "Description of the homepage IR section"
   },
-  "homepage.feature.serverFn.title": {
-    "message": "服务端函数",
-    "description": "Title for Server Functions feature"
+  "homepage.flow.conventions.title": {
+    "message": "发现约定",
+    "description": "Title for the first homepage flow step"
   },
-  "homepage.feature.serverFn.description": {
-    "message": "\"use server\" 指令在构建时自动将异步函数转换为类型安全的远程 API 调用。",
-    "description": "Description for Server Functions feature"
+  "homepage.flow.conventions.description": {
+    "message": "读取 src/pages、src/apis、middleware、server functions 和 ev.config.ts。",
+    "description": "Description for the first homepage flow step"
   },
-  "homepage.feature.dataFetching.title": {
-    "message": "数据获取",
-    "description": "Title for Data Fetching feature"
+  "homepage.flow.ir.title": {
+    "message": "生成 .ev",
+    "description": "Title for the second homepage flow step"
   },
-  "homepage.feature.dataFetching.description": {
-    "message": "面向服务端函数的 TanStack Query helper —— useQuery(fn, ...args)、useMutation(fn) 和稳定 query key。",
-    "description": "Description for Data Fetching feature"
+  "homepage.flow.ir.description": {
+    "message": "写入生成 entries、插件模块、slots、import edges 和 manifest 数据。",
+    "description": "Description for the second homepage flow step"
   },
-  "homepage.feature.multiRuntime.title": {
-    "message": "多运行时",
-    "description": "Title for Multi-Runtime feature"
+  "homepage.flow.bundle.title": {
+    "message": "统一构建",
+    "description": "Title for the third homepage flow step"
   },
-  "homepage.feature.multiRuntime.description": {
-    "message": "基于 Hono 的服务端可运行在 Node.js、Deno、Bun 和边缘运行时上，开箱即用。",
-    "description": "Description for Multi-Runtime feature"
+  "homepage.flow.bundle.description": {
+    "message": "让 Utoopack 或 webpack 消费同一份框架 build plan。",
+    "description": "Description for the third homepage flow step"
   },
-  "homepage.feature.serverRoutes.title": {
-    "message": "服务端路由",
-    "description": "Title for Server Routes feature"
+  "homepage.flow.output.title": {
+    "message": "部署",
+    "description": "Title for the fourth homepage flow step"
   },
-  "homepage.feature.serverRoutes.description": {
-    "message": "通过 createRoute() 构建标准 Request/Response REST 端点 —— 在 React 应用旁构建 API。",
-    "description": "Description for Server Routes feature"
+  "homepage.flow.output.description": {
+    "message": "输出浏览器文件、服务端运行时产物和部署元信息。",
+    "description": "Description for the fourth homepage flow step"
+  },
+  "homepage.feature.conventions.title": {
+    "message": "文件约定",
+    "description": "Title for File Conventions feature"
+  },
+  "homepage.feature.conventions.description": {
+    "message": "src/pages、src/apis、middleware、layouts 和服务端模块保持为应用事实来源。",
+    "description": "Description for File Conventions feature"
+  },
+  "homepage.feature.frameworkIr.title": {
+    "message": "框架 IR",
+    "description": "Title for Framework IR feature"
+  },
+  "homepage.feature.frameworkIr.description": {
+    "message": ".ev 记录发现到的 graph、entry facade、生成模块、slot 挂载和 import edges。",
+    "description": "Description for Framework IR feature"
+  },
+  "homepage.feature.plugins.title": {
+    "message": "插件贡献",
+    "description": "Title for Plugin Contributions feature"
+  },
+  "homepage.feature.plugins.description": {
+    "message": "插件声明生成产物并挂到 framework slots，不需要 bundler-specific loader。",
+    "description": "Description for Plugin Contributions feature"
+  },
+  "homepage.feature.serverBoundary.title": {
+    "message": "服务端边界",
+    "description": "Title for Server Boundary feature"
+  },
+  "homepage.feature.serverBoundary.description": {
+    "message": "Server functions、src/apis 路由、middleware、SSR、PPR 和 RSC 共享同一条 Hono 运行时路径。",
+    "description": "Description for Server Boundary feature"
+  },
+  "homepage.feature.bundlers.title": {
+    "message": "构建器适配",
+    "description": "Title for Bundler Adapters feature"
+  },
+  "homepage.feature.bundlers.description": {
+    "message": "Utoopack 和 webpack 消费同一份 build plan 与 .ev entries，不再重复组装框架逻辑。",
+    "description": "Description for Bundler Adapters feature"
+  },
+  "homepage.feature.deployment.title": {
+    "message": "部署产物",
+    "description": "Title for Deployment Output feature"
+  },
+  "homepage.feature.deployment.description": {
+    "message": "构建产物拆分浏览器资源、服务端 bundle、manifest 和适配器使用的部署元信息。",
+    "description": "Description for Deployment Output feature"
   },
   "homepage.features.label": {
-    "message": "特性",
+    "message": "核心界面",
     "description": "Label above the features section heading"
   },
   "homepage.features.title": {
-    "message": "构建全栈 React 应用所需的一切",
+    "message": "应用代码、插件和产物共享同一张框架图",
     "description": "Title of the features section"
   }
 }

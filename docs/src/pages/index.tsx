@@ -8,12 +8,18 @@ import styles from "./index.module.css";
 /* ─── Feature data ─── */
 
 type FeatureIconName =
-  | "bolt"
   | "routes"
+  | "ir"
+  | "plugin"
   | "server"
-  | "function"
-  | "query"
-  | "runtime";
+  | "bundler"
+  | "deploy";
+
+type FlowStep = {
+  label: string;
+  title: string;
+  description: string;
+};
 
 function useFeatures(): Array<{
   icon: FeatureIconName;
@@ -22,75 +28,128 @@ function useFeatures(): Array<{
 }> {
   return [
     {
-      icon: "bolt",
+      icon: "routes",
       title: translate({
-        id: "homepage.feature.zeroConfig.title",
-        message: "Zero Config",
+        id: "homepage.feature.conventions.title",
+        message: "File Conventions",
       }),
       description: translate({
-        id: "homepage.feature.zeroConfig.description",
+        id: "homepage.feature.conventions.description",
         message:
-          "ev dev / ev build — no boilerplate needed. Convention over configuration with optional ev.config.ts.",
+          "src/pages, src/apis, middleware, layouts, and server modules stay as the application source of truth.",
       }),
     },
     {
-      icon: "routes",
+      icon: "ir",
       title: translate({
-        id: "homepage.feature.clientRoutes.title",
-        message: "Client Routes",
+        id: "homepage.feature.frameworkIr.title",
+        message: "Framework IR",
       }),
       description: translate({
-        id: "homepage.feature.clientRoutes.description",
+        id: "homepage.feature.frameworkIr.description",
         message:
-          "Type-safe page params, search, loaders, and navigation from src/pages while evjs owns router setup.",
+          ".ev records discovered graphs, entry facades, generated modules, slot attachments, and import edges.",
+      }),
+    },
+    {
+      icon: "plugin",
+      title: translate({
+        id: "homepage.feature.plugins.title",
+        message: "Plugin Contributions",
+      }),
+      description: translate({
+        id: "homepage.feature.plugins.description",
+        message:
+          "Plugins declare generated artifacts and attach them to framework slots without bundler-specific loaders.",
       }),
     },
     {
       icon: "server",
       title: translate({
-        id: "homepage.feature.serverRoutes.title",
-        message: "Server Routes",
+        id: "homepage.feature.serverBoundary.title",
+        message: "Server Boundary",
       }),
       description: translate({
-        id: "homepage.feature.serverRoutes.description",
+        id: "homepage.feature.serverBoundary.description",
         message:
-          "File-based REST endpoints from src/apis with uppercase HTTP method exports and scoped middleware.",
+          "Server functions, src/apis routes, middleware, SSR, PPR, and RSC share one Hono-based runtime path.",
       }),
     },
     {
-      icon: "function",
+      icon: "bundler",
       title: translate({
-        id: "homepage.feature.serverFn.title",
-        message: "Server Functions",
+        id: "homepage.feature.bundlers.title",
+        message: "Bundler Adapters",
       }),
       description: translate({
-        id: "homepage.feature.serverFn.description",
+        id: "homepage.feature.bundlers.description",
         message:
-          '"use server" directive auto-transforms async functions into type-safe API calls at build time.',
+          "Utoopack and webpack consume the same build plan and .ev entries instead of duplicating framework assembly.",
       }),
     },
     {
-      icon: "query",
+      icon: "deploy",
       title: translate({
-        id: "homepage.feature.dataFetching.title",
-        message: "Data Fetching",
+        id: "homepage.feature.deployment.title",
+        message: "Deployment Output",
       }),
       description: translate({
-        id: "homepage.feature.dataFetching.description",
+        id: "homepage.feature.deployment.description",
         message:
-          "TanStack Query helpers for server functions — useQuery(fn, ...args), useMutation(fn), and stable query keys.",
+          "Build output separates browser assets, server bundles, manifests, and deployment metadata for adapters.",
+      }),
+    },
+  ];
+}
+
+function useFlowSteps(): FlowStep[] {
+  return [
+    {
+      label: "01",
+      title: translate({
+        id: "homepage.flow.conventions.title",
+        message: "Discover conventions",
+      }),
+      description: translate({
+        id: "homepage.flow.conventions.description",
+        message:
+          "Read src/pages, src/apis, middleware, server functions, and ev.config.ts.",
       }),
     },
     {
-      icon: "runtime",
+      label: "02",
       title: translate({
-        id: "homepage.feature.multiRuntime.title",
-        message: "Multi-Runtime",
+        id: "homepage.flow.ir.title",
+        message: "Materialize .ev",
       }),
       description: translate({
-        id: "homepage.feature.multiRuntime.description",
+        id: "homepage.flow.ir.description",
         message:
-          "Hono-based server runs on Node.js, Deno, Bun, and edge runtimes out of the box.",
+          "Write generated entries, plugin modules, slots, import edges, and manifest data.",
+      }),
+    },
+    {
+      label: "03",
+      title: translate({
+        id: "homepage.flow.bundle.title",
+        message: "Bundle once",
+      }),
+      description: translate({
+        id: "homepage.flow.bundle.description",
+        message:
+          "Let Utoopack or webpack consume the same framework build plan.",
+      }),
+    },
+    {
+      label: "04",
+      title: translate({
+        id: "homepage.flow.output.title",
+        message: "Deploy",
+      }),
+      description: translate({
+        id: "homepage.flow.output.description",
+        message:
+          "Emit browser files, server runtime output, and deployment metadata.",
       }),
     },
   ];
@@ -105,13 +164,26 @@ function HeroSection() {
         <h1 className={styles.heroTitle}>evjs</h1>
         <p className={styles.heroSubtitle}>
           <Translate id="homepage.tagline">
-            React fullstack framework for file-based pages and Hono servers
+            File-convention React framework with an agent-readable .ev IR
+          </Translate>
+        </p>
+        <p className={styles.heroDescription}>
+          <Translate id="homepage.hero.description">
+            Keep application code in src/pages, src/apis, and server modules.
+            evjs generates framework-owned entries, plugin modules, slots, and
+            manifests before the bundler runs.
           </Translate>
         </p>
         <div className={styles.heroButtons}>
           <Link className={styles.btnPrimary} to="/docs/quick-start">
             <Translate id="homepage.getStarted">Get Started</Translate>
             <span aria-hidden="true">→</span>
+          </Link>
+          <Link
+            className={styles.btnSecondary}
+            to="/docs/generated-contributions"
+          >
+            <Translate id="homepage.exploreIr">Explore .ev IR</Translate>
           </Link>
           <Link
             className={styles.btnSecondary}
@@ -126,45 +198,62 @@ function HeroSection() {
   );
 }
 
-/* ─── Terminal Code Preview ─── */
+/* ─── Framework IR Preview ─── */
 
-function TerminalPreview() {
+function FrameworkIRPreview() {
+  const steps = useFlowSteps();
   return (
-    <div className={styles.terminalSection}>
-      <div className={styles.terminal}>
-        <div className={styles.terminalHeader}>
-          <span className={`${styles.terminalDot} ${styles.terminalDotRed}`} />
-          <span
-            className={`${styles.terminalDot} ${styles.terminalDotYellow}`}
-          />
-          <span
-            className={`${styles.terminalDot} ${styles.terminalDotGreen}`}
-          />
+    <section className={styles.irSection}>
+      <div className={styles.irContainer}>
+        <div className={styles.irIntro}>
+          <div className={styles.featuresLabel}>
+            <Translate id="homepage.ir.label">Generated Framework IR</Translate>
+          </div>
+          <h2 className={styles.irTitle}>
+            <Translate id="homepage.ir.title">
+              Framework code is visible before bundling
+            </Translate>
+          </h2>
+          <p className={styles.irDescription}>
+            <Translate id="homepage.ir.description">
+              Run ev prepare to inspect .ev without producing dist. Agents,
+              plugin authors, and reviewers can read the generated graph instead
+              of reverse-engineering virtual loaders.
+            </Translate>
+          </p>
         </div>
-        <div className={styles.terminalBody}>
-          <div>
-            <span className={styles.terminalComment}>
-              # Create a new evjs app
-            </span>
+        <div className={styles.flowGrid}>
+          {steps.map((step) => (
+            <div key={step.label} className={styles.flowStep}>
+              <span className={styles.flowLabel}>{step.label}</span>
+              <h3 className={styles.flowTitle}>{step.title}</h3>
+              <p className={styles.flowDescription}>{step.description}</p>
+            </div>
+          ))}
+        </div>
+        <div className={styles.irShell}>
+          <div className={styles.irShellHeader}>
+            <span>.ev</span>
+            <span>ev prepare</span>
           </div>
-          <div>
-            <span className={styles.terminalPrompt}>$ </span>
-            <span className={styles.terminalCmd}>npx</span>{" "}
-            <span className={styles.terminalArg}>@evjs/create-app</span> my-app
-          </div>
-          <div style={{ marginTop: "0.5rem" }}>
-            <span className={styles.terminalComment}># Start developing</span>
-          </div>
-          <div>
-            <span className={styles.terminalPrompt}>$ </span>
-            <span className={styles.terminalCmd}>cd</span> my-app &&{" "}
-            <span className={styles.terminalCmd}>npm run</span>{" "}
-            <span className={styles.terminalArg}>dev</span>
-            <span className={styles.terminalCursor} />
-          </div>
+          <pre className={styles.irTree}>
+            {[
+              ".ev/",
+              "  framework/",
+              "    app-graph.json",
+              "    build-plan.json",
+              "  entries/",
+              "    main.ts",
+              "    server.ts",
+              "  plugins/",
+              "    qiankun/slave/entry-wrapper.ts",
+              "  manifest.json",
+              "  types.d.ts",
+            ].join("\n")}
+          </pre>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -177,11 +266,11 @@ function FeaturesSection() {
       <div className={styles.featuresContainer}>
         <div className={styles.featuresHeading}>
           <div className={styles.featuresLabel}>
-            <Translate id="homepage.features.label">Features</Translate>
+            <Translate id="homepage.features.label">Core Surfaces</Translate>
           </div>
           <h2 className={styles.featuresTitle}>
             <Translate id="homepage.features.title">
-              Everything you need to build full-stack React apps
+              One framework graph for application code, plugins, and output
             </Translate>
           </h2>
         </div>
@@ -205,12 +294,26 @@ function FeaturesSection() {
 
 function FeatureIcon({ name }: { name: FeatureIconName }) {
   const paths: Record<FeatureIconName, ReactNode> = {
-    bolt: <path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z" />,
     routes: (
       <>
         <circle cx="6" cy="6" r="2.5" />
         <circle cx="18" cy="18" r="2.5" />
         <path d="M8.5 6H14a4 4 0 0 1 0 8h-4a4 4 0 0 0 0 8h5.5" />
+      </>
+    ),
+    ir: (
+      <>
+        <path d="M4 5h16v14H4z" />
+        <path d="M8 9h8M8 13h5M8 17h8" />
+      </>
+    ),
+    plugin: (
+      <>
+        <path d="M8 3v5H3" />
+        <path d="M16 3v5h5" />
+        <path d="M8 21v-5H3" />
+        <path d="M16 21v-5h5" />
+        <path d="M8 8h8v8H8z" />
       </>
     ),
     server: (
@@ -220,25 +323,21 @@ function FeatureIcon({ name }: { name: FeatureIconName }) {
         <path d="M8 7h.01M8 17h.01M12 7h4M12 17h4" />
       </>
     ),
-    function: (
+    bundler: (
       <>
-        <path d="M8 7c0-2 1.5-4 4-4h2" />
-        <path d="M6 11h8" />
-        <path d="M7 21h1c2.5 0 4-2 4-4V7" />
-        <path d="m16 13 2 2 2-2" />
-        <path d="m16 19 2-2 2 2" />
+        <path d="M4 7h16" />
+        <path d="M4 17h16" />
+        <path d="M7 4v16" />
+        <path d="M17 4v16" />
+        <path d="m10 10 4 2-4 2v-4Z" />
       </>
     ),
-    query: (
+    deploy: (
       <>
-        <path d="M5 5h14v10H8l-3 3V5Z" />
-        <path d="M8 9h8M8 12h5" />
-      </>
-    ),
-    runtime: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
+        <path d="M12 3v12" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 21h14" />
+        <path d="M7 17h10" />
       </>
     ),
   };
@@ -282,7 +381,7 @@ export default function Home() {
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
       <HeroSection />
-      <TerminalPreview />
+      <FrameworkIRPreview />
       <main>
         <FeaturesSection />
       </main>
