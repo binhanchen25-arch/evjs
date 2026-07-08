@@ -1,46 +1,42 @@
 {
   "homepage.tagline": {
-    "message": "带 agent-readable .ev IR 的文件约定 React 框架",
+    "message": "面向文件页面和服务端代码的 React 框架",
     "description": "The tagline on the homepage hero"
   },
   "homepage.hero.description": {
-    "message": "应用代码保留在 src/pages、src/apis 和服务端模块中。evjs 会在 bundler 运行前生成框架托管的 entries、插件模块、slots 和 manifests。",
+    "message": "使用 src/pages 编写页面路由，使用 src/apis 编写服务端路由，使用 \"use server\" 模块编写服务端函数。先用约定开始，默认能力不够时再增加配置。",
     "description": "The homepage hero description"
   },
   "homepage.getStarted": {
     "message": "快速开始 →",
     "description": "The Get Started button on the homepage"
   },
-  "homepage.exploreIr": {
-    "message": "查看 .ev IR",
-    "description": "The generated IR button on the homepage"
+  "homepage.workflow.label": {
+    "message": "构建流程",
+    "description": "Label above the homepage workflow section"
   },
-  "homepage.ir.label": {
-    "message": "生成的框架 IR",
-    "description": "Label above the homepage IR section"
+  "homepage.workflow.title": {
+    "message": "从文件到可部署产物",
+    "description": "Title of the homepage workflow section"
   },
-  "homepage.ir.title": {
-    "message": "框架生成代码在 bundling 前可见",
-    "description": "Title of the homepage IR section"
+  "homepage.workflow.description": {
+    "message": "evjs 保持常用路径尽量简单：发现约定、构建应用，然后输出用于部署的浏览器和服务端产物。",
+    "description": "Description of the homepage workflow section"
   },
-  "homepage.ir.description": {
-    "message": "运行 ev prepare 即可在不产出 dist 的情况下查看 .ev。Agent、插件作者和 reviewer 可以直接读取生成图，而不需要反向理解虚拟 loader。",
-    "description": "Description of the homepage IR section"
-  },
-  "homepage.flow.conventions.title": {
-    "message": "发现约定",
+  "homepage.flow.source.title": {
+    "message": "编写文件",
     "description": "Title for the first homepage flow step"
   },
-  "homepage.flow.conventions.description": {
-    "message": "读取 src/pages、src/apis、middleware、server functions 和 ev.config.ts。",
+  "homepage.flow.source.description": {
+    "message": "编写页面、路由、中间件、服务端函数和 ev.config.ts。",
     "description": "Description for the first homepage flow step"
   },
-  "homepage.flow.ir.title": {
-    "message": "生成 .ev",
+  "homepage.flow.discover.title": {
+    "message": "发现约定",
     "description": "Title for the second homepage flow step"
   },
-  "homepage.flow.ir.description": {
-    "message": "写入生成 entries、插件模块、slots、import edges 和 manifest 数据。",
+  "homepage.flow.discover.description": {
+    "message": "解析页面路由、服务端路由、中间件和渲染元信息。",
     "description": "Description for the second homepage flow step"
   },
   "homepage.flow.bundle.title": {
@@ -48,7 +44,7 @@
     "description": "Title for the third homepage flow step"
   },
   "homepage.flow.bundle.description": {
-    "message": "让 Utoopack 或 webpack 消费同一份框架 build plan。",
+    "message": "使用选定的构建器适配器构建浏览器和服务端入口。",
     "description": "Description for the third homepage flow step"
   },
   "homepage.flow.output.title": {
@@ -56,63 +52,63 @@
     "description": "Title for the fourth homepage flow step"
   },
   "homepage.flow.output.description": {
-    "message": "输出浏览器文件、服务端运行时产物和部署元信息。",
+    "message": "写入浏览器文件、服务端产物、manifests 和部署元信息。",
     "description": "Description for the fourth homepage flow step"
   },
-  "homepage.feature.conventions.title": {
-    "message": "文件约定",
-    "description": "Title for File Conventions feature"
+  "homepage.feature.pages.title": {
+    "message": "页面路由",
+    "description": "Title for Page Routes feature"
   },
-  "homepage.feature.conventions.description": {
-    "message": "src/pages、src/apis、middleware、layouts 和服务端模块保持为应用事实来源。",
-    "description": "Description for File Conventions feature"
+  "homepage.feature.pages.description": {
+    "message": "基于 src/pages 构建 SPA 或 MPA 页面，不需要手写 router bootstrap。",
+    "description": "Description for Page Routes feature"
   },
-  "homepage.feature.frameworkIr.title": {
-    "message": "框架 IR",
-    "description": "Title for Framework IR feature"
+  "homepage.feature.serverRoutes.title": {
+    "message": "服务端路由",
+    "description": "Title for Server Routes feature"
   },
-  "homepage.feature.frameworkIr.description": {
-    "message": ".ev 记录发现到的 graph、entry facade、生成模块、slot 挂载和 import edges。",
-    "description": "Description for Framework IR feature"
+  "homepage.feature.serverRoutes.description": {
+    "message": "在 src/apis 中通过大写 HTTP method 导出标准 Request 和 Response handler。",
+    "description": "Description for Server Routes feature"
+  },
+  "homepage.feature.serverFunctions.title": {
+    "message": "服务端函数",
+    "description": "Title for Server Functions feature"
+  },
+  "homepage.feature.serverFunctions.description": {
+    "message": "通过内置传输层，从浏览器代码调用可达的 \"use server\" 函数。",
+    "description": "Description for Server Functions feature"
+  },
+  "homepage.feature.rendering.title": {
+    "message": "渲染模式",
+    "description": "Title for Rendering Modes feature"
+  },
+  "homepage.feature.rendering.description": {
+    "message": "通过页面级导出声明 CSR、SSR、SSG、PPR 和 RSC 集成点。",
+    "description": "Description for Rendering Modes feature"
   },
   "homepage.feature.plugins.title": {
-    "message": "插件贡献",
-    "description": "Title for Plugin Contributions feature"
+    "message": "插件",
+    "description": "Title for Plugins feature"
   },
   "homepage.feature.plugins.description": {
-    "message": "插件声明生成产物并挂到 framework slots，不需要 bundler-specific loader。",
-    "description": "Description for Plugin Contributions feature"
-  },
-  "homepage.feature.serverBoundary.title": {
-    "message": "服务端边界",
-    "description": "Title for Server Boundary feature"
-  },
-  "homepage.feature.serverBoundary.description": {
-    "message": "Server functions、src/apis 路由、middleware、SSR、PPR 和 RSC 共享同一条 Hono 运行时路径。",
-    "description": "Description for Server Boundary feature"
-  },
-  "homepage.feature.bundlers.title": {
-    "message": "构建器适配",
-    "description": "Title for Bundler Adapters feature"
-  },
-  "homepage.feature.bundlers.description": {
-    "message": "Utoopack 和 webpack 消费同一份 build plan 与 .ev entries，不再重复组装框架逻辑。",
-    "description": "Description for Bundler Adapters feature"
+    "message": "扩展配置、构建器设置、HTML 转换、构建产物和生成的框架代码。",
+    "description": "Description for Plugins feature"
   },
   "homepage.feature.deployment.title": {
     "message": "部署产物",
     "description": "Title for Deployment Output feature"
   },
   "homepage.feature.deployment.description": {
-    "message": "构建产物拆分浏览器资源、服务端 bundle、manifest 和适配器使用的部署元信息。",
+    "message": "输出浏览器资源、可选服务端 bundle、manifests 和部署元信息。",
     "description": "Description for Deployment Output feature"
   },
   "homepage.features.label": {
-    "message": "核心界面",
+    "message": "evjs 处理什么",
     "description": "Label above the features section heading"
   },
   "homepage.features.title": {
-    "message": "应用代码、插件和产物共享同一张框架图",
+    "message": "文件路由、服务端代码和构建产物",
     "description": "Title of the features section"
   }
 }

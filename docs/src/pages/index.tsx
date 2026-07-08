@@ -9,10 +9,10 @@ import styles from "./index.module.css";
 
 type FeatureIconName =
   | "routes"
-  | "ir"
+  | "function"
   | "plugin"
   | "server"
-  | "bundler"
+  | "render"
   | "deploy";
 
 type FlowStep = {
@@ -30,61 +30,61 @@ function useFeatures(): Array<{
     {
       icon: "routes",
       title: translate({
-        id: "homepage.feature.conventions.title",
-        message: "File Conventions",
+        id: "homepage.feature.pages.title",
+        message: "Page Routes",
       }),
       description: translate({
-        id: "homepage.feature.conventions.description",
+        id: "homepage.feature.pages.description",
         message:
-          "src/pages, src/apis, middleware, layouts, and server modules stay as the application source of truth.",
+          "Build SPA or MPA pages from src/pages without writing router bootstrap code.",
       }),
     },
     {
-      icon: "ir",
+      icon: "server",
       title: translate({
-        id: "homepage.feature.frameworkIr.title",
-        message: "Framework IR",
+        id: "homepage.feature.serverRoutes.title",
+        message: "Server Routes",
       }),
       description: translate({
-        id: "homepage.feature.frameworkIr.description",
+        id: "homepage.feature.serverRoutes.description",
         message:
-          ".ev records discovered graphs, entry facades, generated modules, slot attachments, and import edges.",
+          "Expose Request and Response handlers from src/apis using uppercase HTTP method exports.",
+      }),
+    },
+    {
+      icon: "function",
+      title: translate({
+        id: "homepage.feature.serverFunctions.title",
+        message: "Server Functions",
+      }),
+      description: translate({
+        id: "homepage.feature.serverFunctions.description",
+        message:
+          'Call reachable "use server" functions from browser code through the built-in transport.',
+      }),
+    },
+    {
+      icon: "render",
+      title: translate({
+        id: "homepage.feature.rendering.title",
+        message: "Rendering Modes",
+      }),
+      description: translate({
+        id: "homepage.feature.rendering.description",
+        message:
+          "Use page-level exports for CSR, SSR, SSG, PPR, and RSC integration points.",
       }),
     },
     {
       icon: "plugin",
       title: translate({
         id: "homepage.feature.plugins.title",
-        message: "Plugin Contributions",
+        message: "Plugins",
       }),
       description: translate({
         id: "homepage.feature.plugins.description",
         message:
-          "Plugins declare generated artifacts and attach them to framework slots without bundler-specific loaders.",
-      }),
-    },
-    {
-      icon: "server",
-      title: translate({
-        id: "homepage.feature.serverBoundary.title",
-        message: "Server Boundary",
-      }),
-      description: translate({
-        id: "homepage.feature.serverBoundary.description",
-        message:
-          "Server functions, src/apis routes, middleware, SSR, PPR, and RSC share one Hono-based runtime path.",
-      }),
-    },
-    {
-      icon: "bundler",
-      title: translate({
-        id: "homepage.feature.bundlers.title",
-        message: "Bundler Adapters",
-      }),
-      description: translate({
-        id: "homepage.feature.bundlers.description",
-        message:
-          "Utoopack and webpack consume the same build plan and .ev entries instead of duplicating framework assembly.",
+          "Extend config, bundler setup, HTML transforms, build output, and generated framework code.",
       }),
     },
     {
@@ -96,7 +96,7 @@ function useFeatures(): Array<{
       description: translate({
         id: "homepage.feature.deployment.description",
         message:
-          "Build output separates browser assets, server bundles, manifests, and deployment metadata for adapters.",
+          "Emit browser assets, optional server bundles, manifests, and deployment metadata.",
       }),
     },
   ];
@@ -107,25 +107,25 @@ function useFlowSteps(): FlowStep[] {
     {
       label: "01",
       title: translate({
-        id: "homepage.flow.conventions.title",
-        message: "Discover conventions",
+        id: "homepage.flow.source.title",
+        message: "Author files",
       }),
       description: translate({
-        id: "homepage.flow.conventions.description",
+        id: "homepage.flow.source.description",
         message:
-          "Read src/pages, src/apis, middleware, server functions, and ev.config.ts.",
+          "Write pages, routes, middleware, server functions, and ev.config.ts.",
       }),
     },
     {
       label: "02",
       title: translate({
-        id: "homepage.flow.ir.title",
-        message: "Materialize .ev",
+        id: "homepage.flow.discover.title",
+        message: "Discover conventions",
       }),
       description: translate({
-        id: "homepage.flow.ir.description",
+        id: "homepage.flow.discover.description",
         message:
-          "Write generated entries, plugin modules, slots, import edges, and manifest data.",
+          "Resolve page routes, server routes, middleware, and rendering metadata.",
       }),
     },
     {
@@ -137,7 +137,7 @@ function useFlowSteps(): FlowStep[] {
       description: translate({
         id: "homepage.flow.bundle.description",
         message:
-          "Let Utoopack or webpack consume the same framework build plan.",
+          "Use the selected bundler adapter to build browser and server entries.",
       }),
     },
     {
@@ -149,7 +149,7 @@ function useFlowSteps(): FlowStep[] {
       description: translate({
         id: "homepage.flow.output.description",
         message:
-          "Emit browser files, server runtime output, and deployment metadata.",
+          "Write browser files, server output, manifests, and deployment metadata.",
       }),
     },
   ];
@@ -164,26 +164,20 @@ function HeroSection() {
         <h1 className={styles.heroTitle}>evjs</h1>
         <p className={styles.heroSubtitle}>
           <Translate id="homepage.tagline">
-            File-convention React framework with an agent-readable .ev IR
+            React framework for file-based pages and server code
           </Translate>
         </p>
         <p className={styles.heroDescription}>
           <Translate id="homepage.hero.description">
-            Keep application code in src/pages, src/apis, and server modules.
-            evjs generates framework-owned entries, plugin modules, slots, and
-            manifests before the bundler runs.
+            Use src/pages for page routes, src/apis for server routes, and "use
+            server" modules for server functions. Start with conventions and add
+            configuration only when the defaults are not enough.
           </Translate>
         </p>
         <div className={styles.heroButtons}>
           <Link className={styles.btnPrimary} to="/docs/quick-start">
             <Translate id="homepage.getStarted">Get Started</Translate>
             <span aria-hidden="true">→</span>
-          </Link>
-          <Link
-            className={styles.btnSecondary}
-            to="/docs/generated-contributions"
-          >
-            <Translate id="homepage.exploreIr">Explore .ev IR</Translate>
           </Link>
           <Link
             className={styles.btnSecondary}
@@ -198,27 +192,26 @@ function HeroSection() {
   );
 }
 
-/* ─── Framework IR Preview ─── */
+/* ─── Build Flow Preview ─── */
 
-function FrameworkIRPreview() {
+function BuildFlowPreview() {
   const steps = useFlowSteps();
   return (
-    <section className={styles.irSection}>
-      <div className={styles.irContainer}>
-        <div className={styles.irIntro}>
+    <section className={styles.workflowSection}>
+      <div className={styles.workflowContainer}>
+        <div className={styles.workflowIntro}>
           <div className={styles.featuresLabel}>
-            <Translate id="homepage.ir.label">Generated Framework IR</Translate>
+            <Translate id="homepage.workflow.label">Build Flow</Translate>
           </div>
-          <h2 className={styles.irTitle}>
-            <Translate id="homepage.ir.title">
-              Framework code is visible before bundling
+          <h2 className={styles.workflowTitle}>
+            <Translate id="homepage.workflow.title">
+              From files to deployable output
             </Translate>
           </h2>
-          <p className={styles.irDescription}>
-            <Translate id="homepage.ir.description">
-              Run ev prepare to inspect .ev without producing dist. Agents,
-              plugin authors, and reviewers can read the generated graph instead
-              of reverse-engineering virtual loaders.
+          <p className={styles.workflowDescription}>
+            <Translate id="homepage.workflow.description">
+              evjs keeps the common path small: discover conventions, build the
+              app, then emit browser and server artifacts for deployment.
             </Translate>
           </p>
         </div>
@@ -230,27 +223,6 @@ function FrameworkIRPreview() {
               <p className={styles.flowDescription}>{step.description}</p>
             </div>
           ))}
-        </div>
-        <div className={styles.irShell}>
-          <div className={styles.irShellHeader}>
-            <span>.ev</span>
-            <span>ev prepare</span>
-          </div>
-          <pre className={styles.irTree}>
-            {[
-              ".ev/",
-              "  framework/",
-              "    app-graph.json",
-              "    build-plan.json",
-              "  entries/",
-              "    main.ts",
-              "    server.ts",
-              "  plugins/",
-              "    qiankun/slave/entry-wrapper.ts",
-              "  manifest.json",
-              "  types.d.ts",
-            ].join("\n")}
-          </pre>
         </div>
       </div>
     </section>
@@ -266,11 +238,13 @@ function FeaturesSection() {
       <div className={styles.featuresContainer}>
         <div className={styles.featuresHeading}>
           <div className={styles.featuresLabel}>
-            <Translate id="homepage.features.label">Core Surfaces</Translate>
+            <Translate id="homepage.features.label">
+              What evjs handles
+            </Translate>
           </div>
           <h2 className={styles.featuresTitle}>
             <Translate id="homepage.features.title">
-              One framework graph for application code, plugins, and output
+              File routes, server code, and build output
             </Translate>
           </h2>
         </div>
@@ -301,12 +275,6 @@ function FeatureIcon({ name }: { name: FeatureIconName }) {
         <path d="M8.5 6H14a4 4 0 0 1 0 8h-4a4 4 0 0 0 0 8h5.5" />
       </>
     ),
-    ir: (
-      <>
-        <path d="M4 5h16v14H4z" />
-        <path d="M8 9h8M8 13h5M8 17h8" />
-      </>
-    ),
     plugin: (
       <>
         <path d="M8 3v5H3" />
@@ -323,7 +291,16 @@ function FeatureIcon({ name }: { name: FeatureIconName }) {
         <path d="M8 7h.01M8 17h.01M12 7h4M12 17h4" />
       </>
     ),
-    bundler: (
+    function: (
+      <>
+        <path d="M8 7c0-2 1.5-4 4-4h2" />
+        <path d="M6 11h8" />
+        <path d="M7 21h1c2.5 0 4-2 4-4V7" />
+        <path d="m16 13 2 2 2-2" />
+        <path d="m16 19 2-2 2 2" />
+      </>
+    ),
+    render: (
       <>
         <path d="M4 7h16" />
         <path d="M4 17h16" />
@@ -381,7 +358,7 @@ export default function Home() {
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
       <HeroSection />
-      <FrameworkIRPreview />
+      <BuildFlowPreview />
       <main>
         <FeaturesSection />
       </main>

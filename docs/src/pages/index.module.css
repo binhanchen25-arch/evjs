@@ -100,24 +100,24 @@
   text-decoration: none;
 }
 
-.irSection {
+.workflowSection {
   background: var(--ev-home-hero-bg);
   border-bottom: 1px solid var(--ev-border-subtle);
   padding: 0 1.5rem 3.5rem;
 }
 
-.irContainer {
+.workflowContainer {
   margin: 0 auto;
   max-width: 1120px;
 }
 
-.irIntro {
+.workflowIntro {
   margin: 0 auto 1.4rem;
   max-width: 760px;
   text-align: center;
 }
 
-.irTitle {
+.workflowTitle {
   color: var(--ifm-font-color-base);
   font-size: 2rem;
   font-weight: 850;
@@ -125,7 +125,7 @@
   margin: 0 0 0.75rem;
 }
 
-.irDescription {
+.workflowDescription {
   color: var(--ev-text-muted);
   font-size: 0.98rem;
   line-height: 1.65;
@@ -170,42 +170,6 @@
   font-size: 0.9rem;
   line-height: 1.55;
   margin: 0;
-}
-
-.irShell {
-  background: #161a1f;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
-  overflow: hidden;
-}
-
-[data-theme="dark"] .irShell {
-  background: #111111;
-  box-shadow: none;
-}
-
-.irShellHeader {
-  align-items: center;
-  background: rgba(255, 255, 255, 0.07);
-  color: #dbeafe;
-  display: flex;
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.78rem;
-  font-weight: 700;
-  justify-content: space-between;
-  padding: 12px 16px;
-}
-
-.irTree {
-  color: #e5e7eb;
-  font-family: var(--ifm-font-family-monospace);
-  font-size: 0.9rem;
-  line-height: 1.62;
-  margin: 0;
-  overflow-x: auto;
-  padding: 20px 24px 24px;
-  text-align: left;
 }
 
 .features {
@@ -343,11 +307,11 @@
     font-size: 0.95rem;
   }
 
-  .irSection {
+  .workflowSection {
     padding: 0 1rem 3rem;
   }
 
-  .irTitle {
+  .workflowTitle {
     font-size: 1.62rem;
   }
 
@@ -357,11 +321,6 @@
 
   .flowStep {
     min-height: 0;
-  }
-
-  .irTree {
-    font-size: 0.82rem;
-    padding: 18px;
   }
 
   .features {
