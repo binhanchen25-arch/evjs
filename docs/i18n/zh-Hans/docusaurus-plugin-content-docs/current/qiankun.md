@@ -146,13 +146,17 @@ qiankun container 内，因此常见的单页应用入口可以继续使用 `#ap
 
 ## 模块引用
 
-`resolver` 和 `runtime` 支持字符串模块引用，也支持带 named export 的对象引用：
+`resolver` 和 `runtime` 支持字符串模块引用、generated module ref，也支持带 named
+export 的对象引用：
 
 ```ts
+import type { GeneratedModuleRef } from "@evjs/ev/plugin";
+
 type QiankunModuleRef =
   | string
+  | GeneratedModuleRef
   | {
-      module: string;
+      module: string | GeneratedModuleRef;
       exportName?: string;
     };
 ```
@@ -165,7 +169,7 @@ evPluginQiankunMaster({
 });
 ```
 
-对象引用适合生成模块或 named export：
+对象引用适合 named export：
 
 ```ts
 evPluginQiankunSlave({
@@ -178,6 +182,9 @@ evPluginQiankunSlave({
 
 路径类引用会先基于项目根目录解析，再进入 bundling，因此生成的 entry wrapper
 不会保留未解析的 `./src/...` specifier。包名 specifier 则按项目依赖正常解析。
+在另一个插件的 `contributions()` hook 中，可以把 `ctx.emit.module()` 返回的
+`GeneratedModuleRef` 直接传给 `contributeQiankunMaster()` 或
+`contributeQiankunSlave()`。
 
 ## Runtime 形态
 
@@ -306,56 +313,70 @@ export default async function resolveQiankunMaster() {
 - 业务应用消费平台插件，通常不需要手写 `src/qiankun.master.ts` 或
   `src/qiankun.slave.ts`。
 
-平台 master 插件可以生成 resolver 模块，再传给开源插件：
+平台 master 插件可以把 resolver 模块 emit 到同一个 `.ev` IR 中，再把返回的 opaque
+ref 传给 qiankun helper：
 
 ```ts
 // packages/plugin-platform/src/master.ts
 import { merge } from "@evjs/ev/config";
 import type { Plugin } from "@evjs/ev/plugin";
-import { evPluginQiankunMaster } from "@evjs/plugin-qiankun";
+import { contributeQiankunMaster } from "@evjs/plugin-qiankun";
 
-export function evPluginPlatformMicroFrontendMaster(): Plugin[] {
-  const generatedResolver = createGeneratedMasterResolverModule();
-
-  return [
-    {
-      name: "@acme/evjs-platform-mf:master-config",
-      config(config) {
-        merge(config, {
-          dev: {
-            proxy: [
-              {
-                context: ["/__platform_slave"],
-                target: "http://localhost:3001",
-                pathRewrite: { "^/__platform_slave": "" },
-                changeOrigin: true,
-                secure: false,
-              },
-            ],
-          },
-        });
-        return config;
-      },
+export function evPluginPlatformMicroFrontendMaster(): Plugin {
+  return {
+    name: "@acme/evjs-platform-mf:master",
+    config(config) {
+      merge(config, {
+        dev: {
+          proxy: [
+            {
+              context: ["/__platform_slave"],
+              target: "http://localhost:3001",
+              pathRewrite: { "^/__platform_slave": "" },
+              changeOrigin: true,
+              secure: false,
+            },
+          ],
+        },
+      });
+      return config;
     },
-    evPluginQiankunMaster({
-      resolver: {
-        module: generatedResolver,
-      },
-      externalQiankun: true,
-    }),
-  ];
-}
+    async contributions(ctx) {
+      const site = ctx.emit.data({
+        id: "platform-site",
+        scope: { kind: "app" },
+        value: await loadPlatformSiteConfig(ctx),
+      });
 
-function createGeneratedMasterResolverModule(): string {
-  // 返回平台插件生成模块的绝对路径。
-  return "/absolute/path/to/generated-master-resolver.ts";
+      const resolver = ctx.emit.module({
+        id: "master-resolver",
+        scope: { kind: "app" },
+        source: ({ importOf }) => `
+          import { defineQiankunMasterResolver } from "@evjs/plugin-qiankun/runtime";
+          import site from ${JSON.stringify(importOf(site))};
+
+          export default defineQiankunMasterResolver(async () => ({
+            apps: site.children,
+            routes: site.routes,
+            sandbox: site.sandbox ?? true,
+            prefetch: site.prefetch ?? true,
+          }));
+        `,
+      });
+
+      await contributeQiankunMaster(ctx, {
+        resolver,
+        externalQiankun: true,
+      });
+    },
+  };
 }
 ```
 
-生成的 resolver 把平台元数据适配为开源 qiankun resolver 形态：
+生成的 resolver 把平台元数据适配为开源 qiankun resolver 形态。关键点是 resolver
+是带 manifest provenance 的 generated artifact，而不是未受管理的临时文件：
 
 ```ts
-// generated-master-resolver.ts
 import { defineQiankunMasterResolver } from "@evjs/plugin-qiankun/runtime";
 
 export default defineQiankunMasterResolver(async () => {
@@ -378,34 +399,60 @@ export default defineQiankunMasterResolver(async () => {
 });
 ```
 
-平台 slave 插件可以生成 runtime 模块，并把推导出的应用名传给开源插件：
+平台 slave 插件可以 emit runtime module，把它传给 qiankun contribution helper，并复用
+qiankun 的 bundler 和 HTML helper：
 
 ```ts
 // packages/plugin-platform/src/slave.ts
 import type { Plugin } from "@evjs/ev/plugin";
-import { evPluginQiankunSlave } from "@evjs/plugin-qiankun";
+import {
+  applyQiankunSlaveBundlerConfig,
+  applyQiankunSlaveHtmlTransform,
+  contributeQiankunSlave,
+  type QiankunContributionState,
+} from "@evjs/plugin-qiankun";
 
-export function evPluginPlatformMicroFrontendSlave(): Plugin[] {
-  const generatedRuntime = createGeneratedSlaveRuntimeModule();
-  const appName = inferPlatformAppName();
+export function evPluginPlatformMicroFrontendSlave(): Plugin {
+  let qiankunState: QiankunContributionState | undefined;
 
-  return [
-    evPluginQiankunSlave({
-      name: appName,
-      runtime: {
-        module: generatedRuntime,
-      },
-      externalQiankun: true,
-    }),
-  ];
-}
+  return {
+    name: "@acme/evjs-platform-mf:slave",
+    async contributions(ctx) {
+      const runtime = ctx.emit.module({
+        id: "slave-runtime",
+        scope: { kind: "app" },
+        source: `
+          import { defineQiankunSlaveRuntime } from "@evjs/plugin-qiankun/runtime";
 
-function createGeneratedSlaveRuntimeModule(): string {
-  return "/absolute/path/to/generated-slave-runtime.ts";
-}
+          export default defineQiankunSlaveRuntime({
+            mount(props) {
+              const platformProps = normalizePlatformProps(props);
+              Reflect.set(globalThis, "__PLATFORM_MICRO_FRONTEND_PROPS__", platformProps);
+            },
+            unmount() {
+              Reflect.deleteProperty(globalThis, "__PLATFORM_MICRO_FRONTEND_PROPS__");
+            },
+          });
+        `,
+      });
 
-function inferPlatformAppName(): string {
-  return "catalog";
+      qiankunState = await contributeQiankunSlave(ctx, {
+        name: inferPlatformAppName(ctx),
+        runtime,
+        externalQiankun: true,
+      });
+    },
+    setup() {
+      return {
+        bundlerConfig(config, ctx) {
+          applyQiankunSlaveBundlerConfig(config, ctx.bundlerName, qiankunState);
+        },
+        transformHtml(doc) {
+          applyQiankunSlaveHtmlTransform(doc);
+        },
+      };
+    },
+  };
 }
 ```
 

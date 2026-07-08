@@ -73,10 +73,20 @@ slots 如下：
 |------|----------|
 | `client.entry` | Entry imports、entry wrapper modules 和 replacement wrappers |
 | `client.runtime.plugin` | Runtime plugin modules 和 export keys |
+| `client.route` | 受约束的 SPA route additions 或 route-module replacements |
 | `server.request.middleware` | Server pipeline 中的 framework request middleware |
 | `html.tag` | 结构化 `meta`、`link`、`script`、`style` tags |
 | `resolve.alias` | 指向用户模块、package、绝对路径或 generated artifacts 的语义化 alias |
 | `resolve.external` | Externalized module resolution，通常和 `html.tag` CDN 资源配合 |
+
+`client.route` 刻意比任意 route tmp file 更窄。它可以用稳定 route id 和 path 追加一个
+generated route module，也可以替换已有 generated route id 的 module。它不能修改无关
+route metadata、创建第二套路由方言，或绕过 file conventions 使用的 path/parent 校验。
+
+`client.runtime.plugin` module 会传给生成的 SPA runtime。Runtime plugin 可以导出
+`patchRoutes`、`patchClientRoutes`、`modifyRouterOptions`、`wrapRoot`、
+`rootContainer` 或 `render`。需要在 `.ev/manifest.json` 中可见的静态 route IR 使用
+route slot；最终路由列表必须依赖浏览器运行时状态时，才使用 runtime route hook。
 
 ## 边界
 

@@ -76,10 +76,23 @@ The supported v1 slots are:
 |------|--------|
 | `client.entry` | Entry imports and entry wrapper modules, including replacement wrappers |
 | `client.runtime.plugin` | Runtime plugin modules and export keys |
+| `client.route` | Constrained SPA route additions or route-module replacements |
 | `server.request.middleware` | Framework request middleware in the server pipeline |
 | `html.tag` | Structured `meta`, `link`, `script`, and `style` tags |
 | `resolve.alias` | Semantic module aliasing to user modules, packages, absolute paths, or generated artifacts |
 | `resolve.external` | Externalized module resolution, usually paired with `html.tag` CDN resources |
+
+`client.route` is intentionally narrower than arbitrary route tmp files. It can
+append a generated route module with a stable route id and path, or replace the
+module for an existing generated route id. It cannot mutate unrelated route
+metadata, create a second route dialect, or bypass the same path and parent
+validation used by file conventions.
+
+`client.runtime.plugin` modules are passed to the generated SPA runtime. Runtime
+plugins may export `patchRoutes`, `patchClientRoutes`, `modifyRouterOptions`,
+`wrapRoot`, `rootContainer`, or `render`. Use route slots for static route IR
+that should be visible in `.ev/manifest.json`; use runtime route hooks only when
+the final route list must depend on browser runtime state.
 
 ## Boundaries
 

@@ -153,14 +153,17 @@ single-SPA entries can keep using `#app`.
 
 ## Module References
 
-`resolver` and `runtime` accept either a string module specifier or an object
-with a named export:
+`resolver` and `runtime` accept a string module specifier, a generated module
+ref, or an object with a named export:
 
 ```ts
+import type { GeneratedModuleRef } from "@evjs/ev/plugin";
+
 type QiankunModuleRef =
   | string
+  | GeneratedModuleRef
   | {
-      module: string;
+      module: string | GeneratedModuleRef;
       exportName?: string;
     };
 ```
@@ -173,7 +176,7 @@ evPluginQiankunMaster({
 });
 ```
 
-Object references are useful for generated modules or named exports:
+Object references are useful for named exports:
 
 ```ts
 evPluginQiankunSlave({
@@ -187,6 +190,9 @@ evPluginQiankunSlave({
 Path-like references are resolved from the project root before bundling, so the
 generated entry wrapper does not preserve unresolved `./src/...` specifiers.
 Package specifiers are resolved from the project as normal dependencies.
+Inside another plugin's `contributions()` hook, pass the `GeneratedModuleRef`
+returned by `ctx.emit.module()` directly to `contributeQiankunMaster()` or
+`contributeQiankunSlave()`.
 
 ## Runtime Shape
 
@@ -321,58 +327,70 @@ The recommended layering is composition:
 - Business applications consume the platform plugin and usually do not create
   `src/qiankun.master.ts` or `src/qiankun.slave.ts` manually.
 
-For a platform master plugin, generate a resolver module and pass it to the
-open plugin:
+For a platform master plugin, emit a resolver module into the same `.ev` IR and
+pass the returned opaque ref to the qiankun helper:
 
 ```ts
 // packages/plugin-platform/src/master.ts
 import { merge } from "@evjs/ev/config";
 import type { Plugin } from "@evjs/ev/plugin";
-import { evPluginQiankunMaster } from "@evjs/plugin-qiankun";
+import { contributeQiankunMaster } from "@evjs/plugin-qiankun";
 
-export function evPluginPlatformMicroFrontendMaster(): Plugin[] {
-  const generatedResolver = createGeneratedMasterResolverModule();
-
-  return [
-    {
-      name: "@acme/evjs-platform-mf:master-config",
-      config(config) {
-        merge(config, {
-          dev: {
-            proxy: [
-              {
-                context: ["/__platform_slave"],
-                target: "http://localhost:3001",
-                pathRewrite: { "^/__platform_slave": "" },
-                changeOrigin: true,
-                secure: false,
-              },
-            ],
-          },
-        });
-        return config;
-      },
+export function evPluginPlatformMicroFrontendMaster(): Plugin {
+  return {
+    name: "@acme/evjs-platform-mf:master",
+    config(config) {
+      merge(config, {
+        dev: {
+          proxy: [
+            {
+              context: ["/__platform_slave"],
+              target: "http://localhost:3001",
+              pathRewrite: { "^/__platform_slave": "" },
+              changeOrigin: true,
+              secure: false,
+            },
+          ],
+        },
+      });
+      return config;
     },
-    evPluginQiankunMaster({
-      resolver: {
-        module: generatedResolver,
-      },
-      externalQiankun: true,
-    }),
-  ];
-}
+    async contributions(ctx) {
+      const site = ctx.emit.data({
+        id: "platform-site",
+        scope: { kind: "app" },
+        value: await loadPlatformSiteConfig(ctx),
+      });
+      const resolver = ctx.emit.module({
+        id: "master-resolver",
+        scope: { kind: "app" },
+        source: ({ importOf }) => `
+          import { defineQiankunMasterResolver } from "@evjs/plugin-qiankun/runtime";
+          import site from ${JSON.stringify(importOf(site))};
 
-function createGeneratedMasterResolverModule(): string {
-  // Return an absolute path to a generated module owned by the platform plugin.
-  return "/absolute/path/to/generated-master-resolver.ts";
+          export default defineQiankunMasterResolver(async () => ({
+            apps: site.children,
+            routes: site.routes,
+            sandbox: site.sandbox ?? true,
+            prefetch: site.prefetch ?? true,
+          }));
+        `,
+      });
+
+      await contributeQiankunMaster(ctx, {
+        resolver,
+        externalQiankun: true,
+      });
+    },
+  };
 }
 ```
 
 The generated resolver adapts platform metadata to the open qiankun resolver
-shape:
+shape. The important part is that the resolver is a generated artifact with
+manifest provenance, not an unmanaged temporary file:
 
 ```ts
-// generated-master-resolver.ts
 import { defineQiankunMasterResolver } from "@evjs/plugin-qiankun/runtime";
 
 export default defineQiankunMasterResolver(async () => {
@@ -395,35 +413,60 @@ export default defineQiankunMasterResolver(async () => {
 });
 ```
 
-For a platform slave plugin, generate a runtime module and pass the inferred app
-name to the open plugin:
+For a platform slave plugin, emit the runtime module, pass it to the qiankun
+contribution helper, and reuse the qiankun bundler and HTML helpers:
 
 ```ts
 // packages/plugin-platform/src/slave.ts
 import type { Plugin } from "@evjs/ev/plugin";
-import { evPluginQiankunSlave } from "@evjs/plugin-qiankun";
+import {
+  applyQiankunSlaveBundlerConfig,
+  applyQiankunSlaveHtmlTransform,
+  contributeQiankunSlave,
+  type QiankunContributionState,
+} from "@evjs/plugin-qiankun";
 
-export function evPluginPlatformMicroFrontendSlave(): Plugin[] {
-  const generatedRuntime = createGeneratedSlaveRuntimeModule();
-  const appName = inferPlatformAppName();
+export function evPluginPlatformMicroFrontendSlave(): Plugin {
+  let qiankunState: QiankunContributionState | undefined;
 
-  return [
-    evPluginQiankunSlave({
-      name: appName,
-      runtime: {
-        module: generatedRuntime,
-      },
-      externalQiankun: true,
-    }),
-  ];
-}
+  return {
+    name: "@acme/evjs-platform-mf:slave",
+    async contributions(ctx) {
+      const runtime = ctx.emit.module({
+        id: "slave-runtime",
+        scope: { kind: "app" },
+        source: `
+          import { defineQiankunSlaveRuntime } from "@evjs/plugin-qiankun/runtime";
 
-function createGeneratedSlaveRuntimeModule(): string {
-  return "/absolute/path/to/generated-slave-runtime.ts";
-}
+          export default defineQiankunSlaveRuntime({
+            mount(props) {
+              const platformProps = normalizePlatformProps(props);
+              Reflect.set(globalThis, "__PLATFORM_MICRO_FRONTEND_PROPS__", platformProps);
+            },
+            unmount() {
+              Reflect.deleteProperty(globalThis, "__PLATFORM_MICRO_FRONTEND_PROPS__");
+            },
+          });
+        `,
+      });
 
-function inferPlatformAppName(): string {
-  return "catalog";
+      qiankunState = await contributeQiankunSlave(ctx, {
+        name: inferPlatformAppName(ctx),
+        runtime,
+        externalQiankun: true,
+      });
+    },
+    setup() {
+      return {
+        bundlerConfig(config, ctx) {
+          applyQiankunSlaveBundlerConfig(config, ctx.bundlerName, qiankunState);
+        },
+        transformHtml(doc) {
+          applyQiankunSlaveHtmlTransform(doc);
+        },
+      };
+    },
+  };
 }
 ```
 

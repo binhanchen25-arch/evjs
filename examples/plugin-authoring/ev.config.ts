@@ -4,7 +4,7 @@ import { defineConfig } from "@evjs/ev";
 /**
  * Example: evjs plugin system.
  *
- * Demonstrates all available plugin hooks:
+ * Demonstrates common lifecycle hooks:
  * - `config`         — update framework config before defaults are resolved
  * - `bundlerConfig` — modify the underlying bundler config (type-safe via utoopack() helper)
  * - `buildStart`    — run logic before compilation begins

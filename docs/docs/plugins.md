@@ -144,9 +144,10 @@ generated artifacts, link those artifacts together, and attach them to
 framework slots.
 
 Use `contributions()` when a plugin needs to extend the generated `.ev` IR.
-This is the right layer for entry imports, runtime plugin modules, HTML tags,
-framework request middleware, and semantic resolution changes. Keep loaders for
-real bundler transforms such as compiling a custom file type.
+This is the right layer for entry imports, runtime plugin modules, constrained
+SPA route additions, HTML tags, framework request middleware, and semantic
+resolution changes. Keep loaders for real bundler transforms such as compiling a
+custom file type.
 
 `.ev` is generated output. It contains:
 
@@ -243,10 +244,19 @@ Available slots:
 |------|---------|
 | `client.entry` | Add generated modules around the client entry at `polyfill`, `before-main-imports`, `after-main-imports`, `before-main`, or `after-main` |
 | `client.runtime.plugin` | Register runtime plugin modules and optional export keys |
+| `client.route` | Append generated SPA routes or replace modules for existing SPA route ids |
 | `server.request.middleware` | Add framework request middleware to the server pipeline |
 | `html.tag` | Add structured `meta`, `link`, `script`, or `style` tags |
 | `resolve.alias` | Redirect a module specifier to a user module, package, absolute path, or generated module |
 | `resolve.external` | Mark a specifier as provided by an external runtime; inject CDN tags separately through `html.tag` |
+
+Use `client.route` when a platform plugin needs route IR that agents and
+inspection tools can see. Append mode requires a `path` and creates a route with
+the declared `routeId`; replace mode requires an existing generated route id and
+preserves the current route path unless a new path is declared. Runtime plugins
+can still export `patchRoutes`, `patchClientRoutes`, `modifyRouterOptions`,
+`wrapRoot`, `rootContainer`, or `render` when the route or render behavior must
+be decided in the browser.
 
 `resolve.external` accepts `runtime: "client" | "server" | "all"`. The
 Webpack adapter applies that filter per target. The current Utoopack adapter

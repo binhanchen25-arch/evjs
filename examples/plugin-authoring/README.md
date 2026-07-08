@@ -1,11 +1,15 @@
 # plugin-authoring
 
-Demonstrates the evjs plugin system with all available hooks:
+Demonstrates the evjs plugin lifecycle hooks used by ordinary build-time
+extensions:
 
 - **`bundlerConfig`** — modify the underlying bundler config (type-safe via `utoopack()` helper)
 - **`buildStart`** — run logic before compilation begins
 - **`buildEnd`** — run logic after compilation completes
 - **`transformHtml`** — modify the parsed HTML document after asset injection with current HTML context
+
+For plugins that need to declare generated `.ev` artifacts and attach them to
+framework slots, see the generated contributions documentation.
 
 ## Run
 

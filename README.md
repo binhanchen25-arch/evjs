@@ -19,11 +19,11 @@ server functions, and independent client/server runtime cores.
 - **Data Fetching** — [TanStack Query](https://tanstack.com/query) with built-in proxies.
 - **Server Functions** — `"use server"` directive, auto-discovered at build time.
 - **Pluggable Transport** — HTTP, WebSocket, or custom via `ServerTransport`.
-- **Plugin System** — extend framework IR through generated contributions and lifecycle hooks.
+- **Plugin System** — extend the generated `.ev` framework IR through contributions, plus lifecycle hooks for config, bundler, HTML, and build output.
 - **Server File Routes** — `src/apis` maps Request/Response method modules to HTTP endpoints.
 - **Typed Errors** — `ServerError` flows structured data server → client.
 - **Multi-Runtime** — [Hono](https://hono.dev/)-based server with Node, Deno, Bun, Edge adapters.
-- **CLI** — `ev dev` · `ev build` · `ev inspect`
+- **CLI** — `ev dev` · `ev build` · `ev prepare` · `ev inspect`
 
 ## 🚀 Quick Start
 
@@ -37,6 +37,19 @@ After `ev dev`, your browser opens to `http://localhost:3000` with hot module
 replacement. Server functions in `*.server.ts` files are auto-discovered — no
 config needed.
 
+## 🧭 Framework IR
+
+evjs materializes framework-owned code under `.ev/` before bundling. This
+agent-readable IR records file-convention discovery, generated entry facades,
+plugin generated modules, slot attachments, import edges, and the final
+manifest.
+
+Use `ev prepare` to generate `.ev/` without writing `dist`, and use
+`ev inspect --json` when you want a preflight report without writing generated
+files. Plugin authors should use `contributions()` for generated modules,
+entry/runtime/HTML/resolution slots, and constrained route additions; keep
+loaders for real bundler transforms.
+
 ## 🏗️ Packages
 
 ### Public entry points
@@ -44,7 +57,7 @@ config needed.
 | Package | Purpose |
 |---------|---------|
 | [`@evjs/ev`](./packages/ev) | Framework API, config, plugins, build orchestration, deployment helpers, and file-convention authoring subpaths |
-| [`@evjs/cli`](./packages/cli) | Thin CLI wrapper (`ev dev`, `ev build`, `ev inspect`) with the default bundler |
+| [`@evjs/cli`](./packages/cli) | Thin CLI wrapper (`ev dev`, `ev build`, `ev prepare`, `ev inspect`) with the default bundler |
 | [`@evjs/create-app`](./packages/create-app) | Project scaffolding (`npx @evjs/create-app`) |
 | [`@evjs/client`](./packages/client) | Standalone/manual browser runtime core |
 | [`@evjs/server`](./packages/server) | Standalone/manual server runtime core for Hono/fetch apps and route primitives |
