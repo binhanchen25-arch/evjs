@@ -36,7 +36,7 @@ flowchart TB
   subgraph Source["Application source"]
     Pages["src/pages\nclient routes"]
     APIs["src/apis\nserver routes"]
-    Functions["\"use server\"\nserver functions"]
+    Functions["use server directive\nserver functions"]
     Config["ev.config.ts\nplugins"]
   end
 

@@ -35,7 +35,7 @@ flowchart TB
   subgraph Source["应用源码"]
     Pages["src/pages\n客户端路由"]
     APIs["src/apis\n服务端路由"]
-    Functions["\"use server\"\n服务端函数"]
+    Functions["use server 指令\n服务端函数"]
     Config["ev.config.ts\n插件"]
   end
 
