@@ -1,12 +1,28 @@
 import type {
   AssetGroup,
+  BuildEntryOwner,
+  BuildEntryPhase,
   BuildEnvironment,
   BuildOutput,
+  ComponentModel,
+  ContributionRuntime,
+  ContributionTarget,
   DeploymentMetadata,
+  EntryContributionPosition,
+  FrameworkSlotName,
+  GeneratedScope,
+  HtmlTagName,
+  HtmlTagPlacement,
+  HydrationMode,
+  PageRouteKind,
+  PprConfig,
+  PrerenderConfig,
   PublicManifestOutput,
   PublicPageOutput,
   PublicRouteOutput,
+  RenderMode,
   ServerManifestOutput,
+  ServerRuntime,
 } from "@evjs/shared/manifest";
 import {
   createDeploymentMetadata,
@@ -20,6 +36,16 @@ import type {
   DefaultBundlerConfig,
   ResolvedConfig,
 } from "../config/index.js";
+
+export type {
+  ContributionRuntime,
+  ContributionTarget,
+  EntryContributionPosition,
+  FrameworkSlotName,
+  GeneratedScope,
+  HtmlTagName,
+  HtmlTagPlacement,
+} from "@evjs/shared/manifest";
 
 /**
  * Minimal DOM element / document interface for plugin HTML manipulation.
@@ -185,6 +211,8 @@ type PluginSetupResult<TBundlerCfg> =
   | Promise<PluginHooks<TBundlerCfg> | undefined>
   | Promise<void>;
 
+type ContributionsHookResult = void | Promise<void>;
+
 /**
  * An evjs plugin.
  */
@@ -227,6 +255,15 @@ export interface EvPlugin<TBundlerCfg = DefaultBundlerConfig> {
   setup?: (
     ctx: EvPluginContext<TBundlerCfg>,
   ) => EvPluginSetupResult<TBundlerCfg>;
+
+  /**
+   * Declare generated framework contributions for the `.ev` IR.
+   *
+   * The alias shape receives the same contribution context as Plugin.
+   */
+  contributions?: (
+    ctx: ContributionContext<TBundlerCfg>,
+  ) => ContributionsHookResult;
 }
 
 /** An evjs plugin. The `EvPlugin` alias shape is accepted. */
@@ -257,6 +294,17 @@ export interface Plugin<TBundlerCfg = DefaultBundlerConfig>
    * hooks share state through closure.
    */
   setup?: (ctx: PluginContext<TBundlerCfg>) => PluginSetupResult<TBundlerCfg>;
+
+  /**
+   * Declare generated framework contributions for the `.ev` IR.
+   *
+   * This hook is separate from setup() lifecycle hooks. It declares generated
+   * modules, structured framework slots, and resolution changes before bundler
+   * configuration is created.
+   */
+  contributions?: (
+    ctx: ContributionContext<TBundlerCfg>,
+  ) => ContributionsHookResult;
 }
 
 /** Base context passed to plugin setup(). */
@@ -280,6 +328,259 @@ export interface PluginContext<TBundlerCfg = DefaultBundlerConfig>
   logger: Logger;
   /** Adds an extra framework-level watch file in dev mode. */
   addWatchFile(file: string): void;
+}
+
+/** Read-only framework IR snapshot exposed to contribution hooks. */
+export interface FrameworkIRView {
+  /** File-convention apps discovered before bundling. */
+  readonly apps: readonly FrameworkAppView[];
+  /** Explicit or convention-derived pages discovered before bundling. */
+  readonly pages: readonly FrameworkPageView[];
+  /** Client route graph discovered from `src/pages` or config. */
+  readonly routes: readonly FrameworkRouteView[];
+  /** Server file routes discovered from `src/apis`. */
+  readonly serverRoutes: readonly FrameworkServerRouteView[];
+  /** Server functions discovered from `"use server"` modules. */
+  readonly serverFunctions: readonly FrameworkServerFunctionView[];
+  /** Bundler-independent entries that the framework will materialize. */
+  readonly entries: readonly FrameworkEntryView[];
+  getEntry(name: string): FrameworkEntryView | undefined;
+  getPagesAppEntry(): FrameworkPagesAppEntryView | undefined;
+}
+
+export interface FrameworkAppView {
+  readonly id: string;
+  readonly entry: string;
+  readonly html: string;
+  readonly mount?: string;
+}
+
+export interface FrameworkPageView {
+  readonly id: string;
+  readonly path?: string;
+  readonly routeId?: string;
+  readonly entry?: string;
+  readonly component?: string;
+  readonly app?: string;
+  readonly html: string;
+  readonly render: RenderMode;
+  readonly componentModel?: ComponentModel;
+  readonly hydrate?: HydrationMode;
+  readonly mount?: string;
+  readonly prerender?: PrerenderConfig;
+  readonly ppr?: PprConfig;
+}
+
+export interface FrameworkRouteView {
+  readonly id: string;
+  readonly path: string;
+  readonly parentId?: string;
+  readonly kind?: PageRouteKind;
+  readonly pageId?: string;
+  readonly appId?: string;
+  readonly module?: string;
+  readonly errorModule?: string;
+  readonly notFoundModule?: string;
+  readonly render?: RenderMode;
+  readonly hydrate?: HydrationMode;
+  readonly runtime?: ServerRuntime;
+}
+
+export interface FrameworkServerFunctionView {
+  readonly id: string;
+  readonly module: string;
+  readonly exportName: string;
+}
+
+export interface FrameworkServerRouteView {
+  readonly id: string;
+  readonly module: string;
+  readonly path: string;
+  readonly methods: readonly string[];
+}
+
+export interface FrameworkEntryView {
+  readonly name: string;
+  readonly import: string;
+  readonly environment: BuildEnvironment;
+  readonly runtime?: "browser" | ServerRuntime;
+  readonly phase?: BuildEntryPhase;
+  readonly kind:
+    | "app-client"
+    | "page-client"
+    | "page-server"
+    | "rsc-page"
+    | "ppr-shell"
+    | "ppr-region"
+    | "server-runtime"
+    | "runtime";
+  readonly owner?: BuildEntryOwner;
+  readonly metadata?: FrameworkEntryMetadataView;
+}
+
+export interface FrameworkPagesAppEntryView extends FrameworkEntryView {
+  readonly metadata: FrameworkPagesAppEntryMetadata;
+}
+
+export type FrameworkEntryMetadataView =
+  | FrameworkReactComponentPageEntryMetadata
+  | FrameworkPagesAppEntryMetadata
+  | FrameworkServerAppEntryMetadata;
+
+export interface FrameworkReactComponentPageEntryMetadata {
+  readonly type: "react-component-page";
+  readonly component: string;
+  readonly mount: string;
+  readonly hydrate: HydrationMode;
+  readonly render: RenderMode;
+  readonly route?: {
+    readonly id: string;
+    readonly path: string;
+  };
+}
+
+export interface FrameworkPagesAppEntryMetadata {
+  readonly type: "pages-app";
+  readonly routes: readonly FrameworkPageAppRouteView[];
+  readonly mount: string;
+  readonly rootModule?: string;
+}
+
+export interface FrameworkPageAppRouteView {
+  readonly id: string;
+  readonly path: string;
+  readonly module: string;
+  readonly html?: string;
+  readonly parentId?: string;
+  readonly kind?: PageRouteKind;
+  readonly errorModule?: string;
+  readonly notFoundModule?: string;
+}
+
+export interface FrameworkServerMiddlewareView {
+  readonly id: string;
+  readonly module: string;
+  readonly scope: "global" | "route";
+  readonly scopeSegments?: readonly string[];
+}
+
+export interface FrameworkServerAppRouteView extends FrameworkServerRouteView {
+  readonly middlewares?: readonly FrameworkServerMiddlewareView[];
+}
+
+export interface FrameworkServerAppEntryMetadata {
+  readonly type: "server-app";
+  readonly routes: readonly FrameworkServerAppRouteView[];
+  readonly middlewares?: readonly FrameworkServerMiddlewareView[];
+  readonly serverFunctions?: readonly FrameworkServerFunctionView[];
+}
+
+export interface ContributionContext<TBundlerCfg = DefaultBundlerConfig>
+  extends PluginContext<TBundlerCfg> {
+  readonly framework: FrameworkIRView;
+  readonly emit: EmitApi;
+  slot<K extends FrameworkSlotName>(name: K): FrameworkSlot<K>;
+}
+
+export interface EmitApi {
+  module(input: {
+    id: string;
+    scope: GeneratedScope;
+    source:
+      | string
+      | ((helpers: {
+          importOf(ref: GeneratedModuleRef): string;
+          importFile(file: string): string;
+        }) => string);
+    extension?: ".ts" | ".tsx" | ".js" | ".jsx" | ".css" | ".less" | ".json";
+  }): GeneratedModuleRef;
+
+  data(input: {
+    id: string;
+    scope: GeneratedScope;
+    value: unknown;
+  }): GeneratedModuleRef;
+
+  entryFacade(input: {
+    id: string;
+    entry: FrameworkEntryView;
+    scope?: GeneratedScope;
+  }): GeneratedModuleRef;
+
+  importOf(ref: GeneratedModuleRef): string;
+}
+
+export interface GeneratedModuleRef {
+  readonly __evGeneratedModuleRef: unique symbol;
+}
+
+export interface FrameworkSlot<K extends FrameworkSlotName> {
+  add(input: FrameworkSlotInput<K>): void;
+}
+
+export type FrameworkSlotInput<K extends FrameworkSlotName> =
+  K extends "client.entry"
+    ? ClientEntryContribution
+    : K extends "client.runtime.plugin"
+      ? ClientRuntimePluginContribution
+      : K extends "server.request.middleware"
+        ? ServerRequestMiddlewareContribution
+        : K extends "html.tag"
+          ? HtmlTagContribution
+          : K extends "resolve.alias"
+            ? ResolveAliasContribution
+            : K extends "resolve.external"
+              ? ResolveExternalContribution
+              : never;
+
+export interface ClientEntryContribution {
+  id: string;
+  module: GeneratedModuleRef | string;
+  position: EntryContributionPosition;
+  runtime?: ContributionRuntime;
+  target?: ContributionTarget;
+  /**
+   * Replaces the generated entry facade with this module.
+   *
+   * Default "import" mode preserves the framework main import and imports this
+   * contribution at the requested position. "replace" is reserved for plugins
+   * such as qiankun slave mode that must own the entry exports.
+   */
+  mode?: "import" | "replace";
+}
+
+export interface ClientRuntimePluginContribution {
+  id: string;
+  module: GeneratedModuleRef | string;
+  exportKeys?: string[];
+  target?: ContributionTarget;
+}
+
+export interface ServerRequestMiddlewareContribution {
+  id: string;
+  module: GeneratedModuleRef | string;
+}
+
+export interface HtmlTagContribution {
+  id: string;
+  tag: HtmlTagName;
+  placement: HtmlTagPlacement;
+  attrs?: Record<string, string | boolean>;
+  children?: string;
+  target?: ContributionTarget;
+}
+
+export interface ResolveAliasContribution {
+  id: string;
+  specifier: string;
+  replacement: GeneratedModuleRef | string;
+}
+
+export interface ResolveExternalContribution {
+  id: string;
+  specifier: string;
+  source?: string;
+  runtime?: ContributionRuntime;
 }
 
 export interface BuildStartContext<TBundlerCfg = DefaultBundlerConfig>

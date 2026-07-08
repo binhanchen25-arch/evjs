@@ -41,7 +41,9 @@ There is no longer a public `@evjs/build-tools` or `@evjs/manifest` workspace pa
 1. All packages are ESM. Use `.js` extensions in relative imports that survive compilation.
 2. Keep imports at the top and use `import type` for type-only imports.
 3. Run Biome before finalizing changes.
-4. Do not add generated `.evjs` production source files. Prefer runtime/library entries or bundler adapter mechanics.
+4. Do not add generated `.evjs` production source files. Framework-owned entry
+   composition belongs in the generated `.ev` IR; keep adapter-specific virtual
+   entry loaders out of file-convention semantics.
 5. Keep `@evjs/bundler-*` adapters semantic-free: they consume `BuildPlan` and return build facts.
 6. `server.functions.endpoint` is not a public config option. Use `server.basePath`; runtime paths are derived into `BuildOutput.runtime.server`.
 7. Page route code should use `src/pages`, page hooks, `Link`, and static page
@@ -141,7 +143,7 @@ npm --workspace @evjs/ev test -- tests/build-tools-graph-plan.test.ts
 | Surface | Primary files | Focused validation |
 | --- | --- | --- |
 | File route convention and SPA/MPA graph | `packages/ev/src/_internal/build/page-route-conventions.ts`, `page-routes.ts`, `graph/index.ts`, `plan/index.ts` | `npx turbo run test --filter=@evjs/ev` |
-| Server file route and middleware conventions | `packages/ev/src/_internal/build/server-routes.ts`, `server-conventions.ts`, `server-routes-entry.ts`, `graph/index.ts`, `plan/index.ts` | `npx turbo run test --filter=@evjs/ev` |
+| Server file route and middleware conventions | `packages/ev/src/_internal/build/server-routes.ts`, `server-conventions.ts`, `generated-contributions.ts`, `graph/index.ts`, `plan/index.ts` | `npx turbo run test --filter=@evjs/ev` |
 | Config and package surface | `packages/ev/src/config/`, package manifests | `npx turbo run test --filter=@evjs/ev` |
 | Server functions and route handlers | `packages/server/src/app/`, `server-functions/`, `routes/*`, `packages/client/src/server-functions/`, `packages/ev/src/_internal/build/server-fns.ts` | `npx turbo run test --filter=@evjs/server` and `npx turbo run test --filter=@evjs/client` |
 | SSR, SSG, PPR, and RSC | `packages/ev/src/_internal/build/graph/index.ts`, `plan/index.ts`, `packages/server/src/framework-rendering/`, `packages/client/src/rsc/` | `npx turbo run test --filter=@evjs/ev`, `npx turbo run test --filter=@evjs/server`, and `npx turbo run test --filter=@evjs/client` |

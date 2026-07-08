@@ -162,6 +162,7 @@ const defaultBundlerTypePackage = "@utoo/pack";
 const forbiddenCoreBundlerPackages = ["webpack", "webpack-dev-server"] as const;
 
 const generatedFrameworkArtifacts = [
+  ".ev",
   ".evjs",
   ".turbopack",
   "route-types.d.ts",
@@ -175,7 +176,10 @@ const forbiddenPackageNames = [
 ];
 
 const expectedBuildToolsRuntimeExports = [
+  "GENERATED_IR_DIR",
+  "GENERATED_IR_MANIFEST",
   "SERVER_FUNCTION_TRANSFORM_RUNTIME",
+  "applyHtmlTagContributions",
   "applyRouteScopedMiddlewares",
   "build",
   "buildHtml",
@@ -193,6 +197,7 @@ const expectedBuildToolsRuntimeExports = [
   "generatePageRouteTypes",
   "inspectFrameworkBuild",
   "loadConfigFile",
+  "materializeFrameworkIR",
   "prepareFrameworkBuild",
   "resolveRoutes",
   "transformRscClientFile",
@@ -490,6 +495,34 @@ describe("workspace package surface", () => {
 
       expect(declaredEvjsPackages).toEqual(["@evjs/ev"]);
     }
+  });
+
+  it("keeps plugin packages off generated-only framework internals", async () => {
+    const violations: string[] = [];
+
+    for (const packageName of expectedPackageNames) {
+      if (packageDistribution[packageName].role !== "plugin") continue;
+      const packageDir = path.join(
+        repoRoot,
+        "packages",
+        packageDistribution[packageName].dir,
+        "src",
+      );
+
+      for (const sourceFile of await listSourceFiles(packageDir)) {
+        const relativeFile = path.relative(repoRoot, sourceFile);
+        const source = await fs.readFile(sourceFile, "utf-8");
+        for (const importSpecifier of parseEvjsImportSpecifiers(source)) {
+          if (importSpecifier.startsWith("@evjs/ev/_internal")) {
+            violations.push(
+              `${relativeFile} imports generated-only ${importSpecifier}`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
   });
 
   it("keeps @evjs/ev tied only to the default Utoopack type package", async () => {

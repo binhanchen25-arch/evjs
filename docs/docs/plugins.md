@@ -31,7 +31,7 @@ export default defineConfig({
 
 ```ts
 import type { Config, DefaultBundlerConfig, ResolvedConfig } from "@evjs/ev/config";
-import type { Plugin, PluginConfigContext, PluginContext, PluginHooks } from "@evjs/ev/plugin";
+import type { ContributionContext, Plugin, PluginConfigContext, PluginContext, PluginHooks } from "@evjs/ev/plugin";
 
 interface Plugin<TBundlerConfig = DefaultBundlerConfig> {
   name: string;
@@ -48,6 +48,10 @@ interface Plugin<TBundlerConfig = DefaultBundlerConfig> {
     | PluginHooks<TBundlerConfig>
     | undefined
     | Promise<PluginHooks<TBundlerConfig> | undefined>;
+
+  contributions?(ctx: ContributionContext<TBundlerConfig>):
+    | void
+    | Promise<void>;
 }
 ```
 
@@ -132,6 +136,127 @@ flowchart LR
 | `transformHtml(doc, ctx)` | Mutate one HTML document at a time; receives the current manifest result fields |
 | `buildEnd({ output, isRebuild })` | Emit final artifacts after build |
 | `dispose(ctx)` | Cleanup |
+
+## Generated Contributions
+
+A contribution is a declarative unit in the framework IR. It can produce
+generated artifacts, link those artifacts together, and attach them to
+framework slots.
+
+Use `contributions()` when a plugin needs to extend the generated `.ev` IR.
+This is the right layer for entry imports, runtime plugin modules, HTML tags,
+framework request middleware, and semantic resolution changes. Keep loaders for
+real bundler transforms such as compiling a custom file type.
+
+`.ev` is generated output. It contains:
+
+- `.ev/framework/app-graph.json`: discovered file-convention graph;
+- `.ev/framework/build-plan.json`: final bundler-independent build plan;
+- `.ev/entries/*`: framework entry facades consumed by bundlers;
+- `.ev/plugins/<plugin>/*`: plugin generated modules and entry facades;
+- `.ev/manifest.json`: graph, generated artifacts, slots, import edges, and final entries.
+
+The contribution model has four parts:
+
+| Concept | Meaning |
+|---------|---------|
+| Generated artifact | A module, data file, or framework entry facade emitted through `ctx.emit`. |
+| Opaque ref | A `GeneratedModuleRef` returned by `ctx.emit`; plugins do not receive `.ev` file paths. |
+| Link edge | A generated-to-generated import declared through `ctx.emit.importOf(ref)` or `helpers.importOf(ref)`. |
+| Slot item | A structured attachment declared through `ctx.slot(name).add(...)`. |
+
+`ctx.framework` is an immutable, read-only public view of the framework IR. It
+exposes entries, apps, pages, routes, server routes, and server functions
+without exposing the internal `BuildPlan` or `AppGraph` objects. Plugin code
+should import authoring types from `@evjs/ev/plugin`; `@evjs/ev/_internal/*` is
+for CLI tooling, bundler adapters, and framework-generated code.
+
+Generated modules use opaque refs instead of exposing filesystem paths:
+
+```ts
+import type { Plugin } from "@evjs/ev/plugin";
+
+export function analyticsPlugin(): Plugin {
+  return {
+    name: "analytics",
+    contributions(ctx) {
+      const runtime = ctx.emit.module({
+        id: "runtime",
+        scope: { kind: "app" },
+        source: "export function install() { console.log('analytics'); }",
+      });
+
+      const entry = ctx.emit.module({
+        id: "entry",
+        scope: { kind: "app" },
+        source: ({ importOf }) =>
+          `import { install } from ${JSON.stringify(importOf(runtime))};\ninstall();`,
+      });
+
+      ctx.slot("client.entry").add({
+        id: "entry",
+        module: entry,
+        position: "after-main",
+      });
+    },
+  };
+}
+```
+
+When a plugin replaces an entry but still needs the original framework facade,
+use `ctx.emit.entryFacade()` instead of reconstructing framework internals:
+
+```ts
+contributions(ctx) {
+  const entry = ctx.framework.getPagesAppEntry();
+  if (!entry) return;
+
+  const original = ctx.emit.entryFacade({
+    id: "original-entry",
+    entry,
+  });
+
+  const wrapper = ctx.emit.module({
+    id: "entry-wrapper",
+    scope: { kind: "app" },
+    source: ({ importOf }) =>
+      `export const load = () => import(${JSON.stringify(importOf(original))});`,
+  });
+
+  ctx.slot("client.entry").add({
+    id: "entry-wrapper-slot",
+    module: wrapper,
+    position: "before-main",
+    mode: "replace",
+  });
+}
+```
+
+Generated plugin paths are stable and readable. For example, a plugin named
+`@evjs/plugin-qiankun:slave` writes modules under
+`.ev/plugins/qiankun/slave/*` and exposes specifiers like
+`evjs:generated/qiankun/slave/entry-wrapper`.
+
+Available slots:
+
+| Slot | Purpose |
+|------|---------|
+| `client.entry` | Add generated modules around the client entry at `polyfill`, `before-main-imports`, `after-main-imports`, `before-main`, or `after-main` |
+| `client.runtime.plugin` | Register runtime plugin modules and optional export keys |
+| `server.request.middleware` | Add framework request middleware to the server pipeline |
+| `html.tag` | Add structured `meta`, `link`, `script`, or `style` tags |
+| `resolve.alias` | Redirect a module specifier to a user module, package, absolute path, or generated module |
+| `resolve.external` | Mark a specifier as provided by an external runtime; inject CDN tags separately through `html.tag` |
+
+`resolve.external` accepts `runtime: "client" | "server" | "all"`. The
+Webpack adapter applies that filter per target. The current Utoopack adapter
+only exposes a top-level externals config, so client/all externals are mapped
+there and server-only externals fail fast when client entries are present.
+
+`contributions()` is separate from lifecycle hooks. Existing `config()`,
+`setup()`, `bundlerConfig()`, `transformHtml()`, and `buildEnd()` hooks remain
+the extension points for configuration, low-level bundler changes, AST-level
+HTML rewrites, and deployment output.
 
 ## HTML Transform Context
 

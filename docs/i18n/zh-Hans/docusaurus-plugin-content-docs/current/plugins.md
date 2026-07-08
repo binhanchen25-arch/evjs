@@ -30,7 +30,7 @@ export default defineConfig({
 
 ```ts
 import type { Config, DefaultBundlerConfig, ResolvedConfig } from "@evjs/ev/config";
-import type { Plugin, PluginConfigContext, PluginContext, PluginHooks } from "@evjs/ev/plugin";
+import type { ContributionContext, Plugin, PluginConfigContext, PluginContext, PluginHooks } from "@evjs/ev/plugin";
 
 interface Plugin<TBundlerConfig = DefaultBundlerConfig> {
   name: string;
@@ -47,6 +47,10 @@ interface Plugin<TBundlerConfig = DefaultBundlerConfig> {
     | PluginHooks<TBundlerConfig>
     | undefined
     | Promise<PluginHooks<TBundlerConfig> | undefined>;
+
+  contributions?(ctx: ContributionContext<TBundlerConfig>):
+    | void
+    | Promise<void>;
 }
 ```
 
@@ -127,6 +131,121 @@ flowchart LR
 | `transformHtml(doc, ctx)` | 逐个 HTML 文档修改输出；接收当前 manifest result 字段 |
 | `buildEnd({ output, isRebuild })` | 构建后输出最终产物 |
 | `dispose(ctx)` | 清理资源 |
+
+## Generated Contributions
+
+Contribution 是 framework IR 里的声明式单元。它可以生成产物、把这些产物链接起来，
+并把它们挂到 framework slot 上。
+
+当插件需要扩展生成的 `.ev` IR 时，使用 `contributions()`。这一层适合处理 entry import、
+runtime plugin module、HTML tag、framework request middleware 和语义化 resolution 变更。
+真正需要 bundler transform 的场景，例如编译自定义文件类型，仍应使用 loader。
+
+`.ev` 是生成产物，包含：
+
+- `.ev/framework/app-graph.json`：file-convention 发现后的 graph；
+- `.ev/framework/build-plan.json`：最终的 bundler 无关 build plan；
+- `.ev/entries/*`：bundler 消费的框架 entry facade；
+- `.ev/plugins/<plugin>/*`：插件生成模块和 entry facade；
+- `.ev/manifest.json`：graph、generated artifacts、slots、import edges 和最终 entries。
+
+Contribution 模型由四部分组成：
+
+| 概念 | 语义 |
+|------|------|
+| Generated artifact | 通过 `ctx.emit` 声明的 module、data file 或 framework entry facade。 |
+| Opaque ref | `ctx.emit` 返回的 `GeneratedModuleRef`；插件拿不到 `.ev` 文件路径。 |
+| Link edge | 通过 `ctx.emit.importOf(ref)` 或 `helpers.importOf(ref)` 声明的 generated-to-generated import。 |
+| Slot item | 通过 `ctx.slot(name).add(...)` 声明的结构化挂载。 |
+
+`ctx.framework` 是 immutable/read-only 的公开 framework IR view。它暴露 entries、apps、
+pages、routes、server routes 和 server functions，但不暴露内部 `BuildPlan` 或
+`AppGraph` 对象。插件代码应从 `@evjs/ev/plugin` 导入 authoring 类型；
+`@evjs/ev/_internal/*` 只用于 CLI tooling、bundler adapter 和框架生成代码。
+
+插件生成模块使用 opaque ref，不暴露文件系统路径：
+
+```ts
+import type { Plugin } from "@evjs/ev/plugin";
+
+export function analyticsPlugin(): Plugin {
+  return {
+    name: "analytics",
+    contributions(ctx) {
+      const runtime = ctx.emit.module({
+        id: "runtime",
+        scope: { kind: "app" },
+        source: "export function install() { console.log('analytics'); }",
+      });
+
+      const entry = ctx.emit.module({
+        id: "entry",
+        scope: { kind: "app" },
+        source: ({ importOf }) =>
+          `import { install } from ${JSON.stringify(importOf(runtime))};\ninstall();`,
+      });
+
+      ctx.slot("client.entry").add({
+        id: "entry",
+        module: entry,
+        position: "after-main",
+      });
+    },
+  };
+}
+```
+
+当插件需要替换 entry、但仍要保留原始 framework facade 时，使用
+`ctx.emit.entryFacade()`，不要在插件里重建 framework internal：
+
+```ts
+contributions(ctx) {
+  const entry = ctx.framework.getPagesAppEntry();
+  if (!entry) return;
+
+  const original = ctx.emit.entryFacade({
+    id: "original-entry",
+    entry,
+  });
+
+  const wrapper = ctx.emit.module({
+    id: "entry-wrapper",
+    scope: { kind: "app" },
+    source: ({ importOf }) =>
+      `export const load = () => import(${JSON.stringify(importOf(original))});`,
+  });
+
+  ctx.slot("client.entry").add({
+    id: "entry-wrapper-slot",
+    module: wrapper,
+    position: "before-main",
+    mode: "replace",
+  });
+}
+```
+
+插件生成路径稳定且可读。例如名为 `@evjs/plugin-qiankun:slave` 的插件会写入
+`.ev/plugins/qiankun/slave/*`，并暴露类似
+`evjs:generated/qiankun/slave/entry-wrapper` 的 specifier。
+
+可用 slots：
+
+| Slot | 用途 |
+|------|------|
+| `client.entry` | 在 `polyfill`、`before-main-imports`、`after-main-imports`、`before-main` 或 `after-main` 位置向客户端 entry 添加生成模块 |
+| `client.runtime.plugin` | 注册 runtime plugin module 和可选 export keys |
+| `server.request.middleware` | 向服务端请求 pipeline 添加 framework request middleware |
+| `html.tag` | 添加结构化的 `meta`、`link`、`script` 或 `style` tag |
+| `resolve.alias` | 将模块 specifier 重定向到用户模块、package、绝对路径或 generated module |
+| `resolve.external` | 声明某个 specifier 由外部 runtime 提供；CDN tag 应另行通过 `html.tag` 注入 |
+
+`resolve.external` 支持 `runtime: "client" | "server" | "all"`。Webpack
+adapter 会按 target 过滤。当前 Utoopack adapter 只有 top-level externals 配置，因此会映射
+client/all externals；当存在 client entries 时，server-only externals 会快速报错。
+
+`contributions()` 和生命周期 hooks 是两个维度。已有的 `config()`、`setup()`、
+`bundlerConfig()`、`transformHtml()` 和 `buildEnd()` 仍分别用于配置、底层 bundler
+修改、AST 级 HTML 改写和部署产物输出。
 
 ## HTML Transform 上下文
 
