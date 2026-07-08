@@ -116,16 +116,40 @@ attach package-local metadata to the returned object.
 ## Lifecycle
 
 ```mermaid
-flowchart LR
-  A["config hooks"] --> B["resolve config"]
-  B --> C["setup hooks"]
-  C --> E["buildStart"]
-  E --> J["bundlerConfig hooks"]
-  J --> K["bundler build"]
-  K --> M["buildOutput hooks"]
-  M --> N["transformHtml per document"]
-  N --> O["buildEnd"]
-  O --> P["dispose"]
+flowchart TB
+  subgraph Configure["Configuration"]
+    Config["config()"]
+    Resolve["resolve config"]
+    Setup["setup()"]
+  end
+
+  subgraph Plan["Framework planning"]
+    BuildStart["buildStart()"]
+    Graph["discover graph\nroutes + server functions"]
+    BuildPlan["create BuildPlan"]
+    Contributions["contributions(ctx)\nmodules + slots"]
+    IR["materialize .ev"]
+  end
+
+  subgraph Build["Bundling and output"]
+    BundlerConfig["bundlerConfig()"]
+    Bundler["bundler build"]
+    BuildOutput["buildOutput()"]
+    HTML["transformHtml()\nper document"]
+    BuildEnd["buildEnd()"]
+    Dispose["dispose()"]
+  end
+
+  Config --> Resolve --> Setup --> BuildStart --> Graph --> BuildPlan
+  BuildPlan --> Contributions --> IR --> BundlerConfig --> Bundler
+  Bundler --> BuildOutput --> HTML --> BuildEnd --> Dispose
+
+  classDef config fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef plan fill:#f3f0ff,stroke:#a78bfa,color:#2e1065;
+  classDef build fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  class Config,Resolve,Setup config;
+  class BuildStart,Graph,BuildPlan,Contributions,IR plan;
+  class BundlerConfig,Bundler,BuildOutput,HTML,BuildEnd,Dispose build;
 ```
 
 | Hook | Purpose |

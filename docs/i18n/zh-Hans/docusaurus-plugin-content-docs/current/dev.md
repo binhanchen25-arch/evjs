@@ -24,13 +24,44 @@ SPA history fallback 不会接管 `/api` 或派生出的服务端运行时路径
 服务端/代理 404，而不是应用 HTML。
 
 ```mermaid
-flowchart LR
-    Browser["浏览器"] -->|":3000"| Client["客户端开发服务器"]
-    Client -->|"HMR"| Browser
-    Client -->|"/__evjs/* 代理"| Server["服务端开发运行时 :3001"]
-    Server --> Functions["服务端函数"]
-    Server --> Routes["服务端路由"]
-    Server --> Rendering["SSR/PPR/RSC"]
+flowchart TB
+  Browser["浏览器"]
+
+  subgraph ClientSide["客户端开发服务器 :3000"]
+    HTML["HTML + browser bundle"]
+    HMR["HMR websocket"]
+    Proxy["/__evjs/* 代理"]
+  end
+
+  subgraph ServerSide["服务端开发运行时 :3001"]
+    Functions["服务端函数"]
+    Routes["服务端路由"]
+    Rendering["SSR / PPR / RSC"]
+  end
+
+  subgraph Updates["Framework updates"]
+    Files["src/pages\nsrc/apis\nev.config.ts"]
+    Plan["refresh AppGraph\nand .ev plan"]
+  end
+
+  Browser --> HTML
+  HMR --> Browser
+  Browser --> Proxy --> ServerSide
+  ServerSide --> Functions
+  ServerSide --> Routes
+  ServerSide --> Rendering
+  Files --> Plan
+  Plan --> ClientSide
+  Plan --> ServerSide
+
+  classDef browser fill:#fff7ed,stroke:#fb923c,color:#7c2d12;
+  classDef client fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef server fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  classDef update fill:#f3f0ff,stroke:#a78bfa,color:#2e1065;
+  class Browser browser;
+  class HTML,HMR,Proxy client;
+  class Functions,Routes,Rendering server;
+  class Files,Plan update;
 ```
 
 ## 配置

@@ -32,60 +32,57 @@ the framework. MPA page routes use the page runtime without adding a router.
 ## Full-Stack Architecture
 
 ```mermaid
-flowchart LR
-    subgraph Browser ["Browser"]
-        UI["React app/page runtime"]
-        RPC["Server function call"]
-        RSCClient["RSC client runtime"]
-    end
+flowchart TB
+  subgraph Source["Application source"]
+    Pages["src/pages\nclient routes"]
+    APIs["src/apis\nserver routes"]
+    Functions["\"use server\"\nserver functions"]
+    Config["ev.config.ts\nplugins"]
+  end
 
-    subgraph Server ["Server runtime"]
-        subgraph Rendering ["Rendering"]
-            SSR["SSR"]
-            PPR["PPR shell/regions"]
-            RSC["RSC"]
-        end
+  subgraph Framework["Framework planning"]
+    Discovery["Convention discovery"]
+    IR[".ev framework IR\nentries + plugin modules + slots"]
+    Manifest["Manifest data\nruntime + deployment metadata"]
+  end
 
-        subgraph APIs ["APIs"]
-            SF["Server functions"]
-            RH["Server routes"]
-        end
+  subgraph Output["Build output"]
+    Assets["Browser assets"]
+    HTML["HTML documents"]
+    ServerBundle["Server bundle"]
+  end
 
-        subgraph Data ["Data/services"]
-            DB[("Database")]
-            KV[("KV Store")]
-        end
-    end
+  subgraph Runtime["Runtime targets"]
+    Browser["Browser app\nSPA / MPA / hydration"]
+    Server["Framework server\nfunctions + routes + SSR/PPR/RSC"]
+    Deploy["Deployment adapters\nNode / static / edge"]
+  end
 
-    subgraph Output ["Build output"]
-        ASSETS["Browser assets"]
-        HTML["HTML documents"]
-        SERVERBUNDLE["Server bundle"]
-        DEPLOY["Deployment metadata"]
-    end
+  Pages --> Discovery
+  APIs --> Discovery
+  Functions --> Discovery
+  Config --> Discovery
+  Discovery --> IR
+  IR --> Manifest
+  Manifest --> Assets
+  Manifest --> HTML
+  Manifest --> ServerBundle
+  Assets --> Browser
+  HTML --> Browser
+  ServerBundle --> Server
+  Browser <-->|"framework requests"| Server
+  Assets --> Deploy
+  HTML --> Deploy
+  ServerBundle --> Deploy
 
-    UI --> ASSETS
-    UI --> HTML
-    UI --> RPC
-    UI -.->|"document request"| SSR
-    UI -.->|"document request"| PPR
-    RSCClient -.->|"RSC request"| RSC
-
-    SSR -->|Read| DB
-    SSR -->|Read| KV
-    PPR -->|Read| DB
-    PPR -->|Read| KV
-    RSC -->|Read| DB
-    RSC -->|Read| KV
-    SF -->|Read/Write| DB
-    SF -->|Read/Write| KV
-    RH -->|Read/Write| DB
-    RH -->|Read/Write| KV
-
-    RPC --> SF
-    UI -->|"HTTP request"| RH
-    SERVERBUNDLE --> Server
-    DEPLOY --> Server
+  classDef source fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef ir fill:#f3f0ff,stroke:#a78bfa,color:#2e1065;
+  classDef output fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  classDef runtime fill:#fff7ed,stroke:#fb923c,color:#7c2d12;
+  class Pages,APIs,Functions,Config source;
+  class Discovery,IR,Manifest ir;
+  class Assets,HTML,ServerBundle output;
+  class Browser,Server,Deploy runtime;
 ```
 
 ## How It Fits Together

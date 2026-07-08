@@ -28,13 +28,44 @@ paths. A mistyped server request therefore returns a server/proxy 404 instead of
 the app HTML.
 
 ```mermaid
-flowchart LR
-    Browser -->|":3000"| Client["Client dev server"]
-    Client -->|"HMR"| Browser
-    Client -->|"/__evjs/* proxy"| Server["Server dev runtime :3001"]
-    Server --> Functions["Server functions"]
-    Server --> Routes["Server routes"]
-    Server --> Rendering["SSR/PPR/RSC"]
+flowchart TB
+  Browser["Browser"]
+
+  subgraph ClientSide["Client dev server :3000"]
+    HTML["HTML + browser bundle"]
+    HMR["HMR websocket"]
+    Proxy["/__evjs/* proxy"]
+  end
+
+  subgraph ServerSide["Server dev runtime :3001"]
+    Functions["Server functions"]
+    Routes["Server routes"]
+    Rendering["SSR / PPR / RSC"]
+  end
+
+  subgraph Updates["Framework updates"]
+    Files["src/pages\nsrc/apis\nev.config.ts"]
+    Plan["refresh AppGraph\nand .ev plan"]
+  end
+
+  Browser --> HTML
+  HMR --> Browser
+  Browser --> Proxy --> ServerSide
+  ServerSide --> Functions
+  ServerSide --> Routes
+  ServerSide --> Rendering
+  Files --> Plan
+  Plan --> ClientSide
+  Plan --> ServerSide
+
+  classDef browser fill:#fff7ed,stroke:#fb923c,color:#7c2d12;
+  classDef client fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef server fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  classDef update fill:#f3f0ff,stroke:#a78bfa,color:#2e1065;
+  class Browser browser;
+  class HTML,HMR,Proxy client;
+  class Functions,Routes,Rendering server;
+  class Files,Plan update;
 ```
 
 ## Configuration

@@ -15,13 +15,39 @@ system. Plugins do not write random files into `.ev`; they declare artifacts and
 relationships. evjs then materializes the final `.ev` tree and manifest.
 
 ```mermaid
-flowchart LR
-  Plugin["plugin contributions(ctx)"] --> Emit["ctx.emit artifacts"]
-  Emit --> Ref["GeneratedModuleRef"]
-  Ref --> Link["importOf(ref) link edges"]
-  Ref --> Slot["ctx.slot(...).add(...)"]
-  Slot --> Manifest[".ev/manifest.json"]
-  Link --> Manifest
+flowchart TB
+  Hook["contributions(ctx)"]
+
+  subgraph Declare["Plugin declarations"]
+    Emit["ctx.emit\nmodule / data / entryFacade"]
+    Slot["ctx.slot(...).add\nstructured framework attachments"]
+  end
+
+  subgraph Link["Generated graph"]
+    Ref["GeneratedModuleRef\nopaque handle"]
+    Edge["helpers.importOf(ref)\nimport edge"]
+  end
+
+  subgraph Materialize["Materialized .ev output"]
+    Files[".ev/plugins/<plugin>\ngenerated artifacts"]
+    Manifest[".ev/manifest.json\nmodules + slots + importEdges"]
+  end
+
+  Hook --> Emit
+  Hook --> Slot
+  Emit --> Ref
+  Ref --> Edge
+  Ref --> Slot
+  Edge --> Files
+  Slot --> Manifest
+  Files --> Manifest
+
+  classDef hook fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef declaration fill:#f3f0ff,stroke:#a78bfa,color:#2e1065;
+  classDef output fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  class Hook hook;
+  class Emit,Slot,Ref,Edge declaration;
+  class Files,Manifest output;
 ```
 
 ## Directory Shape

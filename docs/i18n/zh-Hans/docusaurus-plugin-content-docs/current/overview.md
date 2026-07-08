@@ -31,60 +31,57 @@ page runtime，不引入客户端路由器。
 ## 全栈架构
 
 ```mermaid
-flowchart LR
-    subgraph Browser ["Browser"]
-        UI["React app/page runtime"]
-        RPC["Server function call"]
-        RSCClient["RSC client runtime"]
-    end
+flowchart TB
+  subgraph Source["应用源码"]
+    Pages["src/pages\n客户端路由"]
+    APIs["src/apis\n服务端路由"]
+    Functions["\"use server\"\n服务端函数"]
+    Config["ev.config.ts\n插件"]
+  end
 
-    subgraph Server ["Server runtime"]
-        subgraph Rendering ["Rendering"]
-            SSR["SSR"]
-            PPR["PPR shell/regions"]
-            RSC["RSC"]
-        end
+  subgraph Framework["框架规划"]
+    Discovery["Convention discovery"]
+    IR[".ev framework IR\nentries + 插件模块 + slots"]
+    Manifest["Manifest data\nruntime + deployment metadata"]
+  end
 
-        subgraph APIs ["APIs"]
-            SF["Server functions"]
-            RH["Server routes"]
-        end
+  subgraph Output["构建输出"]
+    Assets["浏览器资源"]
+    HTML["HTML documents"]
+    ServerBundle["服务端 bundle"]
+  end
 
-        subgraph Data ["Data/services"]
-            DB[("数据库")]
-            KV[("KV 存储")]
-        end
-    end
+  subgraph Runtime["运行目标"]
+    Browser["Browser app\nSPA / MPA / hydration"]
+    Server["Framework server\nfunctions + routes + SSR/PPR/RSC"]
+    Deploy["Deployment adapters\nNode / static / edge"]
+  end
 
-    subgraph Output ["Build output"]
-        ASSETS["Browser assets"]
-        HTML["HTML documents"]
-        SERVERBUNDLE["Server bundle"]
-        DEPLOY["Deployment metadata"]
-    end
+  Pages --> Discovery
+  APIs --> Discovery
+  Functions --> Discovery
+  Config --> Discovery
+  Discovery --> IR
+  IR --> Manifest
+  Manifest --> Assets
+  Manifest --> HTML
+  Manifest --> ServerBundle
+  Assets --> Browser
+  HTML --> Browser
+  ServerBundle --> Server
+  Browser <-->|"framework requests"| Server
+  Assets --> Deploy
+  HTML --> Deploy
+  ServerBundle --> Deploy
 
-    UI --> ASSETS
-    UI --> HTML
-    UI --> RPC
-    UI -.->|"document request"| SSR
-    UI -.->|"document request"| PPR
-    RSCClient -.->|"RSC request"| RSC
-
-    SSR -->|读取| DB
-    SSR -->|读取| KV
-    PPR -->|读取| DB
-    PPR -->|读取| KV
-    RSC -->|读取| DB
-    RSC -->|读取| KV
-    SF -->|读/写| DB
-    SF -->|读/写| KV
-    RH -->|读/写| DB
-    RH -->|读/写| KV
-
-    RPC --> SF
-    UI -->|"HTTP request"| RH
-    SERVERBUNDLE --> Server
-    DEPLOY --> Server
+  classDef source fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef ir fill:#f3f0ff,stroke:#a78bfa,color:#2e1065;
+  classDef output fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  classDef runtime fill:#fff7ed,stroke:#fb923c,color:#7c2d12;
+  class Pages,APIs,Functions,Config source;
+  class Discovery,IR,Manifest ir;
+  class Assets,HTML,ServerBundle output;
+  class Browser,Server,Deploy runtime;
 ```
 
 ## 如何组合

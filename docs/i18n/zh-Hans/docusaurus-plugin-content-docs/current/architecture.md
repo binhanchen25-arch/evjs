@@ -6,14 +6,27 @@ plan、私有 BuildOutput 契约和生成的 runtime 投影构建的 React 框�
 middleware 分成 `src/middleware.ts` 中的 framework request middleware，以及
 `src/apis/**/middleware.ts` 中的 API route middleware。
 
-```txt
-src/pages + src/apis + src/middleware.ts + ev.config.ts
-  -> AppGraph
-  -> BuildPlan
-  -> .ev generated framework IR
-  -> bundler build
-  -> BuildOutput
-  -> runtime / shell / deployment adapters
+```mermaid
+flowchart LR
+  Source["File conventions\nsrc/pages + src/apis + middleware"]
+  Config["ev.config.ts\nplugins + explicit entries"]
+  Graph["AppGraph\nframework model"]
+  Plan["BuildPlan\nbundler-independent plan"]
+  IR[".ev IR\nentries + generated modules + slots"]
+  Build["Bundler build\nUtoopack / webpack"]
+  Output["BuildOutput\nruntime + deployment contract"]
+  Runtime["Runtime targets\nbrowser + server + adapters"]
+
+  Source --> Graph
+  Config --> Graph
+  Graph --> Plan --> IR --> Build --> Output --> Runtime
+
+  classDef source fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef model fill:#f3f0ff,stroke:#a78bfa,color:#2e1065;
+  classDef build fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  class Source,Config source;
+  class Graph,Plan,IR model;
+  class Build,Output,Runtime build;
 ```
 
 ## 公共包
@@ -151,34 +164,57 @@ MPA 文件路由和显式 pages 使用 page runtime，不引入客户端路由�
 ## 构建流程
 
 ```mermaid
-sequenceDiagram
-  participant CLI as "@evjs/cli"
-  participant EV as "@evjs/ev"
-  participant Tools as "@evjs/ev/_internal/build"
-  participant Bundler as "BundlerAdapter"
-  participant Manifest as "manifest linker"
-  participant Plugins as "Plugins"
+flowchart TB
+  Request["dev/build request\nconfig + cwd"]
 
-  CLI->>EV: dev/build(config)
-  EV->>Plugins: config hooks
-  EV->>EV: resolveConfig()
-  EV->>Plugins: setup hooks
-  EV->>Tools: createAppGraph(config)
-  Tools-->>EV: AppGraph + diagnostics + fileDependencies
-  EV->>Tools: createBuildPlan(config, graph)
-  Tools-->>EV: BuildPlan
-  EV->>Plugins: contributions(ctx)
-  EV->>EV: materialize .ev framework IR
-  EV->>Bundler: build(plan)
-  Bundler-->>EV: bundler stats/assets
-  EV->>Manifest: linkBuildOutput(graph, plan, bundlerFacts)
-  Manifest-->>EV: BuildOutput
-  EV->>Plugins: buildOutput(output)
-  EV->>EV: emit framework manifests
-  loop each HTML document
-    EV->>Plugins: transformHtml(doc, htmlContext)
+  subgraph ConfigStage["1. 解析配置"]
+    ConfigHooks["plugin config() hooks"]
+    Resolved["ResolvedConfig"]
+    SetupHooks["plugin setup() hooks"]
   end
-  EV->>Plugins: buildEnd({ output, frameworkRuntime, isRebuild })
+
+  subgraph GraphStage["2. 构建 framework model"]
+    Graph["AppGraph\nroutes + server functions + page metadata"]
+    Plan["BuildPlan\nentries + HTML + environments"]
+    Contributions["contributions(ctx)\ngenerated artifacts + slots"]
+  end
+
+  subgraph IRStage["3. Materialize .ev IR"]
+    Entries[".ev/entries/*"]
+    PluginFiles[".ev/plugins/*"]
+    IRManifest[".ev/manifest.json"]
+  end
+
+  subgraph BundleStage["4. Bundling 和链接输出"]
+    BundlerConfig["bundlerConfig() hooks"]
+    Bundler["BundlerAdapter\nUtoopack / webpack"]
+    Output["BuildOutput\nassets + runtime + route rows"]
+  end
+
+  subgraph FinalStage["5. 输出最终产物"]
+    BuildOutputHook["buildOutput() hooks"]
+    HTML["transformHtml()\nper document"]
+    BuildEnd["buildEnd() hooks"]
+    Dist["dist/\nassets + manifests + deployment metadata"]
+  end
+
+  Request --> ConfigHooks --> Resolved --> SetupHooks
+  SetupHooks --> Graph --> Plan --> Contributions
+  Contributions --> Entries
+  Contributions --> PluginFiles
+  Entries --> IRManifest
+  PluginFiles --> IRManifest
+  IRManifest --> BundlerConfig --> Bundler --> Output
+  Output --> BuildOutputHook --> HTML --> BuildEnd --> Dist
+
+  classDef input fill:#fff7ed,stroke:#fb923c,color:#7c2d12;
+  classDef config fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef model fill:#f3f0ff,stroke:#a78bfa,color:#2e1065;
+  classDef build fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  class Request input;
+  class ConfigHooks,Resolved,SetupHooks config;
+  class Graph,Plan,Contributions,Entries,PluginFiles,IRManifest model;
+  class BundlerConfig,Bundler,Output,BuildOutputHook,HTML,BuildEnd,Dist build;
 ```
 
 Bundling 前，evjs 会 materialize `.ev` 作为 agent-readable framework IR。
@@ -210,38 +246,40 @@ server function、PPR endpoint、RSC endpoint 等可部署 route row。
 ## 运行时流程
 
 ```mermaid
-sequenceDiagram
-  participant Browser
-  participant Shell as "@evjs/ev/_internal/client"
-  participant Route as "@evjs/ev/route"
-  participant Navigation as "@evjs/ev/navigation"
-  participant Server as "@evjs/ev/_internal/server"
-  participant ClientRuntime as "ClientRuntime"
-  participant FrameworkRuntime as "FrameworkRuntime"
+flowchart TB
+  subgraph BrowserSide["Browser"]
+    HTMLDoc["HTML document\nembedded ClientRuntime"]
+    Bootstrap["Generated app/page bootstrap"]
+    ReactApp["React runtime\nSPA / MPA / hydration"]
+  end
 
-  Browser->>Runtime: page/app boot
-  Runtime->>ClientRuntime: read embedded JSON or configured runtime URL
-  Runtime->>Shell: create internal shell
-  Shell->>ClientRuntime: resolve app/page target
-  Shell->>Browser: import JS/CSS module assets
-  Shell->>Runtime: mount/hydrate/unmount lifecycle
+  subgraph Requests["Framework requests"]
+    FnReq["POST runtime.server.fn"]
+    PageReq["GET page route"]
+    RSCReq["GET runtime.server.rsc"]
+  end
 
-  Browser->>Server: POST runtime.server.fn
-  Server->>Server: dispatch registered server function
-  Server-->>Browser: JSON result/error
+  subgraph ServerSide["Framework server"]
+    Dispatch["Server function dispatcher"]
+    Renderers["SSR / PPR / RSC renderers"]
+    FrameworkRuntime["FrameworkRuntime\nrender metadata + RSC references"]
+  end
 
-  Browser->>Server: GET page route
-  Server->>FrameworkRuntime: match route/page/renderer
-  Server-->>Browser: SSR HTML
+  HTMLDoc --> Bootstrap --> ReactApp
+  ReactApp --> FnReq --> Dispatch
+  ReactApp --> PageReq --> Renderers
+  ReactApp --> RSCReq --> Renderers
+  Renderers --> FrameworkRuntime
+  Dispatch --> FrameworkRuntime
+  Dispatch --> ReactApp
+  Renderers --> ReactApp
 
-  Browser->>Server: GET PPR page route
-  Server->>FrameworkRuntime: match shell and region renderers
-  Server->>Server: render/cache internal regions
-  Server-->>Browser: PPR HTML in the same route response
-
-  Browser->>Server: GET runtime.server.rsc?page=id
-  Server->>FrameworkRuntime: read RSC renderer and reference manifests
-  Server-->>Browser: React Flight stream
+  classDef browser fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef request fill:#fff7ed,stroke:#fb923c,color:#7c2d12;
+  classDef server fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  class HTMLDoc,Bootstrap,ReactApp browser;
+  class FnReq,PageReq,RSCReq request;
+  class Dispatch,Renderers,FrameworkRuntime server;
 ```
 
 PPR 首屏不会要求浏览器再请求 region endpoint。框架服务端可以对 page route 使用
@@ -255,23 +293,33 @@ direct/debug 访问和 cache 验证使用。
 origin/FaaS 的 dynamic region endpoint。浏览器仍然只看到页面 route：
 
 ```mermaid
-sequenceDiagram
-  participant Browser
-  participant Edge as Edge/CDN
-  participant Origin as Internal FaaS / Origin
+flowchart TB
+  Browser["Browser\nGET /campaign"]
 
-  Browser->>Edge: GET /campaign
-  Edge->>Edge: load cached PPR shell
-  Edge->>Edge: read manifest PPR region metadata
-  Edge->>Origin: GET /__evjs/ppr/campaign/region_a1b2c3d4e5f6
-  Origin->>Origin: render/cache internal region
-  Origin-->>Edge: region HTML fragment + cache headers
-  Edge->>Edge: apply region cache policy
-  alt delivery = merge
-    Edge-->>Browser: complete composed HTML
-  else delivery = stream
-    Edge-->>Browser: shell HTML, then region patch in same response
+  subgraph Edge["Edge / CDN"]
+    Shell["cached PPR shell"]
+    Metadata["manifest region metadata"]
+    Delivery{"delivery mode"}
+    Merge["merge\ncomplete composed HTML"]
+    Stream["stream\nshell + region patch"]
   end
+
+  subgraph Origin["Internal FaaS / Origin"]
+    Region["render/cache region\n/__evjs/ppr/..."]
+  end
+
+  Browser --> Shell --> Metadata
+  Metadata -->|"server-to-server region request"| Region
+  Region -->|"HTML fragment + cache headers"| Delivery
+  Delivery -->|"merge"| Merge --> Browser
+  Delivery -->|"stream"| Stream --> Browser
+
+  classDef browser fill:#fff7ed,stroke:#fb923c,color:#7c2d12;
+  classDef edge fill:#eef6ff,stroke:#8fb5e8,color:#102a43;
+  classDef origin fill:#ecfdf5,stroke:#34d399,color:#064e3b;
+  class Browser browser;
+  class Shell,Metadata,Delivery,Merge,Stream edge;
+  class Region origin;
 ```
 
 因此 `GET /__evjs/ppr/...` 可能出现在 edge 到 origin 的服务端日志里，但不会出现在
