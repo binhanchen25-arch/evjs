@@ -36,6 +36,11 @@ export interface BundlerDevContext<TBundlerCfg = DefaultBundlerConfig>
   extends BundlerBuildContext<TBundlerCfg> {
   callbacks: {
     /**
+     * Called after the client development server is listening and framework
+     * dev artifacts have been emitted.
+     */
+    onDevServerReady?: (context: { origin: string }) => void | Promise<void>;
+    /**
      * Called by the bundler adapter after a dev compile has fresh build facts.
      * The ev orchestrator owns framework output linking, plugin output hooks,
      * manifest emission, and HTML emission.

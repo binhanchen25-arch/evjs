@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { BuildPlan } from "@evjs/shared/manifest";
+import { configureSync, resetSync } from "@logtape/logtape";
 import { execa } from "execa";
 import { describe, expect, it } from "vitest";
 import type {
@@ -4483,6 +4484,96 @@ describe("dev", () => {
 
     expect(events).toEqual(["entry:page-client", "routeTypes:false"]);
     expect(fs.existsSync(path.join(cwd, "src/route-types.d.ts"))).toBe(false);
+  });
+
+  it("logs every MPA page URL after starting dev", async () => {
+    const cwd = await createProject();
+    await fs.promises.mkdir(path.join(cwd, "src/pages/users"), {
+      recursive: true,
+    });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/index.tsx"),
+      "export default function Home() { return null; }",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/about.tsx"),
+      "export default function About() { return null; }",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/report.tsx"),
+      [
+        'export const render = "ssr";',
+        "export default function Report() { return null; }",
+      ].join("\n"),
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/users/$id.tsx"),
+      "export default function User() { return null; }",
+      "utf-8",
+    );
+
+    const logs: string[] = [];
+    configureSync({
+      reset: true,
+      sinks: {
+        memory(record) {
+          logs.push(record.message.map(String).join(""));
+        },
+      },
+      loggers: [
+        { category: ["logtape", "meta"], lowestLevel: "fatal" },
+        { category: ["evjs"], sinks: ["memory"], lowestLevel: "info" },
+      ],
+    });
+
+    const bundler: BundlerAdapter<Record<string, never>> = {
+      name: "mock",
+      async build() {
+        return {};
+      },
+      async dev({ callbacks }) {
+        await callbacks.onDevServerReady?.({
+          origin: "http://localhost:4123",
+        });
+        process.emit("SIGINT");
+      },
+    };
+
+    try {
+      await Promise.race([
+        dev(
+          {
+            output: { client: "dist" },
+            dev: { port: 4123 },
+            routing: { mode: "mpa" },
+          },
+          { cwd, bundler },
+        ),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error("dev startup timed out")),
+            devStartupTimeoutMs,
+          ),
+        ),
+      ]);
+    } finally {
+      resetSync();
+    }
+
+    expect(logs).toContain(
+      [
+        "Dev server ready:",
+        "  Local: http://localhost:4123",
+        "  Pages:",
+        "    index: http://localhost:4123/index.html",
+        "    about: http://localhost:4123/about.html",
+        "    users_id: http://localhost:4123/users_id.html",
+        "    report: http://localhost:4123/report",
+      ].join("\n"),
+    );
   });
 
   it("updates generated SPA route types when a nested page route is added during dev", async () => {

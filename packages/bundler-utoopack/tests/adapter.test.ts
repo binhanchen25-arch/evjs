@@ -29,7 +29,7 @@ import { utoopackAdapter } from "../src/adapter/index.js";
 
 const utoopackMock = vi.hoisted(() => ({
   requireUtoopack: vi.fn(() => ({
-    serve: vi.fn(async ({ config }) => {
+    serve: vi.fn(async ({ config }, _projectPath, _rootPath, serverOptions) => {
       const fs = await import("node:fs");
       const path = await import("node:path");
       const clientOutDir = config.output.path;
@@ -63,6 +63,10 @@ const utoopackMock = vi.hoisted(() => ({
           }),
         );
       }
+      await serverOptions?.onReady?.({
+        port: 3210,
+        hostname: "0.0.0.0",
+      });
     }),
     build: vi.fn(),
   })),
@@ -122,6 +126,7 @@ function createFrameworkCallbacks(options: {
   plan: BuildPlan;
   hooks?: PluginHooks<ConfigComplete>[];
   onBuildOutput?: (output: BuildOutput) => void | Promise<void>;
+  onDevServerReady?: (context: { origin: string }) => void | Promise<void>;
   onServerBundleReady?: () => void | Promise<void>;
 }) {
   let graph = options.graph;
@@ -230,6 +235,7 @@ function createFrameworkCallbacks(options: {
         await fs.promises.writeFile(outPath, finalHtml, "utf-8");
       }
     },
+    onDevServerReady: options.onDevServerReady,
     onServerBundleReady: options.onServerBundleReady ?? vi.fn(),
   };
 }
@@ -279,6 +285,7 @@ describe("utoopackAdapter dev", () => {
     const onBuildOutput = vi.fn((output: BuildOutput) => {
       output.assets.devHook = { js: ["dev-hook.js"], css: [] };
     });
+    const onDevServerReady = vi.fn();
     const buildContext = await createBuildContext(config, cwd);
     const hooks: PluginHooks<ConfigComplete>[] = [
       {
@@ -301,6 +308,7 @@ describe("utoopackAdapter dev", () => {
         ...buildContext,
         hooks,
         onBuildOutput,
+        onDevServerReady,
       }),
       hooks,
     });
@@ -320,6 +328,15 @@ describe("utoopackAdapter dev", () => {
       },
     });
     expect(onBuildOutput).toHaveBeenCalledTimes(1);
+    expect(onDevServerReady).toHaveBeenCalledWith({
+      origin: "http://localhost:3210",
+    });
+    const serve = utoopackMock.requireUtoopack.mock.results.at(-1)?.value.serve;
+    expect(serve.mock.calls.at(-1)?.[3]).toMatchObject({
+      port: 3000,
+      https: false,
+      logServerInfo: false,
+    });
     expect(onBuildOutput.mock.calls[0]?.[0].assets.devHook).toEqual({
       js: ["dev-hook.js"],
       css: [],

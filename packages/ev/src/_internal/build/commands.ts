@@ -2344,6 +2344,62 @@ function compareById<T extends { id: string }>(left: T, right: T): number {
   return left.id.localeCompare(right.id);
 }
 
+function formatDevServerReady(
+  context: { origin: string },
+  config: Pick<ResolvedConfig, "routing">,
+  plan: Pick<BuildPlan, "html">,
+): string {
+  const pageUrls = formatDevPageUrls(context.origin, config, plan);
+  if (!pageUrls) {
+    return `Dev server ready: ${context.origin}`;
+  }
+
+  return [
+    "Dev server ready:",
+    `  Local: ${context.origin}`,
+    "  Pages:",
+    ...pageUrls.map((page) => `    ${page.pageId}: ${page.url}`),
+  ].join("\n");
+}
+
+function formatDevPageUrls(
+  origin: string,
+  config: Pick<ResolvedConfig, "routing">,
+  plan: Pick<BuildPlan, "html">,
+): { pageId: string; url: string }[] | undefined {
+  if (config.routing?.mode !== "mpa") return undefined;
+
+  const htmlPageIds = new Set<string>();
+  const pageUrls = plan.html.flatMap((document) => {
+    const pageId = document.owner.pageId;
+    if (!pageId) return [];
+    htmlPageIds.add(pageId);
+    return [
+      {
+        pageId,
+        url: formatDevUrl(origin, `/${document.fileName}`),
+      },
+    ];
+  });
+
+  for (const route of config.routing.routes) {
+    if (route.kind === "layout" || htmlPageIds.has(route.id)) continue;
+    pageUrls.push({
+      pageId: route.id,
+      url: formatDevUrl(origin, route.path),
+    });
+  }
+
+  return pageUrls.length > 0 ? pageUrls : undefined;
+}
+
+function formatDevUrl(origin: string, pathname: string): string {
+  const pathWithLeadingSlash = pathname.startsWith("/")
+    ? pathname
+    : `/${pathname}`;
+  return `${origin}${encodeURI(pathWithLeadingSlash)}`;
+}
+
 function normalizeDiagnosticFile(file: string): string {
   return file.replace(/^\.\//, "");
 }
@@ -2713,6 +2769,13 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
         graph: activeAnalysis.graph,
         plan: activePlan,
         callbacks: {
+          onDevServerReady(context) {
+            logger.info`${formatDevServerReady(
+              context,
+              activeConfig,
+              activePlan,
+            )}`;
+          },
           async onBuildFacts(bundlerFacts, options) {
             const { frameworkRuntime } = await linkAndEmitBuildOutput({
               bundlerFacts,

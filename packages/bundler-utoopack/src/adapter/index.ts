@@ -100,11 +100,20 @@ export const utoopackAdapter: BundlerAdapter<ConfigComplete> = {
     logger.info`Starting development server with utoopack...`;
 
     const { serve } = requireUtoopack();
-    await serve({ config: utoopackConfig });
+    let devServerOrigin = formatDevServerOrigin(config, config.dev.port);
+    await serve({ config: utoopackConfig }, undefined, undefined, {
+      port: config.dev.port,
+      https: config.dev.https !== false,
+      logServerInfo: false,
+      onReady({ port, hostname }) {
+        devServerOrigin = formatDevServerOrigin(config, port, hostname);
+      },
+    });
 
     await generateDevArtifacts(config, cwd, plan, callbacks.onBuildFacts, {
       isRebuild: false,
     });
+    await callbacks.onDevServerReady?.({ origin: devServerOrigin });
     if (!hasRuntimeServerEntry(plan)) {
       return new UtoopackDevController({
         config,
@@ -162,6 +171,16 @@ function hasRuntimeServerEntry(plan: BuildPlan): boolean {
     (entry) =>
       entry.environment === "server" && entry.kind === "server-runtime",
   );
+}
+
+function formatDevServerOrigin(
+  config: ResolvedConfig<ConfigComplete>,
+  port: number,
+  hostname = "localhost",
+): string {
+  const protocol = config.dev.https ? "https" : "http";
+  const host = hostname === "0.0.0.0" ? "localhost" : hostname;
+  return `${protocol}://${host}:${port}`;
 }
 
 class UtoopackDevController implements BundlerDevController {
