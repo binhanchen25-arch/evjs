@@ -8,6 +8,24 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.10] — 2026-07-09
+
+### ✨ Improvements
+
+- **Generated contributions IR** — Added the `.ev` generated contributions layer for convention results, framework entry facades, plugin generated artifacts, slot attachments, import edges, and final manifest materialization.
+- **Plugin authoring API** — Exposed immutable framework IR views and contribution emitters from `@evjs/ev/plugin`, including `ctx.emit.entryFacade()` for entry-wrapper plugins.
+- **Prepare command** — Added `ev prepare` so projects can materialize `.ev` framework IR for inspection without running a full bundle.
+
+### 🐛 Bug Fixes
+
+- **MPA dev server output** — `ev dev` in MPA mode now prints one consolidated readiness block with every generated page URL and suppresses the duplicate Utoopack server banner.
+
+### 📝 Documentation
+
+- **Generated IR docs** — Added English and Chinese generated contributions docs, refreshed architecture/plugin/overview guidance, refined the docs homepage, and updated the plugin-authoring example.
+
+---
+
 ## [0.2.9] — 2026-07-07
 
 ### 🐛 Bug Fixes
