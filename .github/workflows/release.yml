@@ -3,6 +3,11 @@ name: Release
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, with or without the v prefix"
+        required: true
 
 jobs:
   release:
@@ -29,8 +34,10 @@ jobs:
         run: npm install
 
       - name: Sync version from release tag
+        env:
+          RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${RELEASE_VERSION#v}"
           npm pkg set version="${VERSION}" -ws --include-workspace-root
           npm run sync-release-dependencies -- --version "${VERSION}"
 
@@ -40,15 +47,16 @@ jobs:
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
         run: |
           node --input-type=module <<'NODE'
           import { spawnSync } from "node:child_process";
           import { existsSync, readFileSync, readdirSync } from "node:fs";
           import path from "node:path";
 
-          const version = process.env.GITHUB_REF_NAME?.replace(/^v/, "");
+          const version = process.env.RELEASE_VERSION?.replace(/^v/, "");
           if (!version) {
-            throw new Error("GITHUB_REF_NAME is required.");
+            throw new Error("RELEASE_VERSION is required.");
           }
 
           const workspacePackages = readdirSync("packages")
@@ -121,10 +129,23 @@ jobs:
             }
 
             console.log(`Publishing ${spec}...`);
+            const publishEnv = { ...process.env };
+            if (name === "@evjs/ev") {
+              delete publishEnv.NODE_AUTH_TOKEN;
+              delete publishEnv.NPM_CONFIG_USERCONFIG;
+            }
             const publishResult = spawnSync(
               "npm",
-              ["publish", "--workspace", workspacePackage.dir, "--access", "public"],
-              { stdio: "inherit" },
+              [
+                "publish",
+                "--workspace",
+                workspacePackage.dir,
+                "--access",
+                "public",
+                "--registry",
+                "https://registry.npmjs.org",
+              ],
+              { stdio: "inherit", env: publishEnv },
             );
             if (publishResult.status !== 0) {
               process.exit(publishResult.status ?? 1);
