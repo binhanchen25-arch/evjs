@@ -58,6 +58,36 @@ jobs:
           if (!version) {
             throw new Error("RELEASE_VERSION is required.");
           }
+          const registry = "https://registry.npmjs.org";
+
+          async function getGithubNpmIdToken() {
+            const requestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL;
+            const requestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+            if (!requestUrl || !requestToken) {
+              throw new Error(
+                "GitHub OIDC token request environment is unavailable.",
+              );
+            }
+
+            const url = new URL(requestUrl);
+            url.searchParams.append(
+              "audience",
+              `npm:${new URL(registry).hostname}`,
+            );
+            const response = await fetch(url, {
+              headers: {
+                Accept: "application/json",
+                Authorization: `Bearer ${requestToken}`,
+              },
+            });
+            const body = await response.json();
+            if (!response.ok || typeof body.value !== "string") {
+              throw new Error(
+                `Failed to retrieve GitHub OIDC token: ${response.status}`,
+              );
+            }
+            return body.value;
+          }
 
           const workspacePackages = readdirSync("packages")
             .map((name) => path.join("packages", name))
@@ -133,6 +163,7 @@ jobs:
             if (name === "@evjs/ev") {
               delete publishEnv.NODE_AUTH_TOKEN;
               delete publishEnv.NPM_CONFIG_USERCONFIG;
+              publishEnv.NPM_ID_TOKEN = await getGithubNpmIdToken();
             }
             const publishResult = spawnSync(
               "npm",
@@ -143,7 +174,7 @@ jobs:
                 "--access",
                 "public",
                 "--registry",
-                "https://registry.npmjs.org",
+                registry,
               ],
               { stdio: "inherit", env: publishEnv },
             );
