@@ -115,8 +115,9 @@ stub，`@evjs/ev/_internal/server/server-functions` 用于生成的 `"use server
 bootstrap。
 
 不要重新引入 `@evjs/build-tools`、`@evjs/manifest` 或 `@evjs/router-*`
-这类历史拆分包。构建 helper 从 `@evjs/ev/_internal/build` 导出，manifest
-契约从 `@evjs/shared/manifest` 导出。
+这类历史拆分包。面向下游工具的构建 helper 从 `@evjs/ev/build-tools` 导出；
+仓库内 CLI 和 adapter 使用 `@evjs/ev/_internal/build`。Manifest 契约从
+`@evjs/shared/manifest` 导出。
 
 文档中的代码示例也遵循同一包边界：file-convention 应用示例从 `@evjs/ev`、
 `@evjs/ev/route`、`@evjs/ev/server-context` 或 `@evjs/ev/transport` 导入；standalone
@@ -149,7 +150,7 @@ adapter 示例才直接导入 `@evjs/bundler-utoopack`。
 ```
 
 `@evjs/ev/_internal/build` 不 import bundler adapter。Bundler adapter 消费 `BuildPlan`，不会在 bundling 之后重新扫描源码来发现框架语义。
-`@evjs/ev/_internal/build` 子路径只暴露 CLI 和 bundler adapter 需要的 tooling API。
+`@evjs/ev/build-tools` 和 `@evjs/ev/_internal/build` 子路径只暴露 tooling API。
 底层 module export 解析、server-function ID hashing 和 module-ref helper
 保留为 `@evjs/ev` 私有实现。
 

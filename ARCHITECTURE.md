@@ -114,8 +114,9 @@ Do not reintroduce legacy split packages:
 @evjs/manifest     -> packages/shared/src/manifest
 ```
 
-Build helpers are exported from `@evjs/ev/_internal/build`, manifest contracts are
-exported from `@evjs/shared/manifest`, and generated page/shell/server-function
+Build helpers for downstream tooling are exported from `@evjs/ev/build-tools`;
+the repo's CLI and adapters use `@evjs/ev/_internal/build`. Manifest contracts
+are exported from `@evjs/shared/manifest`, and generated page/shell/server-function
 runtime primitives stay behind focused generated-only
 `@evjs/ev/_internal/*` subpaths.
 

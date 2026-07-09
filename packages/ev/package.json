@@ -53,6 +53,11 @@
       "import": "./esm/deployment/index.js",
       "default": "./esm/deployment/index.js"
     },
+    "./build-tools": {
+      "types": "./esm/build-tools/index.d.ts",
+      "import": "./esm/build-tools/index.js",
+      "default": "./esm/build-tools/index.js"
+    },
     "./_internal/build": {
       "types": "./esm/_internal/build/index.d.ts",
       "import": "./esm/_internal/build/index.js",

@@ -8,6 +8,14 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.11] — 2026-07-09
+
+### 🐛 Bug Fixes
+
+- **Build tools subpath** — Restored the public `@evjs/ev/build-tools` subpath so downstream tooling can continue importing helpers such as `loadConfigFile` without using `_internal` paths.
+
+---
+
 ## [0.2.10] — 2026-07-09
 
 ### ✨ Improvements

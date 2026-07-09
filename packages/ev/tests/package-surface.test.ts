@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import * as buildTools from "../src/_internal/build/index.js";
+import * as publicBuildTools from "../src/build-tools/index.js";
 import * as evRoot from "../src/index.js";
 
 const execFileAsync = promisify(execFile);
@@ -251,6 +252,7 @@ const expectedPackageExportSubpaths = {
     "./_internal/server/node",
     "./_internal/server/react",
     "./_internal/server/server-functions",
+    "./build-tools",
     "./config",
     "./deployment",
     "./navigation",
@@ -446,9 +448,13 @@ describe("workspace package surface", () => {
       import: "./esm/server-context/index.js",
       default: "./esm/server-context/index.js",
     });
+    expect(evPackageJson.exports?.["./build-tools"]).toEqual({
+      types: "./esm/build-tools/index.d.ts",
+      import: "./esm/build-tools/index.js",
+      default: "./esm/build-tools/index.js",
+    });
     expect(exportedSubpaths).not.toEqual(
       expect.arrayContaining([
-        "./build-tools",
         "./client",
         "./client/internal",
         "./client/internal/page-context",
@@ -561,11 +567,16 @@ describe("workspace package surface", () => {
     expect(violations).toEqual([]);
   });
 
-  it("keeps @evjs/ev/_internal/build limited to bundler and CLI tooling APIs", () => {
+  it("keeps @evjs/ev build-tool subpaths limited to tooling APIs", () => {
     const runtimeExports = Object.keys(buildTools).sort();
+    const publicRuntimeExports = Object.keys(publicBuildTools).sort();
 
     expect(runtimeExports).toEqual([...expectedBuildToolsRuntimeExports]);
+    expect(publicRuntimeExports).toEqual(runtimeExports);
     expect(runtimeExports).not.toEqual(
+      expect.arrayContaining([...privateBuildToolsRuntimeExports]),
+    );
+    expect(publicRuntimeExports).not.toEqual(
       expect.arrayContaining([...privateBuildToolsRuntimeExports]),
     );
   });
