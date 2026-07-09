@@ -176,6 +176,16 @@ const forbiddenPackageNames = [
   "@evjs/router-tanstack",
 ];
 
+const forbiddenBuildToolsLoadTimeImports = [
+  "react",
+  "react-dom",
+  "react-server-dom-webpack",
+  "@evjs/client",
+  "@evjs/server/react",
+  "@evjs/server/node",
+  "@evjs/server/fetch",
+] as const;
+
 const expectedBuildToolsRuntimeExports = [
   "GENERATED_IR_DIR",
   "GENERATED_IR_MANIFEST",
@@ -567,18 +577,25 @@ describe("workspace package surface", () => {
     expect(violations).toEqual([]);
   });
 
-  it("keeps @evjs/ev build-tool subpaths limited to tooling APIs", () => {
+  it("keeps @evjs/ev/_internal/build limited to bundler and CLI tooling APIs", () => {
     const runtimeExports = Object.keys(buildTools).sort();
-    const publicRuntimeExports = Object.keys(publicBuildTools).sort();
 
     expect(runtimeExports).toEqual([...expectedBuildToolsRuntimeExports]);
-    expect(publicRuntimeExports).toEqual(runtimeExports);
     expect(runtimeExports).not.toEqual(
       expect.arrayContaining([...privateBuildToolsRuntimeExports]),
     );
-    expect(publicRuntimeExports).not.toEqual(
-      expect.arrayContaining([...privateBuildToolsRuntimeExports]),
+  });
+
+  it("keeps @evjs/ev/build-tools narrowed to config loading", () => {
+    expect(Object.keys(publicBuildTools).sort()).toEqual(["loadConfigFile"]);
+  });
+
+  it("keeps @evjs/ev/build-tools load-time imports out of React runtimes", async () => {
+    const imports = await collectLoadTimeImportSpecifiers(
+      path.join(repoRoot, "packages/ev/src/build-tools/index.ts"),
     );
+
+    expect(imports.filter(isForbiddenBuildToolsLoadTimeImport)).toEqual([]);
   });
 
   it("does not keep @evjs/ev source shims for runtime packages", async () => {
@@ -1324,6 +1341,116 @@ function parseEvjsImportSpecifiers(source: string): string[] {
     ),
     (match) => match[1],
   );
+}
+
+async function collectLoadTimeImportSpecifiers(
+  entryFile: string,
+): Promise<string[]> {
+  const visited = new Set<string>();
+  const packageSpecifiers = new Set<string>();
+
+  async function visit(sourceFile: string): Promise<void> {
+    const normalizedSourceFile = path.normalize(sourceFile);
+    if (visited.has(normalizedSourceFile)) return;
+    visited.add(normalizedSourceFile);
+
+    const source = await fs.readFile(normalizedSourceFile, "utf-8");
+    for (const specifier of parseRuntimeImportSpecifiers(source)) {
+      if (specifier.startsWith(".")) {
+        const resolved = await resolveRelativeSourceImport(
+          normalizedSourceFile,
+          specifier,
+        );
+        if (resolved) {
+          await visit(resolved);
+        }
+        continue;
+      }
+
+      packageSpecifiers.add(specifier);
+    }
+  }
+
+  await visit(entryFile);
+  return [...packageSpecifiers].sort();
+}
+
+function parseRuntimeImportSpecifiers(source: string): string[] {
+  const specifiers: string[] = [];
+  const importPattern =
+    /^\s*import\s+(?!type\b)(?:[^"';]+?\s+from\s+)?["']([^"']+)["']/gm;
+  const exportPattern =
+    /^\s*export\s+(?!type\b)(?:[^"';]+?\s+from\s+)?["']([^"']+)["']/gm;
+
+  for (const match of source.matchAll(importPattern)) {
+    specifiers.push(match[1]);
+  }
+  for (const match of source.matchAll(exportPattern)) {
+    specifiers.push(match[1]);
+  }
+
+  return specifiers;
+}
+
+async function resolveRelativeSourceImport(
+  sourceFile: string,
+  specifier: string,
+): Promise<string | undefined> {
+  const absolutePath = path.resolve(path.dirname(sourceFile), specifier);
+  const candidates = sourceImportCandidates(absolutePath);
+
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
+function sourceImportCandidates(absolutePath: string): string[] {
+  const ext = path.extname(absolutePath);
+  if (ext) {
+    const withoutExt = absolutePath.slice(0, -ext.length);
+    return [
+      absolutePath,
+      `${withoutExt}.ts`,
+      `${withoutExt}.tsx`,
+      `${withoutExt}.mts`,
+      `${withoutExt}.cts`,
+      `${withoutExt}.js`,
+      `${withoutExt}.jsx`,
+      `${withoutExt}.mjs`,
+      `${withoutExt}.cjs`,
+    ];
+  }
+
+  return [
+    `${absolutePath}.ts`,
+    `${absolutePath}.tsx`,
+    `${absolutePath}.mts`,
+    `${absolutePath}.cts`,
+    `${absolutePath}.js`,
+    `${absolutePath}.jsx`,
+    `${absolutePath}.mjs`,
+    `${absolutePath}.cjs`,
+    path.join(absolutePath, "index.ts"),
+    path.join(absolutePath, "index.tsx"),
+    path.join(absolutePath, "index.js"),
+    path.join(absolutePath, "index.jsx"),
+  ];
+}
+
+function isForbiddenBuildToolsLoadTimeImport(specifier: string): boolean {
+  return forbiddenBuildToolsLoadTimeImports.some((forbiddenSpecifier) => {
+    if (forbiddenSpecifier.startsWith("@evjs/")) {
+      return specifier === forbiddenSpecifier;
+    }
+    return (
+      specifier === forbiddenSpecifier ||
+      specifier.startsWith(`${forbiddenSpecifier}/`)
+    );
+  });
 }
 
 function packageNameFromSpecifier(specifier: string): string {

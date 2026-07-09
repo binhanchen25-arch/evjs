@@ -24,7 +24,7 @@
 | `@evjs/bundler-utoopack` | `packages/bundler-utoopack` | Default Utoopack adapter; consumes `BuildPlan` and links `BuildOutput` where supported |
 | `@evjs/bundler-webpack` | `packages/bundler-webpack` | Validation/fallback adapter for new architecture features that Utoopack cannot build yet |
 
-`packages/build-tools` and `packages/manifest` no longer exist as public workspace packages. Build-tool helpers live in `packages/ev/src/_internal/build` and are exposed to downstream tooling through `@evjs/ev/build-tools`; manifest schemas/linkers live under `packages/shared/src/manifest`.
+`packages/build-tools` and `packages/manifest` no longer exist as public workspace packages. Build-tool helpers live in `packages/ev/src/_internal/build`; downstream tooling that only needs config loading can use `@evjs/ev/build-tools`. Manifest schemas/linkers live under `packages/shared/src/manifest`.
 
 ## Core Principles
 
@@ -89,7 +89,7 @@ and adapters depend on `@evjs/ev` instead of on each other.
    functions or supported named async values.
 6. Use `ev.config.ts`; new docs should import `defineConfig` from `@evjs/ev`.
 7. Simple config imports stay on `@evjs/ev`. Advanced config utilities use
-   `@evjs/ev/config`, plugin authoring details use `@evjs/ev/plugin`, build tooling consumers use `@evjs/ev/build-tools`, and
+   `@evjs/ev/config`, plugin authoring details use `@evjs/ev/plugin`, config-loading tooling can use `@evjs/ev/build-tools`, and
    CLI/adapter/generated code uses `@evjs/ev/_internal/*`. File-convention app source imports
    route data helpers from `@evjs/ev/route`, navigation helpers from `@evjs/ev/navigation`, query helpers from `@evjs/ev/query`, request helpers from `@evjs/ev/server-context`,
    and custom transport helpers from `@evjs/ev/transport`; standalone/manual

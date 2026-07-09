@@ -130,9 +130,9 @@ client stubs, `@evjs/ev/_internal/server/server-functions` for generated
 `@evjs/ev/_internal/client/rsc-runtime` for RSC page bootstraps.
 
 Do not reintroduce legacy split packages such as `@evjs/build-tools`,
-`@evjs/manifest`, or `@evjs/router-*`. Build helpers for downstream tooling are
-exported from `@evjs/ev/build-tools`; the repo's CLI and adapters use
-`@evjs/ev/_internal/build`. Manifest contracts are exported from
+`@evjs/manifest`, or `@evjs/router-*`. The public `@evjs/ev/build-tools`
+subpath exposes the config loader for downstream tooling; the repo's CLI and
+adapters use `@evjs/ev/_internal/build`. Manifest contracts are exported from
 `@evjs/shared/manifest`.
 
 Documentation code examples follow the same package boundary: file-convention
@@ -168,8 +168,8 @@ import from `@evjs/client` or `@evjs/server`; adapter examples may import
 ```
 
 `@evjs/ev/_internal/build` does not import bundler adapters. Bundler adapters consume `BuildPlan`; they do not rediscover framework semantics from source files after bundling.
-The `@evjs/ev/build-tools` and `@evjs/ev/_internal/build` subpaths are limited to
-tooling APIs. Low-level module export parsing, server-function ID
+The public `@evjs/ev/build-tools` subpath stays limited to config loading, while
+`@evjs/ev/_internal/build` is limited to CLI and adapter tooling APIs. Low-level module export parsing, server-function ID
 hashing, and module-ref helpers stay private to `@evjs/ev`.
 
 ## Build Flow

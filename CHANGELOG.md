@@ -8,6 +8,14 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.12] — 2026-07-09
+
+### 🐛 Bug Fixes
+
+- **Build tools config loader** — Narrowed the public `@evjs/ev/build-tools` subpath to `loadConfigFile` and deferred the React framework server import used for SSG prerendering, keeping config loading usable without loading React runtimes at module import time.
+
+---
+
 ## [0.2.11] — 2026-07-09
 
 ### 🐛 Bug Fixes

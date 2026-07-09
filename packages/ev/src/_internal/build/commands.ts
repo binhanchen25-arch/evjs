@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { createApp } from "@evjs/server/app";
-import { createReactFrameworkServer } from "@evjs/server/react";
 import type {
   AppGraph,
   BuildOutput,
@@ -1455,6 +1454,7 @@ async function prerenderStaticPageHtml(options: {
   const pathname = findStaticPagePath(output, html.pageId, page);
   if (!page || !pathname) return;
 
+  const { createReactFrameworkServer } = await import("@evjs/server/react");
   const framework = createReactFrameworkServer({
     runtime: frameworkRuntime,
     loadModule: async (asset) =>
