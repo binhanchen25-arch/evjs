@@ -1392,6 +1392,8 @@ async function renderPprPageResponse(
 
   if (request.method === "HEAD") {
     const headers = new Headers(response.headers);
+    removeStaleBodyHeaders(headers);
+    headers.set("Content-Type", TEXT_HTML_UTF8_CONTENT_TYPE);
     applyDefaultPprPageCacheHeaders(headers, page, options);
     return new Response(null, {
       status: response.status,
@@ -1451,6 +1453,7 @@ async function renderPprMergedPageResponse(
   }
 
   const headers = new Headers(response.headers);
+  removeStaleBodyHeaders(headers);
   headers.set("Content-Type", TEXT_HTML_UTF8_CONTENT_TYPE);
   applyDefaultPprPageCacheHeaders(headers, page, options);
   if (!changed) {
@@ -1482,6 +1485,7 @@ async function renderPprStreamingPageResponse(
   const html = await response.text();
   const { head, tail } = splitHtmlForPprStream(html);
   const headers = new Headers(response.headers);
+  removeStaleBodyHeaders(headers);
   headers.set("Content-Type", TEXT_HTML_UTF8_CONTENT_TYPE);
   applyDefaultPprPageCacheHeaders(headers, page, options);
   headers.set("x-evjs-ppr", "stream");
@@ -2566,6 +2570,7 @@ async function normalizePprRegionResponse(
   }
 
   headers.set("Content-Type", TEXT_HTML_UTF8_CONTENT_TYPE);
+  removeStaleBodyHeaders(headers);
   if (!options.readBody) {
     return new Response(response.body, {
       status: response.status,
@@ -2580,6 +2585,18 @@ async function normalizePprRegionResponse(
     statusText: response.statusText,
     headers,
   });
+}
+
+function removeStaleBodyHeaders(headers: Headers): void {
+  for (const name of [
+    "Content-Encoding",
+    "Content-Length",
+    "Content-MD5",
+    "Digest",
+    "ETag",
+  ]) {
+    headers.delete(name);
+  }
 }
 
 function extractPprRegionFragment(html: string): string {

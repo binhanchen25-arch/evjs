@@ -60,6 +60,12 @@ export interface GraphAnalysisResult {
   fileDependencies: string[];
 }
 
+export interface CreateAppGraphOptions {
+  resolve?: {
+    alias?: Record<string, string>;
+  };
+}
+
 export interface Diagnostic {
   level: "warning" | "error";
   message: string;
@@ -136,6 +142,7 @@ type PprRegionConfigMap = NonNullable<PprConfig["regions"]>;
 export async function createAppGraph(
   config: GraphConfig,
   cwd: string,
+  options: CreateAppGraphOptions = {},
 ): Promise<GraphAnalysisResult> {
   const diagnostics: Diagnostic[] = [];
   const configuredPageRoutes = validateConfiguredPageRoutes(
@@ -162,6 +169,7 @@ export async function createAppGraph(
     config,
     cwd,
     sourceCache,
+    options.resolve?.alias,
   );
   diagnostics.push(...sourceFiles.diagnostics);
   graph.apps = createAppNodes(config);
@@ -352,6 +360,7 @@ export async function createAppGraph(
     sourceCache,
     diagnostics,
     fileDependencies,
+    options.resolve?.alias,
   );
   validateGraphPageContracts(graph, diagnostics);
   graph.serverRoutes = [...serverRoutes.values()];
@@ -572,6 +581,7 @@ async function mergePprRegionsFromPageModules(
   sourceCache: Map<string, string>,
   diagnostics: Diagnostic[],
   fileDependencies: Set<string>,
+  aliases?: Record<string, string>,
 ) {
   for (const page of Object.values(graph.pages)) {
     if (!page.ppr || !page.component) continue;
@@ -584,6 +594,7 @@ async function mergePprRegionsFromPageModules(
       root,
       sourceCache,
       fileDependencies,
+      aliases,
     );
     diagnostics.push(...analysis.diagnostics);
 
@@ -609,6 +620,7 @@ async function collectPprRegionsFromPageClosure(
   root: string,
   sourceCache: Map<string, string>,
   fileDependencies: Set<string>,
+  aliases?: Record<string, string>,
 ): Promise<{
   regions: PprRegionConfigMap;
   diagnostics: Diagnostic[];
@@ -651,8 +663,13 @@ async function collectPprRegionsFromPageClosure(
       regions[id] = region;
     }
 
-    for (const specifier of extractStaticImportSpecifiers(source)) {
-      const dependency = await resolveSourceImport(cwd, file, specifier);
+    for (const specifier of extractStaticImportSpecifiers(source, aliases)) {
+      const dependency = await resolveSourceImport(
+        cwd,
+        file,
+        specifier,
+        aliases,
+      );
       if (dependency) {
         await visit(dependency);
       }
@@ -1303,6 +1320,7 @@ async function collectFrameworkSourceFiles(
   config: GraphConfig,
   cwd: string,
   sourceCache: Map<string, string>,
+  aliases?: Record<string, string>,
 ): Promise<FrameworkSourceFiles> {
   const files = new Set<string>();
   const roots = new Set<string>();
@@ -1430,7 +1448,7 @@ async function collectFrameworkSourceFiles(
     );
   }
   for (const root of roots) {
-    await collectStaticImportClosure(files, cwd, root, sourceCache);
+    await collectStaticImportClosure(files, cwd, root, sourceCache, aliases);
   }
 
   return {
@@ -1525,6 +1543,7 @@ async function collectStaticImportClosure(
   cwd: string,
   file: string,
   sourceCache: Map<string, string>,
+  aliases?: Record<string, string>,
 ) {
   if (files.has(file)) return;
   files.add(file);
@@ -1537,31 +1556,43 @@ async function collectStaticImportClosure(
     return;
   }
 
-  for (const specifier of extractStaticImportSpecifiers(source)) {
-    const dependency = await resolveSourceImport(cwd, file, specifier);
+  for (const specifier of extractStaticImportSpecifiers(source, aliases)) {
+    const dependency = await resolveSourceImport(cwd, file, specifier, aliases);
     if (dependency) {
-      await collectStaticImportClosure(files, cwd, dependency, sourceCache);
+      await collectStaticImportClosure(
+        files,
+        cwd,
+        dependency,
+        sourceCache,
+        aliases,
+      );
     }
   }
 }
 
-function extractStaticImportSpecifiers(source: string): string[] {
+function extractStaticImportSpecifiers(
+  source: string,
+  aliases?: Record<string, string>,
+): string[] {
   const specifiers = new Set<string>();
   for (const specifier of extractParsedStaticImportSpecifiers(source)) {
     specifiers.add(specifier);
   }
-  for (const specifier of extractDynamicImportSpecifiers(source)) {
-    specifiers.add(specifier);
-  }
 
-  return [...specifiers].filter(isLocalSourceImportSpecifier);
+  return [...specifiers].filter((specifier) =>
+    isLocalSourceImportSpecifier(specifier, aliases),
+  );
 }
 
-function isLocalSourceImportSpecifier(specifier: string): boolean {
+function isLocalSourceImportSpecifier(
+  specifier: string,
+  aliases?: Record<string, string>,
+): boolean {
   return (
     specifier.startsWith(".") ||
     specifier === DEFAULT_SOURCE_ALIAS.slice(0, -1) ||
-    specifier.startsWith(DEFAULT_SOURCE_ALIAS)
+    specifier.startsWith(DEFAULT_SOURCE_ALIAS) ||
+    findMatchingSourceAlias(specifier, aliases) !== undefined
   );
 }
 
@@ -1572,22 +1603,97 @@ function extractParsedStaticImportSpecifiers(source: string): string[] {
       tsx: true,
       target: "esnext",
     });
-    return ast.body.flatMap(getStaticModuleSpecifier);
+    return [
+      ...ast.body.flatMap(getStaticModuleSpecifier),
+      ...extractParsedDynamicImportSpecifiers(ast),
+    ];
   } catch {
-    return extractStaticImportSpecifiersWithRegex(source);
+    return [
+      ...extractStaticImportSpecifiersWithRegex(source),
+      ...extractDynamicImportSpecifiersWithRegex(source),
+    ];
   }
 }
 
 function getStaticModuleSpecifier(item: ModuleItem): string[] {
-  if (item.type === "ImportDeclaration") return [item.source.value];
-  if (item.type === "ExportNamedDeclaration" && item.source) {
+  if (item.type === "ImportDeclaration") {
+    if (
+      item.typeOnly ||
+      (item.specifiers.length > 0 &&
+        item.specifiers.every(
+          (specifier) =>
+            specifier.type === "ImportSpecifier" && specifier.isTypeOnly,
+        ))
+    ) {
+      return [];
+    }
     return [item.source.value];
   }
-  if (item.type === "ExportAllDeclaration") return [item.source.value];
+  if (item.type === "ExportNamedDeclaration" && item.source) {
+    if (
+      item.typeOnly ||
+      (item.specifiers.length > 0 &&
+        item.specifiers.every(
+          (specifier) =>
+            specifier.type === "ExportSpecifier" && specifier.isTypeOnly,
+        ))
+    ) {
+      return [];
+    }
+    return [item.source.value];
+  }
+  if (item.type === "ExportAllDeclaration") {
+    return "typeOnly" in item && item.typeOnly ? [] : [item.source.value];
+  }
   return [];
 }
 
-function extractDynamicImportSpecifiers(source: string): string[] {
+function extractParsedDynamicImportSpecifiers(ast: unknown): string[] {
+  const specifiers = new Set<string>();
+
+  function visit(value: unknown): void {
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (!isAstRecord(value)) return;
+    if (value.type === "TsImportType") return;
+
+    const specifier = getRuntimeDynamicImportSpecifier(value);
+    if (specifier) specifiers.add(specifier);
+    for (const child of Object.values(value)) visit(child);
+  }
+
+  visit(ast);
+  return [...specifiers];
+}
+
+function getRuntimeDynamicImportSpecifier(
+  expression: Record<string, unknown>,
+): string | undefined {
+  if (expression.type !== "CallExpression") return undefined;
+  if (!isAstRecord(expression.callee) || expression.callee.type !== "Import") {
+    return undefined;
+  }
+  if (!Array.isArray(expression.arguments)) return undefined;
+
+  const firstArgument = expression.arguments[0];
+  if (!isAstRecord(firstArgument) || firstArgument.spread) return undefined;
+  if (
+    !isAstRecord(firstArgument.expression) ||
+    firstArgument.expression.type !== "StringLiteral" ||
+    typeof firstArgument.expression.value !== "string"
+  ) {
+    return undefined;
+  }
+  return firstArgument.expression.value;
+}
+
+function isAstRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+function extractDynamicImportSpecifiersWithRegex(source: string): string[] {
   const specifiers: string[] = [];
   const importPattern = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g;
 
@@ -1602,7 +1708,7 @@ function extractDynamicImportSpecifiers(source: string): string[] {
 function extractStaticImportSpecifiersWithRegex(source: string): string[] {
   const specifiers: string[] = [];
   const importPattern =
-    /\bimport\s+(?:[^'"]*?\s+from\s+)?["']([^"']+)["']|\bexport\s+[^'"]*?\s+from\s+["']([^"']+)["']/g;
+    /\bimport\s+(?!type\b)(?:[^'"]*?\s+from\s+)?["']([^"']+)["']|\bexport\s+(?!type\b)[^'"]*?\s+from\s+["']([^"']+)["']/g;
 
   for (const match of source.matchAll(importPattern)) {
     const specifier = match[1] ?? match[2];
@@ -1620,7 +1726,13 @@ async function resolveSourceImport(
   cwd: string,
   fromFile: string,
   specifier: string,
+  aliases?: Record<string, string>,
 ): Promise<string | undefined> {
+  const alias = findMatchingSourceAlias(specifier, aliases);
+  if (alias) {
+    const suffix = specifier.slice(alias.specifier.length).replace(/^\//, "");
+    return resolveSourcePath(cwd, path.resolve(cwd, alias.replacement, suffix));
+  }
   if (specifier === DEFAULT_SOURCE_ALIAS.slice(0, -1)) {
     return resolveSourcePath(cwd, path.resolve(cwd, "src"));
   }
@@ -1634,6 +1746,21 @@ async function resolveSourceImport(
     cwd,
     path.resolve(path.dirname(fromFile), specifier),
   );
+}
+
+function findMatchingSourceAlias(
+  specifier: string,
+  aliases?: Record<string, string>,
+): { specifier: string; replacement: string } | undefined {
+  if (!aliases) return undefined;
+  let match: { specifier: string; replacement: string } | undefined;
+  for (const [alias, replacement] of Object.entries(aliases)) {
+    if (specifier !== alias && !specifier.startsWith(`${alias}/`)) continue;
+    if (!match || alias.length > match.specifier.length) {
+      match = { specifier: alias, replacement };
+    }
+  }
+  return match;
 }
 
 async function resolveSourcePath(

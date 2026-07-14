@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { BuildPlan } from "@evjs/shared/manifest";
+import type { AppGraph, BuildPlan } from "@evjs/shared/manifest";
 import { configureSync, resetSync } from "@logtape/logtape";
 import { execa } from "execa";
 import { describe, expect, it } from "vitest";
@@ -366,6 +366,79 @@ describe("prepareFrameworkBuild", () => {
     ]);
   });
 
+  it("rolls back earlier plugin setups when a later setup fails", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+
+    await expect(
+      prepareFrameworkBuild(
+        {
+          output: { client: "dist" },
+          plugins: [
+            {
+              name: "first",
+              setup() {
+                events.push("setup:first");
+                return {
+                  dispose() {
+                    events.push("dispose:first");
+                  },
+                };
+              },
+            },
+            {
+              name: "second",
+              setup() {
+                events.push("setup:second");
+                throw new Error("setup blocked");
+              },
+            },
+          ],
+        },
+        { cwd },
+      ),
+    ).rejects.toThrow("setup blocked");
+
+    expect(events).toEqual(["setup:first", "setup:second", "dispose:first"]);
+  });
+
+  it("disposes plugins in reverse order and continues after failures", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const prepared = await prepareFrameworkBuild(
+      {
+        output: { client: "dist" },
+        plugins: [
+          {
+            name: "first",
+            setup() {
+              return {
+                dispose() {
+                  events.push("dispose:first");
+                },
+              };
+            },
+          },
+          {
+            name: "second",
+            setup() {
+              return {
+                dispose() {
+                  events.push("dispose:second");
+                  throw new Error("dispose blocked");
+                },
+              };
+            },
+          },
+        ],
+      },
+      { cwd },
+    );
+
+    await expect(prepared.dispose()).rejects.toThrow("dispose blocked");
+    expect(events).toEqual(["dispose:second", "dispose:first"]);
+  });
+
   it("generates .ev framework IR and plugin contributions", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src"), { recursive: true });
@@ -706,6 +779,76 @@ describe("prepareFrameworkBuild", () => {
       ),
     ).toBeLessThan(mainEntry.indexOf("../../src/main"));
 
+    await prepared.dispose();
+  });
+
+  it("uses contributed source aliases during framework graph analysis", async () => {
+    const cwd = await createProject();
+    await fs.promises.mkdir(path.join(cwd, "src/features/orders"), {
+      recursive: true,
+    });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/main.tsx"),
+      [
+        'import { saveOrder } from "@features/orders/actions";',
+        'import { saveProject } from "@project/src/project-actions";',
+        "void saveOrder();",
+        "void saveProject();",
+      ].join("\n"),
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/features/orders/actions.ts"),
+      '"use server"; export async function saveOrder() { return { ok: true }; }',
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/project-actions.ts"),
+      '"use server"; export async function saveProject() { return { ok: true }; }',
+      "utf-8",
+    );
+    const plugin: Plugin<Record<string, never>> = {
+      name: "source-alias",
+      contributions(ctx) {
+        ctx.slot("resolve.alias").add({
+          id: "features",
+          specifier: "@features",
+          replacement: "./src/features",
+        });
+        ctx.slot("resolve.alias").add({
+          id: "project",
+          specifier: "@project",
+          replacement: ".",
+        });
+      },
+    };
+
+    const prepared = await prepareFrameworkBuild(
+      {
+        output: { client: "dist" },
+        plugins: [plugin],
+      },
+      { cwd },
+    );
+    const generatedGraph = JSON.parse(
+      await fs.promises.readFile(
+        path.join(cwd, ".ev/framework/app-graph.json"),
+        "utf-8",
+      ),
+    ) as { graph: AppGraph };
+
+    expect(generatedGraph.graph.serverFunctions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          module: "src/features/orders/actions.ts",
+          exportName: "saveOrder",
+        }),
+        expect.objectContaining({
+          module: "src/project-actions.ts",
+          exportName: "saveProject",
+        }),
+      ]),
+    );
     await prepared.dispose();
   });
 
@@ -4395,6 +4538,83 @@ describe("dev", () => {
     ).rejects.toThrow("[evjs] options.bundler.build must be a function.");
   });
 
+  it("disposes plugins when dev initialization fails", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler = createMockBundler(events);
+
+    await expect(
+      dev(
+        {
+          output: { client: "dist" },
+          plugins: [
+            {
+              name: "failing-start",
+              setup() {
+                return {
+                  buildStart() {
+                    throw new Error("start blocked");
+                  },
+                  dispose() {
+                    events.push("dispose");
+                  },
+                };
+              },
+            },
+          ],
+        },
+        { cwd, bundler },
+      ),
+    ).rejects.toThrow("start blocked");
+
+    expect(events).toEqual(["dispose"]);
+  });
+
+  it("continues dev cleanup when the bundler close hook fails", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const bundler: BundlerAdapter<Record<string, never>> = {
+      name: "mock",
+      async build() {
+        return {};
+      },
+      async dev() {
+        events.push("bundler.dev");
+        process.emit("SIGINT");
+        return {
+          async updatePlan() {},
+          close() {
+            events.push("bundler.close");
+            throw new Error("close blocked");
+          },
+        };
+      },
+    };
+
+    await expect(
+      dev(
+        {
+          output: { client: "dist" },
+          plugins: [
+            {
+              name: "cleanup",
+              setup() {
+                return {
+                  dispose() {
+                    events.push("dispose");
+                  },
+                };
+              },
+            },
+          ],
+        },
+        { cwd, bundler },
+      ),
+    ).rejects.toThrow("close blocked");
+
+    expect(events).toEqual(["bundler.dev", "bundler.close", "dispose"]);
+  });
+
   it("writes generated SPA route types before starting the dev bundler", async () => {
     const cwd = await createProject();
     await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
@@ -4837,6 +5057,11 @@ describe("dev", () => {
       "export default { pages: { home: './src/pages/Home.tsx', orders: './src/pages/Orders.tsx' } };",
       "utf-8",
     );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/Home.tsx"),
+      "export default function Home() { return <main>Home</main>; }",
+      "utf-8",
+    );
 
     await Promise.race([
       running,
@@ -4932,6 +5157,11 @@ describe("dev", () => {
       "export default { pages: { home: './src/pages/Home.tsx', orders: './src/pages/Orders.tsx' } };",
       "utf-8",
     );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/Home.tsx"),
+      "export default function Home() { return <main>Updated</main>; }",
+      "utf-8",
+    );
 
     await Promise.race([
       running,
@@ -4949,5 +5179,135 @@ describe("dev", () => {
       "dispose:v1",
       "dispose:v2",
     ]);
+  });
+
+  it("refreshes plugin watch files after committed plugin cleanup fails", async () => {
+    const cwd = await createProject();
+    await fs.promises.mkdir(path.join(cwd, "src/pages"), { recursive: true });
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/Home.tsx"),
+      "export default function Home() { return null; }",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "src/pages/Orders.tsx"),
+      "export default function Orders() { return null; }",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "ev.config.ts"),
+      "export default {};",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "old-watch.txt"),
+      "old",
+      "utf-8",
+    );
+    await fs.promises.writeFile(
+      path.join(cwd, "new-watch.txt"),
+      "new",
+      "utf-8",
+    );
+
+    const events: string[] = [];
+    function createPlugin(
+      label: string,
+      watchFile: string,
+      failDispose = false,
+    ): Plugin<Record<string, never>> {
+      return {
+        name: "same-name-plugin",
+        setup(ctx) {
+          ctx.addWatchFile(`./${watchFile}`);
+          events.push(`setup:${label}`);
+          return {
+            dispose() {
+              events.push(`dispose:${label}`);
+              if (failDispose) throw new Error(`${label} dispose blocked`);
+            },
+          };
+        },
+      };
+    }
+
+    let currentConfig: Config<Record<string, never>> = {
+      output: { client: "dist" },
+      pages: { home: "./src/pages/Home.tsx" },
+      plugins: [createPlugin("old", "old-watch.txt", true)],
+    };
+    const bundler: BundlerAdapter<Record<string, never>> = {
+      name: "mock",
+      async build() {
+        return {};
+      },
+      async dev() {
+        events.push("bundler.dev");
+        return {
+          async updatePlan(update) {
+            events.push(
+              `update:${update.entries.added.map((entry) => entry.name).join(",")}`,
+            );
+          },
+        };
+      },
+    };
+    let loadCount = 0;
+    const running = dev(currentConfig, {
+      cwd,
+      bundler,
+      loadConfig() {
+        loadCount += 1;
+        events.push(`load:${loadCount}`);
+        return currentConfig;
+      },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    currentConfig = {
+      ...currentConfig,
+      pages: {
+        ...currentConfig.pages,
+        orders: "./src/pages/Orders.tsx",
+      },
+      plugins: [createPlugin("new", "new-watch.txt")],
+    };
+    await fs.promises.writeFile(
+      path.join(cwd, "ev.config.ts"),
+      "export default { pages: { home: './src/pages/Home.tsx', orders: './src/pages/Orders.tsx' } };",
+      "utf-8",
+    );
+    await waitForEvent(events, "update:orders");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const loadCountBeforeNewWatch = loadCount;
+    await fs.promises.writeFile(
+      path.join(cwd, "new-watch.txt"),
+      "changed",
+      "utf-8",
+    );
+    await waitForEvent(events, `load:${loadCountBeforeNewWatch + 1}`);
+    process.emit("SIGINT");
+
+    await Promise.race([
+      running,
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("dev shutdown timed out")),
+          devUpdateTimeoutMs,
+        ),
+      ),
+    ]);
+
+    expect(events).toEqual(
+      expect.arrayContaining([
+        "setup:old",
+        "bundler.dev",
+        "setup:new",
+        "update:orders",
+        "dispose:old",
+        "dispose:new",
+      ]),
+    );
   });
 });
