@@ -8,6 +8,14 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ---
 
+## [0.2.13] — 2026-07-20
+
+### 🐛 Bug Fixes
+
+- **Utoopack Less support** — Pinned `less` and `less-loader` in `@evjs/bundler-utoopack` and wired the bundled implementation into the generated loader config so Less styles build consistently.
+
+---
+
 ## [0.2.12] — 2026-07-09
 
 ### 🐛 Bug Fixes
