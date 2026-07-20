@@ -12,7 +12,9 @@ All notable changes to evjs are documented here. Releases follow [Semantic Versi
 
 ### 🐛 Bug Fixes
 
+- **Framework build lifecycle** — Hardened framework build and rendering lifecycle handling across generated client and server runtimes.
 - **Utoopack Less support** — Pinned `less` and `less-loader` in `@evjs/bundler-utoopack` and wired the bundled implementation into the generated loader config so Less styles build consistently.
+- **Qiankun Utoopack slave builds** — Stopped configuring Utoopack client entries as UMD libraries, exposed qiankun lifecycle methods through the application global, and injected a lifecycle proxy before the HTML entry so server assets are emitted correctly.
 
 ---
 
