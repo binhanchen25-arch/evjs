@@ -17,7 +17,7 @@ import {
   resolveConfig,
 } from "../../config/index.js";
 import {
-  type CliContext,
+  type CliFlags,
   createBuildResult,
   type PluginContext,
   type PluginHooks,
@@ -64,14 +64,14 @@ const logger = getLogger(["evjs", "ev"]);
 const DEV_PAGE_RENDER_PROXY_HEADER = "x-evjs-dev-page-render";
 const DEV_DIST_DIR = "dist";
 
-function createDefaultCliContext(): CliContext {
-  return { flags: {} };
+function createDefaultCliFlags(): CliFlags {
+  return {};
 }
 
 export interface DevOptions<TBundlerCfg = DefaultBundlerConfig> {
   cwd?: string;
   bundler?: BundlerAdapter<TBundlerCfg>;
-  cli?: CliContext;
+  flags?: CliFlags;
   loadConfig?: (
     cwd: string,
   ) =>
@@ -83,14 +83,14 @@ export interface DevOptions<TBundlerCfg = DefaultBundlerConfig> {
 export interface BuildOptions<TBundlerCfg = DefaultBundlerConfig> {
   cwd?: string;
   bundler?: BundlerAdapter<TBundlerCfg>;
-  cli?: CliContext;
+  flags?: CliFlags;
 }
 
 export interface PrepareFrameworkBuildOptions<
   TBundlerCfg = DefaultBundlerConfig,
 > {
   cwd?: string;
-  cli?: CliContext;
+  flags?: CliFlags;
   mode?: "development" | "production";
   command?: "dev" | "build";
   bundler?: BundlerAdapter<TBundlerCfg>;
@@ -244,12 +244,12 @@ async function prepareInternalFrameworkBuild<
     );
   }
   const mode = options.mode ?? expectedMode;
-  const cli = options.cli ?? createDefaultCliContext();
+  const flags = options.flags ?? createDefaultCliFlags();
   const configuredConfig = await runConfigHooks(userConfig, {
     mode,
     command,
     cwd,
-    cli,
+    flags,
   });
   const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
@@ -289,7 +289,7 @@ async function prepareInternalFrameworkBuild<
     command,
     cwd,
     config,
-    cli,
+    flags,
     logger,
     addWatchFile(file) {
       pluginWatchFiles.add(path.resolve(cwd, file));
@@ -417,13 +417,13 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
   options?: DevOptions<TBundlerCfg>,
 ): Promise<void> {
   const cwd = options?.cwd ?? process.cwd();
-  const cli = options?.cli ?? createDefaultCliContext();
+  const flags = options?.flags ?? createDefaultCliFlags();
   process.env.NODE_ENV ??= "development";
   const configuredConfig = await runConfigHooks(userConfig, {
     mode: "development",
     command: "dev",
     cwd,
-    cli,
+    flags,
   });
   const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
@@ -456,7 +456,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
     command: "dev",
     cwd,
     config: activeConfig,
-    cli,
+    flags,
     logger,
     addWatchFile,
   };
@@ -599,7 +599,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
       mode: "development",
       command: "dev",
       cwd,
-      cli,
+      flags,
     });
     const nextPageResolvedConfig = await withPageRoutingDefaults(
       resolveConfig(nextConfiguredConfig),
@@ -868,7 +868,7 @@ export async function build<TBundlerCfg = DefaultBundlerConfig>(
     mode: "production",
     command: "build",
     bundler: options?.bundler,
-    cli: options?.cli,
+    flags: options?.flags,
     requireBundler: true,
   });
   const bundler = prepared.config.bundler;

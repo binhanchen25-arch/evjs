@@ -209,7 +209,7 @@ function createFrameworkCallbacks(options: {
             command: "dev",
             cwd: options.cwd,
             config: options.config,
-            cli: { flags: {} },
+            flags: {},
             logger: console as never,
             addWatchFile() {},
           },

@@ -61,7 +61,7 @@ const CTX: PluginContext = {
   command: "build",
   cwd: process.cwd(),
   config: TEST_CONFIG,
-  cli: { flags: {} },
+  flags: {},
   logger: getLogger(["evjs", "test"]),
   addWatchFile() {},
 };
@@ -142,7 +142,7 @@ describe("resolveConfig", () => {
       command: "build",
       cwd: process.cwd(),
       config,
-      cli: { flags: {} },
+      flags: {},
       logger: getLogger(["evjs", "test"]),
       addWatchFile() {},
     });
