@@ -64,10 +64,6 @@ const logger = getLogger(["evjs", "ev"]);
 const DEV_PAGE_RENDER_PROXY_HEADER = "x-evjs-dev-page-render";
 const DEV_DIST_DIR = "dist";
 
-function createDefaultCliFlags(): CliFlags {
-  return {};
-}
-
 export interface DevOptions<TBundlerCfg = DefaultBundlerConfig> {
   cwd?: string;
   bundler?: BundlerAdapter<TBundlerCfg>;
@@ -244,7 +240,7 @@ async function prepareInternalFrameworkBuild<
     );
   }
   const mode = options.mode ?? expectedMode;
-  const flags = options.flags ?? createDefaultCliFlags();
+  const flags = options.flags;
   const configuredConfig = await runConfigHooks(userConfig, {
     mode,
     command,
@@ -417,7 +413,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
   options?: DevOptions<TBundlerCfg>,
 ): Promise<void> {
   const cwd = options?.cwd ?? process.cwd();
-  const flags = options?.flags ?? createDefaultCliFlags();
+  const flags = options?.flags;
   process.env.NODE_ENV ??= "development";
   const configuredConfig = await runConfigHooks(userConfig, {
     mode: "development",

@@ -424,7 +424,6 @@ async function createGeneratedPlan(
       mode,
       command: mode === "development" ? "dev" : "build",
       config,
-      flags: {},
       logger: {} as never,
       addWatchFile() {},
     },

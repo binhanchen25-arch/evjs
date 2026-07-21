@@ -372,11 +372,11 @@ describe("prepareFrameworkBuild", () => {
     const plugin: Plugin<Record<string, never>> = {
       name: "reads-cli-flags",
       setup(ctx) {
-        events.push(`setup:${ctx.flags.mock}:${ctx.flags.coverage}`);
+        events.push(`setup:${ctx.flags?.mock}:${ctx.flags?.coverage}`);
         return {
           buildStart(buildCtx) {
             events.push(
-              `buildStart:${buildCtx.flags.mock}:${buildCtx.flags.coverage}`,
+              `buildStart:${buildCtx.flags?.mock}:${buildCtx.flags?.coverage}`,
             );
           },
         };

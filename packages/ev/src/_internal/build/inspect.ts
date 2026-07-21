@@ -39,10 +39,6 @@ import { toProjectPath } from "./utils.js";
 
 const logger = getLogger(["evjs", "ev"]);
 
-function createDefaultCliFlags(): CliFlags {
-  return {};
-}
-
 export interface InspectFrameworkBuildOptions<
   TBundlerCfg = DefaultBundlerConfig,
 > {
@@ -178,7 +174,7 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
     );
   }
   const mode = options.mode ?? expectedMode;
-  const flags = options.flags ?? createDefaultCliFlags();
+  const flags = options.flags;
   const diagnostics: InspectDiagnostic[] = [];
   let pageRouteDiscovery: PageRouteDiscovery | undefined;
 

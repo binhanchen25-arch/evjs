@@ -181,7 +181,7 @@ export interface EvPluginConfigContext {
   /** The current working directory. */
   cwd: string;
   /** Extra CLI flags made available to plugins. */
-  flags: CliFlags;
+  flags?: CliFlags;
 }
 
 /**
@@ -318,7 +318,7 @@ export interface EvPluginContext<TBundlerCfg = DefaultBundlerConfig> {
   /** The fully resolved framework config. */
   config: ResolvedConfig<TBundlerCfg>;
   /** Extra CLI flags made available to plugins. */
-  flags: CliFlags;
+  flags?: CliFlags;
 }
 
 /**

@@ -368,7 +368,6 @@ function createPluginContext(
       plugins: [],
       ...config,
     } as never,
-    flags: {},
     logger: {} as never,
     addWatchFile(file) {
       watched.push(file);
