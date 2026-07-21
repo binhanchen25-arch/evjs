@@ -44,12 +44,6 @@ export function parseCliContext(args: readonly string[]): CliContext {
       setFlag(flags, name, coerceFlagValue(rawFlag.slice(equalsIndex + 1)));
       continue;
     }
-
-    if (rawFlag.startsWith("no-")) {
-      setFlag(flags, toFlagName(rawFlag.slice(3)), false);
-      continue;
-    }
-
     const nextArg = args[index + 1];
     if (nextArg && !nextArg.startsWith("-")) {
       setFlag(flags, toFlagName(rawFlag), coerceFlagValue(nextArg));
