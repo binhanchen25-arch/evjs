@@ -12,7 +12,7 @@ import {
   resolveBundlerConfig,
   resolveConfig,
 } from "../../config/index.js";
-import type { PluginContext } from "../../plugin/index.js";
+import type { CliContext, PluginContext } from "../../plugin/index.js";
 import { analyzeAndMaterializeFrameworkIR } from "./analyze-and-materialize.js";
 import type { BundlerAdapter } from "./bundler.js";
 import { withActiveBundler } from "./bundler-config.js";
@@ -39,10 +39,15 @@ import { toProjectPath } from "./utils.js";
 
 const logger = getLogger(["evjs", "ev"]);
 
+function createDefaultCliContext(): CliContext {
+  return { flags: {} };
+}
+
 export interface InspectFrameworkBuildOptions<
   TBundlerCfg = DefaultBundlerConfig,
 > {
   cwd?: string;
+  cli?: CliContext;
   mode?: "development" | "production";
   command?: "dev" | "build";
   bundler?: BundlerAdapter<TBundlerCfg>;
@@ -173,6 +178,7 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
     );
   }
   const mode = options.mode ?? expectedMode;
+  const cli = options.cli ?? createDefaultCliContext();
   const diagnostics: InspectDiagnostic[] = [];
   let pageRouteDiscovery: PageRouteDiscovery | undefined;
 
@@ -180,6 +186,7 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
     mode,
     command,
     cwd,
+    cli,
   });
   const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
@@ -273,6 +280,7 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
     command,
     cwd,
     config,
+    cli,
     logger,
     addWatchFile(file) {
       pluginWatchFiles.add(path.resolve(cwd, file));

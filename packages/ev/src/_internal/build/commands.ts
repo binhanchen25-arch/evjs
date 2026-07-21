@@ -17,6 +17,7 @@ import {
   resolveConfig,
 } from "../../config/index.js";
 import {
+  type CliContext,
   createBuildResult,
   type PluginContext,
   type PluginHooks,
@@ -63,9 +64,14 @@ const logger = getLogger(["evjs", "ev"]);
 const DEV_PAGE_RENDER_PROXY_HEADER = "x-evjs-dev-page-render";
 const DEV_DIST_DIR = "dist";
 
+function createDefaultCliContext(): CliContext {
+  return { flags: {} };
+}
+
 export interface DevOptions<TBundlerCfg = DefaultBundlerConfig> {
   cwd?: string;
   bundler?: BundlerAdapter<TBundlerCfg>;
+  cli?: CliContext;
   loadConfig?: (
     cwd: string,
   ) =>
@@ -77,12 +83,14 @@ export interface DevOptions<TBundlerCfg = DefaultBundlerConfig> {
 export interface BuildOptions<TBundlerCfg = DefaultBundlerConfig> {
   cwd?: string;
   bundler?: BundlerAdapter<TBundlerCfg>;
+  cli?: CliContext;
 }
 
 export interface PrepareFrameworkBuildOptions<
   TBundlerCfg = DefaultBundlerConfig,
 > {
   cwd?: string;
+  cli?: CliContext;
   mode?: "development" | "production";
   command?: "dev" | "build";
   bundler?: BundlerAdapter<TBundlerCfg>;
@@ -236,10 +244,12 @@ async function prepareInternalFrameworkBuild<
     );
   }
   const mode = options.mode ?? expectedMode;
+  const cli = options.cli ?? createDefaultCliContext();
   const configuredConfig = await runConfigHooks(userConfig, {
     mode,
     command,
     cwd,
+    cli,
   });
   const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
@@ -279,6 +289,7 @@ async function prepareInternalFrameworkBuild<
     command,
     cwd,
     config,
+    cli,
     logger,
     addWatchFile(file) {
       pluginWatchFiles.add(path.resolve(cwd, file));
@@ -406,11 +417,13 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
   options?: DevOptions<TBundlerCfg>,
 ): Promise<void> {
   const cwd = options?.cwd ?? process.cwd();
+  const cli = options?.cli ?? createDefaultCliContext();
   process.env.NODE_ENV ??= "development";
   const configuredConfig = await runConfigHooks(userConfig, {
     mode: "development",
     command: "dev",
     cwd,
+    cli,
   });
   const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
@@ -443,6 +456,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
     command: "dev",
     cwd,
     config: activeConfig,
+    cli,
     logger,
     addWatchFile,
   };
@@ -585,6 +599,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
       mode: "development",
       command: "dev",
       cwd,
+      cli,
     });
     const nextPageResolvedConfig = await withPageRoutingDefaults(
       resolveConfig(nextConfiguredConfig),
@@ -853,6 +868,7 @@ export async function build<TBundlerCfg = DefaultBundlerConfig>(
     mode: "production",
     command: "build",
     bundler: options?.bundler,
+    cli: options?.cli,
     requireBundler: true,
   });
   const bundler = prepared.config.bundler;

@@ -180,6 +180,8 @@ export interface EvPluginConfigContext {
   mode: "development" | "production";
   /** The current working directory. */
   cwd: string;
+  /** CLI arguments made available to plugins. */
+  cli: CliContext;
 }
 
 /**
@@ -315,6 +317,8 @@ export interface EvPluginContext<TBundlerCfg = DefaultBundlerConfig> {
   cwd: string;
   /** The fully resolved framework config. */
   config: ResolvedConfig<TBundlerCfg>;
+  /** CLI arguments made available to plugins. */
+  cli: CliContext;
 }
 
 /**
@@ -328,6 +332,12 @@ export interface PluginContext<TBundlerCfg = DefaultBundlerConfig>
   logger: Logger;
   /** Adds an extra framework-level watch file in dev mode. */
   addWatchFile(file: string): void;
+}
+
+export type CliFlagValue = boolean | string | Array<boolean | string>;
+
+export interface CliContext {
+  flags: Record<string, CliFlagValue>;
 }
 
 /** Read-only framework IR snapshot exposed to contribution hooks. */
