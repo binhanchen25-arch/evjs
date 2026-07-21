@@ -1,4 +1,4 @@
-import type { CliFlags, CliFlagValue } from "@evjs/ev/plugin";
+import type { CliFlagValue, CliFlags } from "@evjs/ev/plugin";
 
 /** Converts dash-separated CLI flag names to camelCase context keys. */
 function toFlagName(rawName: string): string {
