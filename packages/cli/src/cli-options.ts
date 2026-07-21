@@ -1,17 +1,20 @@
 import type { CliContext, CliFlagValue } from "@evjs/ev/plugin";
 
+/** Converts dash-separated CLI flag names to camelCase context keys. */
 function toFlagName(rawName: string): string {
   return rawName.replace(/-([a-zA-Z0-9])/g, (_, char: string) =>
     char.toUpperCase(),
   );
 }
 
+/** Converts boolean-like flag values while preserving other strings. */
 function coerceFlagValue(value: string): boolean | string {
   if (value === "true") return true;
   if (value === "false") return false;
   return value;
 }
 
+/** Stores a flag value, preserving repeated flags as an ordered array. */
 function setFlag(
   flags: Record<string, CliFlagValue>,
   name: string,
@@ -27,6 +30,13 @@ function setFlag(
   }
 }
 
+/**
+ * Parses extra command arguments into the plugin CLI context.
+ *
+ * Supports boolean flags (`--mock`), equals values (`--target=local`),
+ * space-separated values (`--target local`), camelCase keys for dashed names,
+ * and repeated flags as arrays.
+ */
 export function parseCliContext(args: readonly string[]): CliContext {
   const flags: CliContext["flags"] = {};
 
