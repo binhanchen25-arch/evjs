@@ -142,6 +142,7 @@ describe("resolveConfig", () => {
       command: "build",
       cwd: process.cwd(),
       config,
+      cli: { flags: {} },
       logger: getLogger(["evjs", "test"]),
       addWatchFile() {},
     });
