@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { configure, getConsoleSink, getLogger } from "@logtape/logtape";
 import { Command } from "commander";
+import { parseCliFlags } from "./cli-options.js";
 import type { DefaultBundlerConfig } from "./index.js";
 import { build, dev, prepare } from "./index.js";
 import {
@@ -58,12 +59,14 @@ const logger = getLogger(["evjs", "cli"]);
 program
   .command("dev")
   .description("Start development server")
-  .action(async () => {
+  .allowUnknownOption(true)
+  .action(async (_options: unknown, command: Command) => {
     const cwd = process.cwd();
+    const flags = parseCliFlags(command.args);
     const { loadConfig } = await import("./load-config.js");
     const config = await loadConfig<DefaultBundlerConfig>(cwd);
     try {
-      await dev(config ?? undefined, { cwd });
+      await dev(config ?? undefined, { cwd, flags });
     } catch (err) {
       logger.error`Failed to start dev server: ${err}`;
       process.exit(1);
@@ -73,12 +76,14 @@ program
 program
   .command("build")
   .description("Build project for production")
-  .action(async () => {
+  .allowUnknownOption(true)
+  .action(async (_options: unknown, command: Command) => {
     const cwd = process.cwd();
+    const flags = parseCliFlags(command.args);
     const { loadConfig } = await import("./load-config.js");
     const config = await loadConfig<DefaultBundlerConfig>(cwd);
     try {
-      await build(config ?? undefined, { cwd });
+      await build(config ?? undefined, { cwd, flags });
     } catch (err) {
       logger.error`Build failed: ${err}`;
       process.exit(1);
@@ -88,12 +93,14 @@ program
 program
   .command("prepare")
   .description("Generate .ev framework IR without running a bundler")
-  .action(async () => {
+  .allowUnknownOption(true)
+  .action(async (_options: unknown, command: Command) => {
     const cwd = process.cwd();
+    const flags = parseCliFlags(command.args);
     const { loadConfig } = await import("./load-config.js");
     const config = await loadConfig<DefaultBundlerConfig>(cwd);
     try {
-      await prepare(config ?? undefined, { cwd });
+      await prepare(config ?? undefined, { cwd, flags });
     } catch (err) {
       logger.error`Prepare failed: ${err}`;
       process.exit(1);

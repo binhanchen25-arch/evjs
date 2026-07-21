@@ -366,6 +366,40 @@ describe("prepareFrameworkBuild", () => {
     ]);
   });
 
+  it("exposes CLI flags to plugin setup and lifecycle hooks", async () => {
+    const cwd = await createProject();
+    const events: string[] = [];
+    const plugin: Plugin<Record<string, never>> = {
+      name: "reads-cli-flags",
+      setup(ctx) {
+        events.push(`setup:${ctx.flags?.mock}:${ctx.flags?.coverage}`);
+        return {
+          buildStart(buildCtx) {
+            events.push(
+              `buildStart:${buildCtx.flags?.mock}:${buildCtx.flags?.coverage}`,
+            );
+          },
+        };
+      },
+    };
+
+    await prepareFrameworkBuild(
+      {
+        output: { client: "dist" },
+        plugins: [plugin],
+      },
+      {
+        cwd,
+        flags: {
+          mock: true,
+          coverage: true,
+        },
+      },
+    );
+
+    expect(events).toEqual(["setup:true:true", "buildStart:true:true"]);
+  });
+
   it("rolls back earlier plugin setups when a later setup fails", async () => {
     const cwd = await createProject();
     const events: string[] = [];

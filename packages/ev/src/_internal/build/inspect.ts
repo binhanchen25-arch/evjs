@@ -12,7 +12,7 @@ import {
   resolveBundlerConfig,
   resolveConfig,
 } from "../../config/index.js";
-import type { PluginContext } from "../../plugin/index.js";
+import type { CliFlags, PluginContext } from "../../plugin/index.js";
 import { analyzeAndMaterializeFrameworkIR } from "./analyze-and-materialize.js";
 import type { BundlerAdapter } from "./bundler.js";
 import { withActiveBundler } from "./bundler-config.js";
@@ -43,6 +43,7 @@ export interface InspectFrameworkBuildOptions<
   TBundlerCfg = DefaultBundlerConfig,
 > {
   cwd?: string;
+  flags?: CliFlags;
   mode?: "development" | "production";
   command?: "dev" | "build";
   bundler?: BundlerAdapter<TBundlerCfg>;
@@ -173,6 +174,7 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
     );
   }
   const mode = options.mode ?? expectedMode;
+  const flags = options.flags;
   const diagnostics: InspectDiagnostic[] = [];
   let pageRouteDiscovery: PageRouteDiscovery | undefined;
 
@@ -180,6 +182,7 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
     mode,
     command,
     cwd,
+    flags,
   });
   const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
@@ -273,6 +276,7 @@ export async function inspectFrameworkBuild<TBundlerCfg = DefaultBundlerConfig>(
     command,
     cwd,
     config,
+    flags,
     logger,
     addWatchFile(file) {
       pluginWatchFiles.add(path.resolve(cwd, file));

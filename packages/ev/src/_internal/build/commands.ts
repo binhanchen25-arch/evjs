@@ -17,6 +17,7 @@ import {
   resolveConfig,
 } from "../../config/index.js";
 import {
+  type CliFlags,
   createBuildResult,
   type PluginContext,
   type PluginHooks,
@@ -66,6 +67,7 @@ const DEV_DIST_DIR = "dist";
 export interface DevOptions<TBundlerCfg = DefaultBundlerConfig> {
   cwd?: string;
   bundler?: BundlerAdapter<TBundlerCfg>;
+  flags?: CliFlags;
   loadConfig?: (
     cwd: string,
   ) =>
@@ -77,12 +79,14 @@ export interface DevOptions<TBundlerCfg = DefaultBundlerConfig> {
 export interface BuildOptions<TBundlerCfg = DefaultBundlerConfig> {
   cwd?: string;
   bundler?: BundlerAdapter<TBundlerCfg>;
+  flags?: CliFlags;
 }
 
 export interface PrepareFrameworkBuildOptions<
   TBundlerCfg = DefaultBundlerConfig,
 > {
   cwd?: string;
+  flags?: CliFlags;
   mode?: "development" | "production";
   command?: "dev" | "build";
   bundler?: BundlerAdapter<TBundlerCfg>;
@@ -236,10 +240,12 @@ async function prepareInternalFrameworkBuild<
     );
   }
   const mode = options.mode ?? expectedMode;
+  const flags = options.flags;
   const configuredConfig = await runConfigHooks(userConfig, {
     mode,
     command,
     cwd,
+    flags,
   });
   const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
@@ -279,6 +285,7 @@ async function prepareInternalFrameworkBuild<
     command,
     cwd,
     config,
+    flags,
     logger,
     addWatchFile(file) {
       pluginWatchFiles.add(path.resolve(cwd, file));
@@ -406,11 +413,13 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
   options?: DevOptions<TBundlerCfg>,
 ): Promise<void> {
   const cwd = options?.cwd ?? process.cwd();
+  const flags = options?.flags;
   process.env.NODE_ENV ??= "development";
   const configuredConfig = await runConfigHooks(userConfig, {
     mode: "development",
     command: "dev",
     cwd,
+    flags,
   });
   const pageResolvedConfig = await withPageRoutingDefaults(
     resolveConfig(configuredConfig),
@@ -443,6 +452,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
     command: "dev",
     cwd,
     config: activeConfig,
+    flags,
     logger,
     addWatchFile,
   };
@@ -585,6 +595,7 @@ export async function dev<TBundlerCfg = DefaultBundlerConfig>(
       mode: "development",
       command: "dev",
       cwd,
+      flags,
     });
     const nextPageResolvedConfig = await withPageRoutingDefaults(
       resolveConfig(nextConfiguredConfig),
@@ -853,6 +864,7 @@ export async function build<TBundlerCfg = DefaultBundlerConfig>(
     mode: "production",
     command: "build",
     bundler: options?.bundler,
+    flags: options?.flags,
     requireBundler: true,
   });
   const bundler = prepared.config.bundler;
