@@ -1,3 +1,4 @@
+export type * from "./host.js";
 export type * from "./manifest.js";
 export {
   assertFrameworkManifestShape,

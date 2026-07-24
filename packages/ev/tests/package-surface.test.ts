@@ -297,7 +297,7 @@ const expectedPackageExportSubpaths = {
   "@evjs/plugin-qiankun": [".", "./runtime"],
   "@evjs/bundler-utoopack": ["."],
   "@evjs/bundler-webpack": ["."],
-  "@evjs/build-core": [".", "./manifest"],
+  "@evjs/build-core": [".", "./host", "./manifest"],
   "@evjs/shared": [".", "./manifest"],
 } as const satisfies Record<PackageName, readonly string[]>;
 

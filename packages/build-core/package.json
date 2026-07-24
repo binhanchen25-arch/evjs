@@ -13,6 +13,11 @@
       "import": "./esm/index.js",
       "default": "./esm/index.js"
     },
+    "./host": {
+      "types": "./esm/host.d.ts",
+      "import": "./esm/host.js",
+      "default": "./esm/host.js"
+    },
     "./manifest": {
       "types": "./esm/manifest.d.ts",
       "import": "./esm/manifest.js",
