@@ -29,6 +29,7 @@ const packageDistribution = {
   "@evjs/plugin-qiankun": { dir: "plugin-qiankun", role: "plugin" },
   "@evjs/bundler-utoopack": { dir: "bundler-utoopack", role: "adapter" },
   "@evjs/bundler-webpack": { dir: "bundler-webpack", role: "adapter" },
+  "@evjs/build-core": { dir: "build-core", role: "contract" },
   "@evjs/shared": { dir: "shared", role: "contract" },
 } as const;
 
@@ -67,6 +68,7 @@ const expectedPublishedFiles = {
   "@evjs/plugin-qiankun": ["esm"],
   "@evjs/bundler-utoopack": ["esm"],
   "@evjs/bundler-webpack": ["esm"],
+  "@evjs/build-core": ["esm"],
   "@evjs/shared": ["esm"],
 } as const satisfies Record<PackageName, readonly string[]>;
 
@@ -110,6 +112,11 @@ const expectedPrimaryPackageExports = {
     import: "./esm/index.js",
     default: "./esm/index.js",
   },
+  "@evjs/build-core": {
+    types: "./esm/index.d.ts",
+    import: "./esm/index.js",
+    default: "./esm/index.js",
+  },
   "@evjs/shared": {
     types: "./esm/index.d.ts",
     import: "./esm/index.js",
@@ -126,6 +133,7 @@ const expectedInternalRuntimeDependencies = {
   "@evjs/plugin-qiankun": ["@evjs/ev"],
   "@evjs/bundler-utoopack": ["@evjs/ev"],
   "@evjs/bundler-webpack": ["@evjs/ev"],
+  "@evjs/build-core": ["@evjs/shared"],
   "@evjs/shared": [],
 } as const satisfies Record<PackageName, readonly string[]>;
 
@@ -289,6 +297,7 @@ const expectedPackageExportSubpaths = {
   "@evjs/plugin-qiankun": [".", "./runtime"],
   "@evjs/bundler-utoopack": ["."],
   "@evjs/bundler-webpack": ["."],
+  "@evjs/build-core": [".", "./manifest"],
   "@evjs/shared": [".", "./manifest"],
 } as const satisfies Record<PackageName, readonly string[]>;
 

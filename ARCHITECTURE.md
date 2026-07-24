@@ -27,10 +27,11 @@ src/pages + src/apis + src/middleware.ts + ev.config.ts
   -> DeploymentMetadata / lightweight manifests / deployment adapters
 ```
 
-Framework semantics are owned by `@evjs/ev` and `@evjs/shared/manifest`.
-Bundlers own module graphs, chunks, assets, dev HMR, and stats. Runtime packages
-consume generated runtime contracts rather than `BuildOutput` or manifest
-artifacts.
+Framework orchestration is owned by `@evjs/ev`, shared build contracts are
+published from `@evjs/build-core`, and low-level manifest schemas/linkers remain
+available from `@evjs/shared/manifest`. Bundlers own module graphs, chunks,
+assets, dev HMR, and stats. Runtime packages consume generated runtime
+contracts rather than `BuildOutput` or manifest artifacts.
 
 ## Package Shape
 
@@ -48,6 +49,11 @@ artifacts.
   composition/control plane for config, plugins, graph analysis, build
   planning, HTML, capability validation, deployment helpers, and bundler
   adapter contracts, plus curated file-convention authoring subpaths
+
+@evjs/build-core
+  shared framework build contracts for hosts and adapters; initially re-exports
+  AppGraph, BuildPlan, BuildOutput, route resolution, deployment projections,
+  and BuildOutput linking without Node host behavior
 
 @evjs/shared
   runtime shared helpers and @evjs/shared/manifest schemas/linkers
@@ -82,9 +88,11 @@ Plugin authoring details, including generated contribution types and the public
 framework IR view, live under `@evjs/ev/plugin`; plugin packages should not
 import `@evjs/ev/_internal/*`.
 Other packages are tooling, bundler adapters, or shared contracts for framework
-packages. When a new capability needs a boundary, prefer adding a subpath export
-to the package that owns the behavior before creating another distributed
-package.
+packages. `@evjs/build-core` is the shared build-contract boundary for Node and
+Browser Sandbox hosts; it must not absorb config loading, filesystem access,
+process management, dev servers, or concrete bundler execution. When a new
+capability needs a boundary, prefer adding a subpath export to the package that
+owns the behavior before creating another distributed package.
 `@evjs/plugin-qiankun` is an explicit plugin-package boundary for qiankun
 micro-frontend integration because it carries an optional third-party runtime
 dependency and generated bridge behavior that should not become part of the
@@ -97,7 +105,8 @@ Internal `@evjs/*` runtime dependencies are kept explicit and workspace-local.
 `@evjs/ev` consumes `@evjs/client`, `@evjs/server`, and shared contracts so
 file-convention apps can install one framework package while generated code
 still reaches the runtime cores. `@evjs/server` consumes `@evjs/client` for
-shared runtime types.
+shared runtime types. `@evjs/build-core` consumes only `@evjs/shared` so it can
+stay host-neutral.
 `@evjs/cli` owns the default Utoopack adapter dependency, and bundler adapters
 depend on `@evjs/ev` instead of depending on each other. Internal runtime
 dependency versions stay `"*"` in source manifests for workspace development,
@@ -119,6 +128,9 @@ downstream tooling; the repo's CLI and adapters use `@evjs/ev/_internal/build`.
 Manifest contracts are exported from `@evjs/shared/manifest`, and generated page/shell/server-function
 runtime primitives stay behind focused generated-only
 `@evjs/ev/_internal/*` subpaths.
+Host-neutral build-contract exports are also available from
+`@evjs/build-core` and `@evjs/build-core/manifest`; Node-only build tools stay
+under `@evjs/ev`.
 
 Before bundling, evjs writes `.ev` as the generated framework IR. It contains
 framework graph/plan snapshots, generated entry facades, plugin generated

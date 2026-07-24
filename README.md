@@ -61,11 +61,13 @@ loaders for real bundler transforms.
 | [`@evjs/create-app`](./packages/create-app) | Project scaffolding (`npx @evjs/create-app`) |
 | [`@evjs/client`](./packages/client) | Standalone/manual browser runtime core |
 | [`@evjs/server`](./packages/server) | Standalone/manual server runtime core for Hono/fetch apps and route primitives |
+| [`@evjs/build-core`](./packages/build-core) | Host-neutral build contracts for framework hosts and adapters |
 | [`examples/`](./examples) | Starter templates |
 
-Internal modules such as manifest schemas, build tools, page runtime, and shell
-live inside the public packages above instead of separate application-facing
-packages. Application code imports framework composition APIs from `@evjs/ev`
+Internal modules such as Node build tools, page runtime, and shell live inside
+the public packages above instead of separate application-facing packages.
+Shared graph/plan/output contracts are available from `@evjs/build-core` for
+framework tooling. Application code imports framework composition APIs from `@evjs/ev`
 and file-convention authoring APIs from `@evjs/ev/route`, `@evjs/ev/navigation`,
 `@evjs/ev/query`, `@evjs/ev/server-context`, or `@evjs/ev/transport`. `@evjs/client` and `@evjs/server` remain independent
 standalone/manual runtime packages for apps that intentionally own those

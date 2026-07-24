@@ -129,8 +129,9 @@ The `@evjs/ev/*` subpaths are curated around evjs file-convention authoring
 semantics. They are not mirrors of `@evjs/client` or `@evjs/server`, which are
 lower-level standalone/manual runtime packages.
 Use `@evjs/cli` and `@evjs/create-app` as tools, not application imports.
-Bundler adapters such as `@evjs/bundler-utoopack` and shared contract modules
-such as `@evjs/shared` are only for custom framework tooling or adapter work.
+Bundler adapters such as `@evjs/bundler-utoopack`, host-neutral build contracts
+such as `@evjs/build-core`, and shared contract modules such as `@evjs/shared`
+are only for custom framework tooling or adapter work.
 
 Generated framework code resolves client and server runtime internals through
 `@evjs/ev/_internal/*`, so ordinary file-convention apps do not install

@@ -63,7 +63,8 @@ creating another distributed package.
 ```
 
 `@evjs/cli` and `@evjs/create-app` are distribution tooling. Bundler adapters
-stay in `@evjs/bundler-utoopack` and `@evjs/bundler-webpack`, and shared
+stay in `@evjs/bundler-utoopack` and `@evjs/bundler-webpack`, shared
+host-neutral build contracts live in `@evjs/build-core`, and low-level
 runtime/manifest contracts stay in `@evjs/shared`. `@evjs/ev` decides which
 runtime capabilities can be composed in one app through config resolution,
 graph analysis, build-plan generation, and manifest validation; the runtime
@@ -79,6 +80,7 @@ declaration model; use `src/apis` for framework-managed server routes.
 | Tooling | `@evjs/cli`, `@evjs/create-app` | Install or execute them; application modules should not import them. |
 | Micro-frontend plugins | `@evjs/plugin-qiankun` | Configure it from `ev.config.ts` when an app intentionally participates in a qiankun master/slave topology. |
 | Bundler adapters | `@evjs/bundler-utoopack`, `@evjs/bundler-webpack` | `@evjs/cli` owns the default Utoopack adapter. Import an adapter directly only when authoring custom tooling. |
+| Shared build contracts | `@evjs/build-core` | Host-neutral graph/plan/output contracts and linking helpers for Node and Browser Sandbox hosts. |
 | Shared contracts | `@evjs/shared` | Published so framework packages share manifest/runtime types; app code should not import it directly. |
 
 ### Import Ownership Principle
@@ -111,6 +113,8 @@ Internal `@evjs/*` runtime dependencies are kept explicit. `@evjs/ev` consumes
 `@evjs/client`, `@evjs/server`, and shared contracts so file-convention apps can
 install one framework package while generated code still reaches the runtime
 cores. `@evjs/server` also consumes `@evjs/client` for shared runtime types.
+`@evjs/build-core` consumes only `@evjs/shared`, keeping it free of Node host
+and runtime package dependencies.
 `@evjs/cli` owns the
 default Utoopack adapter dependency, and bundler adapters depend on `@evjs/ev`
 instead of depending on each other. Internal runtime dependency versions stay
@@ -133,7 +137,8 @@ Do not reintroduce legacy split packages such as `@evjs/build-tools`,
 `@evjs/manifest`, or `@evjs/router-*`. The public `@evjs/ev/build-tools`
 subpath exposes the config loader for downstream tooling; the repo's CLI and
 adapters use `@evjs/ev/_internal/build`. Manifest contracts are exported from
-`@evjs/shared/manifest`.
+`@evjs/shared/manifest`, with host-neutral build-contract re-exports from
+`@evjs/build-core` and `@evjs/build-core/manifest`.
 
 Documentation code examples follow the same package boundary: file-convention
 application examples import from `@evjs/ev`, `@evjs/ev/route`, `@evjs/ev/navigation`, `@evjs/ev/query`,
@@ -150,6 +155,10 @@ import from `@evjs/client` or `@evjs/server`; adapter examples may import
 
 @evjs/shared/manifest
   AppGraph, BuildPlan, BuildOutput, and manifest schemas
+
+@evjs/build-core
+  host-neutral build contract re-exports for AppGraph, BuildPlan, BuildOutput,
+  route resolution, deployment projections, and BuildOutput linking
 
 @evjs/ev generated-only runtime internals
   framework-managed runtime, shell, router-free react-page runtime, transport,

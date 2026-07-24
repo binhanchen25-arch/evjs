@@ -16,6 +16,7 @@
 | --- | --- | --- |
 | `@evjs/cli` | `packages/cli` | CLI binary and programmatic command entrypoints |
 | `@evjs/ev` | `packages/ev` | Config, plugin lifecycle, graph analysis, build planning, HTML, deployment helpers, and bundler adapter contracts |
+| `@evjs/build-core` | `packages/build-core` | Host-neutral build contracts shared by Node and Browser Sandbox hosts |
 | `@evjs/create-app` | `packages/create-app` | Project scaffolding from examples/templates |
 | `@evjs/plugin-qiankun` | `packages/plugin-qiankun` | Optional qiankun master/slave micro-frontend bridge plugin |
 | `@evjs/shared` | `packages/shared` | Runtime shared helpers plus `@evjs/shared/manifest` graph/plan/output schemas |
@@ -24,7 +25,7 @@
 | `@evjs/bundler-utoopack` | `packages/bundler-utoopack` | Default Utoopack adapter; consumes `BuildPlan` and links `BuildOutput` where supported |
 | `@evjs/bundler-webpack` | `packages/bundler-webpack` | Validation/fallback adapter for new architecture features that Utoopack cannot build yet |
 
-`packages/build-tools` and `packages/manifest` no longer exist as public workspace packages. Build-tool helpers live in `packages/ev/src/_internal/build`; downstream tooling that only needs config loading can use `@evjs/ev/build-tools`. Manifest schemas/linkers live under `packages/shared/src/manifest`.
+`packages/build-tools` and `packages/manifest` no longer exist as public workspace packages. Build-tool helpers live in `packages/ev/src/_internal/build`; downstream tooling that only needs config loading can use `@evjs/ev/build-tools`. Manifest schemas/linkers live under `packages/shared/src/manifest`, with host-neutral build-contract re-exports in `packages/build-core`.
 
 ## Core Principles
 
@@ -51,6 +52,9 @@
 @evjs/ev
   -> @evjs/shared
 
+@evjs/build-core
+  -> @evjs/shared
+
 @evjs/bundler-utoopack
   -> @evjs/ev
   -> @utoo/pack
@@ -74,7 +78,8 @@
 Internal `@evjs/*` runtime dependency versions stay `"*"` in source manifests
 for workspace development. Release automation rewrites those dependencies to the
 concrete release version before publishing, so app-facing packages move together
-and adapters depend on `@evjs/ev` instead of on each other.
+and adapters depend on `@evjs/ev` instead of on each other. `@evjs/build-core`
+depends only on `@evjs/shared`; Node host behavior stays in `@evjs/ev`.
 
 ## Coding Rules
 
@@ -96,7 +101,9 @@ and adapters depend on `@evjs/ev` instead of on each other.
    runtime imports use `@evjs/client` and `@evjs/server`. Prefer a subpath
    export on the package that owns the behavior before adding another
    distributed package. Subpath exports stay intentional and documented; do not
-   add convenience aliases.
+   add convenience aliases. Shared build contracts can be exported from
+   `@evjs/build-core`, but config loading, filesystem access, process
+   management, dev servers, and concrete bundler execution stay out of it.
 8. Keep generated page bootstrap, server-function stubs, server runtime
    bootstrap, and shell runtime primitives behind focused generated-only
    `@evjs/ev/_internal/*` subpaths.

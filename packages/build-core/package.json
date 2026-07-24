@@ -1,0 +1,53 @@
+{
+  "name": "@evjs/build-core",
+  "version": "0.0.0",
+  "description": "Shared framework build contracts for evjs hosts and adapters",
+  "type": "module",
+  "types": "./esm/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./esm/index.d.ts",
+      "import": "./esm/index.js",
+      "default": "./esm/index.js"
+    },
+    "./manifest": {
+      "types": "./esm/manifest.d.ts",
+      "import": "./esm/manifest.js",
+      "default": "./esm/manifest.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf esm && tsc",
+    "test": "vitest run",
+    "check-types": "tsc --noEmit"
+  },
+  "files": [
+    "esm"
+  ],
+  "homepage": "https://github.com/afx-team/evjs#readme",
+  "bugs": {
+    "url": "https://github.com/afx-team/evjs/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/afx-team/evjs.git"
+  },
+  "license": "MIT",
+  "author": "xusd320",
+  "dependencies": {
+    "@evjs/shared": "*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  },
+  "keywords": [
+    "evjs",
+    "build",
+    "framework",
+    "manifest",
+    "contracts"
+  ]
+}
