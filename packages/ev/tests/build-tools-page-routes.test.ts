@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { BuildHost } from "@evjs/build-core/host";
 import { afterEach, describe, expect, it } from "vitest";
 import { discoverPageRoutes } from "../src/_internal/build/index.js";
 import {
@@ -1986,6 +1987,38 @@ describe("discoverPageRoutes", () => {
       }),
     ]);
   });
+
+  it("discovers SPA page routes from a build host", async () => {
+    const host = createMemoryPageRouteHost("/project", {
+      "src/layout/index.tsx": "export default function Root() { return null; }",
+      "src/pages/index.tsx": "export default function Home() { return null; }",
+      "src/pages/about.tsx": "export default function About() { return null; }",
+    });
+
+    const discovery = await discoverPageRoutes("/project", {
+      dir: "./src/pages",
+      host,
+    });
+
+    expect(discovery.rootModule).toBe("./src/layout/index.tsx");
+    expect(discovery.routes).toEqual([
+      {
+        id: "index",
+        path: "/",
+        module: "./src/pages/index.tsx",
+      },
+      {
+        id: "about",
+        path: "/about",
+        module: "./src/pages/about.tsx",
+      },
+    ]);
+    expect(discovery.files).toEqual([
+      "/project/src/pages/about.tsx",
+      "/project/src/pages/index.tsx",
+    ]);
+    expect(discovery.diagnostics).toEqual([]);
+  });
 });
 
 async function createFixture(files: Record<string, string>) {
@@ -1999,4 +2032,140 @@ async function createFixture(files: Record<string, string>) {
   }
 
   return dir;
+}
+
+function createMemoryPageRouteHost(
+  root: string,
+  files: Record<string, string>,
+): BuildHost {
+  const normalizedRoot = path.posix.resolve("/", root);
+  const fileMap = new Map(
+    Object.entries(files).map(([file, source]) => [
+      path.posix.resolve(normalizedRoot, file),
+      source,
+    ]),
+  );
+
+  const normalize = (file: string) => path.posix.normalize(file);
+  const stat = (file: string) => {
+    const normalized = normalize(file);
+    if (fileMap.has(normalized)) {
+      return {
+        type: "file" as const,
+        size: fileMap.get(normalized)?.length ?? 0,
+      };
+    }
+    const directoryPrefix = normalized.endsWith("/")
+      ? normalized
+      : `${normalized}/`;
+    for (const absolute of fileMap.keys()) {
+      if (absolute.startsWith(directoryPrefix)) {
+        return { type: "directory" as const };
+      }
+    }
+    return undefined;
+  };
+
+  return {
+    kind: "browser",
+    root: normalizedRoot,
+    capabilities: {
+      filesystem: "virtual",
+      modules: "none",
+      parser: "none",
+      watch: "none",
+      bundler: "none",
+      serverRuntime: "none",
+    },
+    fs: {
+      async readFile(file) {
+        const normalized = normalize(file);
+        const source = fileMap.get(normalized);
+        if (source === undefined) {
+          const error = new Error(`ENOENT: no such file, open '${file}'`);
+          (error as NodeJS.ErrnoException).code = "ENOENT";
+          throw error;
+        }
+        return source;
+      },
+      async writeFile() {
+        throw new Error("memory page route host is read-only");
+      },
+      async exists(file) {
+        return stat(file) !== undefined;
+      },
+      async stat(file) {
+        return stat(file);
+      },
+      async readDir(dir) {
+        const normalized = normalize(dir);
+        const directoryPrefix = normalized.endsWith("/")
+          ? normalized
+          : `${normalized}/`;
+        const entries = new Map<string, "file" | "directory">();
+        for (const absolute of fileMap.keys()) {
+          if (!absolute.startsWith(directoryPrefix)) continue;
+          const relative = absolute.slice(directoryPrefix.length);
+          const [name, child] = relative.split("/");
+          if (!name) continue;
+          entries.set(name, child ? "directory" : "file");
+        }
+        return [...entries]
+          .map(([name, type]) => ({ name, type }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      },
+      async walk(dir) {
+        const normalized = normalize(dir);
+        const directoryPrefix = normalized.endsWith("/")
+          ? normalized
+          : `${normalized}/`;
+        return [...fileMap.keys()].filter((file) =>
+          file.startsWith(directoryPrefix),
+        );
+      },
+      async remove() {
+        throw new Error("memory page route host is read-only");
+      },
+    },
+    path: {
+      resolve: (...parts) => path.posix.resolve(...parts),
+      join: (...parts) => path.posix.join(...parts),
+      relative: (from, to) => path.posix.relative(from, to),
+      dirname: (file) => path.posix.dirname(file),
+      basename: (file) => path.posix.basename(file),
+      extname: (file) => path.posix.extname(file),
+      isAbsolute: (file) => path.posix.isAbsolute(file),
+      normalize,
+      toPosix: normalize,
+      toProjectPath(file) {
+        const relative = path.posix.relative(normalizedRoot, file);
+        return relative ? `./${relative}` : ".";
+      },
+      isInsideRoot(file) {
+        const relative = path.posix.relative(normalizedRoot, file);
+        return (
+          relative === "" || (!relative.startsWith("../") && relative !== "..")
+        );
+      },
+    },
+    parser: {
+      parseModule(source) {
+        return { source };
+      },
+      formatParseError(error) {
+        return String(error);
+      },
+    },
+    modules: {
+      async resolve() {
+        return undefined;
+      },
+      async load() {
+        throw new Error("memory page route host cannot load modules");
+      },
+    },
+    diagnostics: {
+      report() {},
+    },
+  };
 }

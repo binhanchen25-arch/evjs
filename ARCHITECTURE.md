@@ -102,11 +102,12 @@ Subpath exports stay explicit and documented; adding a new package export is a
 public API decision, not a convenience alias.
 
 Internal `@evjs/*` runtime dependencies are kept explicit and workspace-local.
-`@evjs/ev` consumes `@evjs/client`, `@evjs/server`, and shared contracts so
-file-convention apps can install one framework package while generated code
-still reaches the runtime cores. `@evjs/server` consumes `@evjs/client` for
-shared runtime types. `@evjs/build-core` consumes only `@evjs/shared` so it can
-stay host-neutral.
+`@evjs/ev` consumes `@evjs/build-core`, `@evjs/client`, `@evjs/server`, and
+shared contracts so file-convention apps can install one framework package
+while generated code still reaches the runtime cores and build orchestration can
+target host-neutral contracts. `@evjs/server` consumes `@evjs/client` for shared
+runtime types. `@evjs/build-core` consumes only `@evjs/shared` so it can stay
+host-neutral.
 `@evjs/cli` owns the default Utoopack adapter dependency, and bundler adapters
 depend on `@evjs/ev` instead of depending on each other. Internal runtime
 dependency versions stay `"*"` in source manifests for workspace development,

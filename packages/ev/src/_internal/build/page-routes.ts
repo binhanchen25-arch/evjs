@@ -1,5 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import type {
+  BuildHost,
+  BuildHostDirectoryEntry,
+  BuildHostFileStat,
+} from "@evjs/build-core/host";
 import type { PageRouteNode } from "@evjs/shared/manifest";
 import {
   findPageRouteSegmentConventionViolation,
@@ -31,6 +36,7 @@ import {
 
 export interface DiscoverPageRoutesOptions {
   dir: string;
+  host?: BuildHost;
   mode?: "spa" | "mpa";
   rootLayout?: boolean | string;
   spaConventions?: boolean;
@@ -54,10 +60,11 @@ export async function discoverPageRoutes(
   cwd: string,
   options: DiscoverPageRoutesOptions,
 ): Promise<PageRouteDiscovery> {
-  const absoluteDir = path.resolve(cwd, options.dir);
+  const routeHost = createPageRouteRuntimeHost(cwd, options.host);
+  const absoluteDir = routeHost.path.resolve(cwd, options.dir);
   const diagnostics: PageRouteDiscoveryDiagnostic[] = [];
   const validDirectory = await validatePageRouteDirectory(
-    cwd,
+    routeHost,
     absoluteDir,
     options.required === true,
     diagnostics,
@@ -70,7 +77,7 @@ export async function discoverPageRoutes(
     };
   }
 
-  const { files } = await collectPageRouteTree(cwd, absoluteDir);
+  const { files } = await collectPageRouteTree(routeHost, absoluteDir);
   const routeCandidates: PageRouteCandidate[] = [];
   const layoutCandidatesBySegments = new Map<string, PageRouteCandidate>();
   const errorModulesBySegments = new Map<string, PageRouteConventionModule>();
@@ -87,8 +94,10 @@ export async function discoverPageRoutes(
   const allowCatchAll = options.mode !== "mpa";
 
   for (const file of files) {
-    const sourceRel = toProjectPath(cwd, file);
-    const routeRel = toPosixPath(path.relative(absoluteDir, file));
+    const sourceRel = routeHost.path.toProjectPath(file);
+    const routeRel = routeHost.path.toPosix(
+      routeHost.path.relative(absoluteDir, file),
+    );
     const conventionFile = spaConventions
       ? parsePageRouteConventionFile(routeRel)
       : undefined;
@@ -107,6 +116,7 @@ export async function discoverPageRoutes(
       }
 
       const validConventionModule = await validatePageRouteConventionModule(
+        routeHost,
         file,
         conventionFile.kind,
         diagnostics,
@@ -159,10 +169,15 @@ export async function discoverPageRoutes(
         continue;
       }
 
-      const validRouteModule = await validateRouteModule(file, diagnostics, {
-        file: sourceRel,
-        parseError: "Layout route module could not be parsed",
-      });
+      const validRouteModule = await validateRouteModule(
+        routeHost,
+        file,
+        diagnostics,
+        {
+          file: sourceRel,
+          parseError: "Layout route module could not be parsed",
+        },
+      );
       if (!validRouteModule) continue;
 
       const routePath = routePathFromSegments(layoutFile.segments);
@@ -213,11 +228,16 @@ export async function discoverPageRoutes(
     }
 
     const routePath = routePathFromSegments(routeFile.segments);
-    const validRouteModule = await validateRouteModule(file, diagnostics, {
-      file: sourceRel,
-      parseError: "Page route module could not be parsed",
-      missingDefaultExport: createPageRouteDefaultExportDiagnostic(),
-    });
+    const validRouteModule = await validateRouteModule(
+      routeHost,
+      file,
+      diagnostics,
+      {
+        file: sourceRel,
+        parseError: "Page route module could not be parsed",
+        missingDefaultExport: createPageRouteDefaultExportDiagnostic(),
+      },
+    );
     if (!validRouteModule) continue;
 
     const previous = routeByPath.get(routePath);
@@ -262,7 +282,7 @@ export async function discoverPageRoutes(
 
     const html =
       options.mode === "mpa"
-        ? await findColocatedPageHtmlTemplate(cwd, file)
+        ? await findColocatedPageHtmlTemplate(routeHost, file)
         : undefined;
 
     routeById.set(routeId, { file: sourceRel, path: routePath });
@@ -290,8 +310,13 @@ export async function discoverPageRoutes(
   if (hasRouteCandidate && options.rootLayout !== false) {
     rootModule =
       typeof options.rootLayout === "string"
-        ? await discoverExplicitRootLayout(cwd, options.rootLayout, diagnostics)
-        : await discoverRootLayout(cwd, absoluteDir, diagnostics);
+        ? await discoverExplicitRootLayout(
+            routeHost,
+            cwd,
+            options.rootLayout,
+            diagnostics,
+          )
+        : await discoverRootLayout(routeHost, absoluteDir, diagnostics);
   }
 
   return {
@@ -321,14 +346,111 @@ export async function discoverPageRoutes(
   };
 }
 
-async function validatePageRouteDirectory(
+interface PageRouteRuntimeHost {
+  readonly fs: {
+    readFile(file: string): Promise<string>;
+    stat(file: string): Promise<PageRouteRuntimeFileStat | undefined>;
+    readDir(dir: string): Promise<PageRouteRuntimeDirectoryEntry[]>;
+  };
+  readonly path: {
+    resolve(...parts: string[]): string;
+    join(...parts: string[]): string;
+    relative(from: string, to: string): string;
+    dirname(file: string): string;
+    basename(file: string): string;
+    extname(file: string): string;
+    toPosix(file: string): string;
+    toProjectPath(file: string): string;
+    isInsideRoot(file: string): boolean;
+  };
+}
+
+interface PageRouteRuntimeFileStat {
+  isFile(): boolean;
+  isDirectory(): boolean;
+}
+
+interface PageRouteRuntimeDirectoryEntry {
+  readonly name: string;
+  isFile(): boolean;
+  isDirectory(): boolean;
+}
+
+function createPageRouteRuntimeHost(
   cwd: string,
+  host?: BuildHost,
+): PageRouteRuntimeHost {
+  if (host) {
+    return {
+      fs: {
+        readFile: (file) => host.fs.readFile(file),
+        stat: async (file) =>
+          toPageRouteRuntimeFileStat(await host.fs.stat(file)),
+        readDir: async (dir) =>
+          (await host.fs.readDir(dir)).map(toPageRouteRuntimeDirectoryEntry),
+      },
+      path: {
+        resolve: (...parts) => host.path.resolve(...parts),
+        join: (...parts) => host.path.join(...parts),
+        relative: (from, to) => host.path.relative(from, to),
+        dirname: (file) => host.path.dirname(file),
+        basename: (file) => host.path.basename(file),
+        extname: (file) => host.path.extname(file),
+        toPosix: (file) => host.path.toPosix(file),
+        toProjectPath: (file) => host.path.toProjectPath(file),
+        isInsideRoot: (file) => host.path.isInsideRoot(file),
+      },
+    };
+  }
+
+  return {
+    fs: {
+      readFile: (file) => fs.readFile(file, "utf-8"),
+      stat: async (file) => fs.stat(file),
+      readDir: async (dir) => fs.readdir(dir, { withFileTypes: true }),
+    },
+    path: {
+      resolve: (...parts) => path.resolve(...parts),
+      join: (...parts) => path.join(...parts),
+      relative: (from, to) => path.relative(from, to),
+      dirname: (file) => path.dirname(file),
+      basename: (file) => path.basename(file),
+      extname: (file) => path.extname(file),
+      toPosix: toPosixPath,
+      toProjectPath: (file) => toProjectPath(cwd, file),
+      isInsideRoot: (file) => isInsideCwd(cwd, file),
+    },
+  };
+}
+
+function toPageRouteRuntimeFileStat(
+  stat: BuildHostFileStat | undefined,
+): PageRouteRuntimeFileStat | undefined {
+  if (!stat) return undefined;
+  return {
+    isFile: () => stat.type === "file",
+    isDirectory: () => stat.type === "directory",
+  };
+}
+
+function toPageRouteRuntimeDirectoryEntry(
+  entry: BuildHostDirectoryEntry,
+): PageRouteRuntimeDirectoryEntry {
+  return {
+    name: entry.name,
+    isFile: () => entry.type === "file",
+    isDirectory: () => entry.type === "directory",
+  };
+}
+
+async function validatePageRouteDirectory(
+  routeHost: PageRouteRuntimeHost,
   absoluteRouteDir: string,
   required: boolean,
   diagnostics: PageRouteDiscoveryDiagnostic[],
 ): Promise<boolean> {
-  const expected = toProjectPath(cwd, absoluteRouteDir);
-  if (!isInsideCwd(cwd, absoluteRouteDir)) {
+  const expected = routeHost.path.toProjectPath(absoluteRouteDir);
+  if (!routeHost.path.isInsideRoot(absoluteRouteDir)) {
     if (required) {
       diagnostics.push({
         level: "error",
@@ -339,11 +461,8 @@ async function validatePageRouteDirectory(
     return false;
   }
 
-  let stat: import("node:fs").Stats;
-  try {
-    stat = await fs.stat(absoluteRouteDir);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  const stat = await statIfExists(routeHost, absoluteRouteDir);
+  if (!stat) {
     if (required) {
       diagnostics.push({
         level: "error",
@@ -514,12 +633,13 @@ function createPageRouteNotFoundBoundaryDefaultExportDiagnostic(): string {
 }
 
 async function validatePageRouteConventionModule(
+  routeHost: PageRouteRuntimeHost,
   absolute: string,
   kind: PageRouteConventionFile["kind"],
   diagnostics: PageRouteDiscoveryDiagnostic[],
   sourceRel: string,
 ): Promise<boolean> {
-  return validateRouteModule(absolute, diagnostics, {
+  return validateRouteModule(routeHost, absolute, diagnostics, {
     file: sourceRel,
     parseError:
       kind === "error"
@@ -577,13 +697,14 @@ function formatPageRouteConventionScope(segments: string[]): string {
 }
 
 async function discoverExplicitRootLayout(
+  routeHost: PageRouteRuntimeHost,
   cwd: string,
   layout: string,
   diagnostics: PageRouteDiscoveryDiagnostic[],
 ): Promise<string | undefined> {
-  const absolute = path.resolve(cwd, layout);
-  const expected = toProjectPath(cwd, absolute);
-  if (!isInsideCwd(cwd, absolute)) {
+  const absolute = routeHost.path.resolve(cwd, layout);
+  const expected = routeHost.path.toProjectPath(absolute);
+  if (!routeHost.path.isInsideRoot(absolute)) {
     diagnostics.push({
       level: "error",
       file: layout,
@@ -592,11 +713,8 @@ async function discoverExplicitRootLayout(
     return undefined;
   }
 
-  let stat: import("node:fs").Stats;
-  try {
-    stat = await fs.stat(absolute);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  const stat = await statIfExists(routeHost, absolute);
+  if (!stat) {
     diagnostics.push({
       level: "error",
       file: toDiagnosticPath(expected),
@@ -612,7 +730,7 @@ async function discoverExplicitRootLayout(
     });
     return undefined;
   }
-  if (!isPageRouteSourceModuleFile(path.basename(absolute))) {
+  if (!isPageRouteSourceModuleFile(routeHost.path.basename(absolute))) {
     diagnostics.push({
       level: "error",
       file: toDiagnosticPath(expected),
@@ -621,46 +739,53 @@ async function discoverExplicitRootLayout(
     return undefined;
   }
 
-  const validRootLayout = await validateRouteModule(absolute, diagnostics, {
-    file: expected,
-    parseError: "Root layout module could not be parsed",
-    missingDefaultExport: createRootLayoutDefaultExportDiagnostic(),
-  });
+  const validRootLayout = await validateRouteModule(
+    routeHost,
+    absolute,
+    diagnostics,
+    {
+      file: expected,
+      parseError: "Root layout module could not be parsed",
+      missingDefaultExport: createRootLayoutDefaultExportDiagnostic(),
+    },
+  );
   return validRootLayout ? expected : undefined;
 }
 
 async function discoverRootLayout(
-  cwd: string,
+  routeHost: PageRouteRuntimeHost,
   absoluteRouteDir: string,
   diagnostics: PageRouteDiscoveryDiagnostic[],
 ): Promise<string | undefined> {
-  const appDir = path.dirname(absoluteRouteDir);
-  if (!isInsideCwd(cwd, appDir)) return undefined;
+  const appDir = routeHost.path.dirname(absoluteRouteDir);
+  if (!routeHost.path.isInsideRoot(appDir)) return undefined;
 
   let hasUnsupportedRootLayout = false;
   for (const layoutFile of PAGE_ROUTE_UNSUPPORTED_ROOT_LAYOUT_FILES) {
-    const absolute = path.join(appDir, layoutFile);
-    const stat = await statIfExists(absolute);
+    const absolute = routeHost.path.join(appDir, layoutFile);
+    const stat = await statIfExists(routeHost, absolute);
     if (!stat) continue;
-    const projectPath = toProjectPath(cwd, absolute);
+    const projectPath = routeHost.path.toProjectPath(absolute);
     hasUnsupportedRootLayout = true;
     diagnostics.push({
       level: "error",
       file: toDiagnosticPath(projectPath),
       message: createUnsupportedRootLayoutDiagnostic(
         projectPath,
-        toProjectPath(cwd, path.join(appDir, PAGE_ROUTE_ROOT_LAYOUT_FILE)),
+        routeHost.path.toProjectPath(
+          routeHost.path.join(appDir, PAGE_ROUTE_ROOT_LAYOUT_FILE),
+        ),
       ),
     });
   }
 
   if (hasUnsupportedRootLayout) return undefined;
 
-  const absolute = path.join(appDir, PAGE_ROUTE_ROOT_LAYOUT_FILE);
-  const stat = await statIfExists(absolute);
+  const absolute = routeHost.path.join(appDir, PAGE_ROUTE_ROOT_LAYOUT_FILE);
+  const stat = await statIfExists(routeHost, absolute);
   if (!stat) return undefined;
 
-  const projectPath = toProjectPath(cwd, absolute);
+  const projectPath = routeHost.path.toProjectPath(absolute);
   if (!stat.isFile()) {
     diagnostics.push({
       level: "error",
@@ -669,11 +794,16 @@ async function discoverRootLayout(
     });
     return undefined;
   }
-  const validRootLayout = await validateRouteModule(absolute, diagnostics, {
-    file: projectPath,
-    parseError: "Root layout module could not be parsed",
-    missingDefaultExport: createRootLayoutDefaultExportDiagnostic(),
-  });
+  const validRootLayout = await validateRouteModule(
+    routeHost,
+    absolute,
+    diagnostics,
+    {
+      file: projectPath,
+      parseError: "Root layout module could not be parsed",
+      missingDefaultExport: createRootLayoutDefaultExportDiagnostic(),
+    },
+  );
   if (!validRootLayout) return undefined;
   return projectPath;
 }
@@ -686,17 +816,18 @@ function createUnsupportedRootLayoutDiagnostic(
 }
 
 async function findColocatedPageHtmlTemplate(
-  cwd: string,
+  routeHost: PageRouteRuntimeHost,
   routeFile: string,
 ): Promise<string | undefined> {
-  const extension = path.extname(routeFile);
+  const extension = routeHost.path.extname(routeFile);
   const htmlFile = `${routeFile.slice(0, -extension.length)}.html`;
-  const stat = await statIfExists(htmlFile);
+  const stat = await statIfExists(routeHost, htmlFile);
   if (!stat) return undefined;
-  return toProjectPath(cwd, htmlFile);
+  return routeHost.path.toProjectPath(htmlFile);
 }
 
 async function validateRouteModule(
+  routeHost: PageRouteRuntimeHost,
   absolute: string,
   diagnostics: PageRouteDiscoveryDiagnostic[],
   messages: {
@@ -705,7 +836,7 @@ async function validateRouteModule(
     missingDefaultExport?: string;
   },
 ): Promise<boolean> {
-  const source = await fs.readFile(absolute, "utf-8");
+  const source = await routeHost.fs.readFile(absolute);
   const { ast, error } = parseRouteModuleWithError(source);
   const file = toDiagnosticPath(messages.file);
 
@@ -735,24 +866,24 @@ interface PageRouteTree {
 }
 
 async function collectPageRouteTree(
-  cwd: string,
+  routeHost: PageRouteRuntimeHost,
   dir: string,
 ): Promise<PageRouteTree> {
   const files: string[] = [];
 
   async function visit(current: string) {
-    let entries: import("node:fs").Dirent[];
+    let entries: PageRouteRuntimeDirectoryEntry[];
     try {
-      entries = await fs.readdir(current, { withFileTypes: true });
+      entries = await routeHost.fs.readDir(current);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") return;
+      if (isNoEntryError(err)) return;
       throw err;
     }
 
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;
-      const absolute = path.join(current, entry.name);
-      if (!isInsideCwd(cwd, absolute)) continue;
+      const absolute = routeHost.path.join(current, entry.name);
+      if (!routeHost.path.isInsideRoot(absolute)) continue;
 
       if (entry.isDirectory()) {
         await visit(absolute);
@@ -788,12 +919,17 @@ function toDiagnosticPath(projectPath: string): string {
 }
 
 async function statIfExists(
+  routeHost: PageRouteRuntimeHost,
   file: string,
-): Promise<import("node:fs").Stats | undefined> {
+): Promise<PageRouteRuntimeFileStat | undefined> {
   try {
-    return await fs.stat(file);
+    return await routeHost.fs.stat(file);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    if (isNoEntryError(err)) return undefined;
     throw err;
   }
+}
+
+function isNoEntryError(err: unknown): boolean {
+  return (err as NodeJS.ErrnoException).code === "ENOENT";
 }

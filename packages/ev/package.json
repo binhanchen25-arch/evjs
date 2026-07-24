@@ -148,6 +148,7 @@
   "license": "MIT",
   "author": "xusd320",
   "dependencies": {
+    "@evjs/build-core": "*",
     "@evjs/client": "*",
     "@evjs/server": "*",
     "@evjs/shared": "*",

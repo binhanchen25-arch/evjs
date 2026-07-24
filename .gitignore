@@ -9,6 +9,8 @@ packages/shared/esm
 packages/client/esm
 packages/server/esm
 esm
+!packages/build-core/esm/
+!packages/build-core/esm/**
 .ev
 .evjs
 route-types.d.ts

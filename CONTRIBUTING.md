@@ -50,6 +50,9 @@
   -> @evjs/bundler-utoopack
 
 @evjs/ev
+  -> @evjs/build-core
+  -> @evjs/client
+  -> @evjs/server
   -> @evjs/shared
 
 @evjs/build-core
@@ -78,7 +81,8 @@
 Internal `@evjs/*` runtime dependency versions stay `"*"` in source manifests
 for workspace development. Release automation rewrites those dependencies to the
 concrete release version before publishing, so app-facing packages move together
-and adapters depend on `@evjs/ev` instead of on each other. `@evjs/build-core`
+and adapters depend on `@evjs/ev` instead of on each other. `@evjs/ev` may
+consume `@evjs/build-core` for host-neutral contracts, while `@evjs/build-core`
 depends only on `@evjs/shared`; Node host behavior stays in `@evjs/ev`.
 
 ## Coding Rules

@@ -125,7 +125,12 @@ const expectedPrimaryPackageExports = {
 } as const satisfies Record<PackageName, Record<string, string>>;
 
 const expectedInternalRuntimeDependencies = {
-  "@evjs/ev": ["@evjs/client", "@evjs/server", "@evjs/shared"],
+  "@evjs/ev": [
+    "@evjs/build-core",
+    "@evjs/client",
+    "@evjs/server",
+    "@evjs/shared",
+  ],
   "@evjs/client": ["@evjs/shared"],
   "@evjs/server": ["@evjs/shared"],
   "@evjs/cli": ["@evjs/bundler-utoopack", "@evjs/ev"],
@@ -493,6 +498,7 @@ describe("workspace package surface", () => {
       ]),
     );
     expect(evjsRuntimeDependencyNames(evPackageJson)).toEqual([
+      "@evjs/build-core",
       "@evjs/client",
       "@evjs/server",
       "@evjs/shared",

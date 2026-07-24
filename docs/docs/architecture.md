@@ -110,11 +110,12 @@ Subpath exports stay explicit and documented; adding a new package export is a
 public API decision, not a convenience alias.
 
 Internal `@evjs/*` runtime dependencies are kept explicit. `@evjs/ev` consumes
-`@evjs/client`, `@evjs/server`, and shared contracts so file-convention apps can
-install one framework package while generated code still reaches the runtime
-cores. `@evjs/server` also consumes `@evjs/client` for shared runtime types.
-`@evjs/build-core` consumes only `@evjs/shared`, keeping it free of Node host
-and runtime package dependencies.
+`@evjs/build-core`, `@evjs/client`, `@evjs/server`, and shared contracts so
+file-convention apps can install one framework package while generated code
+still reaches the runtime cores and build orchestration can target host-neutral
+contracts. `@evjs/server` also consumes `@evjs/client` for shared runtime types.
+`@evjs/build-core` consumes only `@evjs/shared`, keeping it free of Node host and
+runtime package dependencies.
 `@evjs/cli` owns the
 default Utoopack adapter dependency, and bundler adapters depend on `@evjs/ev`
 instead of depending on each other. Internal runtime dependency versions stay
@@ -157,8 +158,9 @@ import from `@evjs/client` or `@evjs/server`; adapter examples may import
   AppGraph, BuildPlan, BuildOutput, and manifest schemas
 
 @evjs/build-core
-  host-neutral build contract re-exports for AppGraph, BuildPlan, BuildOutput,
-  route resolution, deployment projections, and BuildOutput linking
+  host-neutral BuildHost contracts plus build contract re-exports for AppGraph,
+  BuildPlan, BuildOutput, route resolution, deployment projections, and
+  BuildOutput linking
 
 @evjs/ev generated-only runtime internals
   framework-managed runtime, shell, router-free react-page runtime, transport,
